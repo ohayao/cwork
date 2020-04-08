@@ -4,30 +4,31 @@
 !_TAG_PROGRAM_NAME	Exuberant Ctags	//
 !_TAG_PROGRAM_URL	http://ctags.sourceforge.net	/official site/
 !_TAG_PROGRAM_VERSION	5.6	//
-CA_PATH	./publish.c	15;"	d	file:
-CA_PATH	./subscribe.c	10;"	d	file:
-HOST	./publish.c	13;"	d	file:
-HOST	./subscribe.c	8;"	d	file:
-KEY_STORE	./publish.c	18;"	d	file:
-KEY_STORE	./subscribe.c	13;"	d	file:
-PRIVATE_KEY	./publish.c	17;"	d	file:
-PRIVATE_KEY	./subscribe.c	12;"	d	file:
+CA_PATH	./publish.c	14;"	d	file:
+CA_PATH	./subscribe.c	12;"	d	file:
+HOST	./publish.c	12;"	d	file:
+HOST	./subscribe.c	10;"	d	file:
+KEY_STORE	./publish.c	17;"	d	file:
+KEY_STORE	./subscribe.c	15;"	d	file:
+PRIVATE_KEY	./publish.c	16;"	d	file:
+PRIVATE_KEY	./subscribe.c	14;"	d	file:
 PROTOBUF_C__NO_DEPRECATED	./proto.pb-c.c	6;"	d	file:
 PROTOBUF_C_proto_2eproto__INCLUDED	./proto.pb-c.h	5;"	d
 PROTO__ANSWER__INIT	./proto.pb-c.h	50;"	d
 PROTO__PROTO__BASE_INIT	./proto.pb-c.h	116;"	d
 PROTO__PROTO__INIT	./proto.pb-c.h	118;"	d
 PROTO__QUESTION__INIT	./proto.pb-c.h	36;"	d
-PUBLISH_CLIENT_ID	./publish.c	14;"	d	file:
-PUBLISH_CLIENT_ID	./subscribe.c	9;"	d	file:
+PUBLISH_CLIENT_ID	./publish.c	13;"	d	file:
 Proto__Answer	./proto.pb-c.h	/^typedef struct _Proto__Answer Proto__Answer;$/;"	t	typeref:struct:_Proto__Answer
 Proto__Answer_Closure	./proto.pb-c.h	/^typedef void (*Proto__Answer_Closure)$/;"	t
 Proto__Proto_Service	./proto.pb-c.h	/^typedef struct _Proto__Proto_Service Proto__Proto_Service;$/;"	t	typeref:struct:_Proto__Proto_Service
 Proto__Proto_ServiceDestroy	./proto.pb-c.h	/^typedef void (*Proto__Proto_ServiceDestroy)(Proto__Proto_Service *);$/;"	t
 Proto__Question	./proto.pb-c.h	/^typedef struct _Proto__Question Proto__Question;$/;"	t	typeref:struct:_Proto__Question
 Proto__Question_Closure	./proto.pb-c.h	/^typedef void (*Proto__Question_Closure)$/;"	t
-TRUST_STORE	./publish.c	16;"	d	file:
-TRUST_STORE	./subscribe.c	11;"	d	file:
+SUBSCRIBE_CLIENT_ID	./subscribe.c	11;"	d	file:
+TRUST_STORE	./publish.c	15;"	d	file:
+TRUST_STORE	./subscribe.c	13;"	d	file:
+_PROTO_H_	./proto.h	2;"	d
 _Proto__Answer	./proto.pb-c.h	/^struct  _Proto__Answer$/;"	s
 _Proto__Proto_Service	./proto.pb-c.h	/^struct _Proto__Proto_Service$/;"	s
 _Proto__Question	./proto.pb-c.h	/^struct  _Proto__Question$/;"	s
@@ -71,4 +72,4 @@ util_bindSSLToConnect	./util.h	/^void util_bindSSLToConnect(MQTTClient_connectOp
 util_configConnect	./util.h	/^MQTTClient_connectOptions util_configConnect(int keepAliveInterval,int cleanSession){$/;"	f
 util_configSSL	./util.h	/^MQTTClient_SSLOptions util_configSSL(char *caPath,char *trustStore,char *privateKey,char *keyStore){$/;"	f
 util_initClients	./util.h	/^MQTTClient util_initClients(char *host,char *clientID,int keepAliveInterval,int clearnSession,char *caPath,char *trustStore,char *privateKey,char *keyStore){$/;"	f
-util_sendMessage	./util.h	/^void util_sendMessage(MQTTClient client,char *topic,int qos,void * message){$/;"	f
+util_sendMessage	./util.h	/^int util_sendMessage(MQTTClient client,char *topic,int qos,void * message,int messageLength){$/;"	f
