@@ -17,5 +17,5 @@
 * 窗口运行订阅端 每3秒检查收一次订阅的主题
 * Ctrl+c结束会有残留进程 cliPub
 
-#### 第二阶段 迁移至 paho.mqtt.embedded-c进行通信
+### 第二阶段 迁移至 paho.mqtt.embedded-c进行通信
 - TODO
