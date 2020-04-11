@@ -47,8 +47,8 @@ MQTTClient util_initClients(char *host,char *clientID,int keepAliveInterval,int 
     MQTTClient_SSLOptions ssl=util_configSSL(caPath,trustStore,privateKey,keyStore);
     util_bindSSLToConnect(&opts,&ssl);
 
-    int rc;
-    if((rc=MQTTClient_connect(client,&opts))!=MQTTCLIENT_SUCCESS){
+    int rc = MQTTClient_connect(client,&opts);
+    if(MQTTCLIENT_SUCCESS != rc){
         printf("Connect server error with code[%d]!!!!!!\n",rc);
         return NULL;
     }
