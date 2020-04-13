@@ -1,83 +1,75 @@
-/*********************************************************************
-Author:Li Junshi
-File Decription: Finite State Machine general framework
-File Created Time: 2017-06-23
-Please send email to lijunshi2015@163.com if you have any question.
-*********************************************************************/
-
 #include <stdio.h>
-//#include <windows.h> //windows
 #include <unistd.h>  //linux
 
-//比如我们定义了小明一天的状态如下
 enum
 {
-	GET_UP,
-	GO_TO_SCHOOL,
-	HAVE_LUNCH,
-	DO_HOMEWORK,
-	SLEEP,
+    DONE,
+	CMD_INIT,
+    INITED,
+	CMD_REQ_USERINFO,
+    CMD_UPDATE_USERINFO,
+    CMD_CONNECT_LOCK,
+    CMD_UPDATE_LOCKSTATUS,
+    CMD_UNLOCK,
 };
 
-//我们定义的事件有以下几个
-enum
+
+FsmTable_t IgnSMTable[] =
 {
-	EVENT1 = 1,
-	EVENT2,
-	EVENT3,
-};
+	{  CMD_REQ_USERINFO,        GetUserInfo,        CMD_UPDATE_USERINFO},
+	{  CMD_UPDATE_USERINFO,     DealUserInfo,       CMD_CONNECT_LOCK},
+    {  CMD_CONNECT_LOCK,        ScanLock,           CMD_UPDATE_LOCKSTATUS},
+    {  CMD_UPDATE_LOCKSTATUS,   UpdateLockState,    DONE},
+	{  CMD_UNLOCK,              UnLock,             CMD_UPDATE_LOCKSTATUS},
 
+};
 
 typedef struct FsmTable_s
 {
-	int event;   //事件
-	int CurState;  //当前状态
-	void (*eventActFun)();  //函数指针
-	int NextState;  //下一个状态
+	//int event;
+	int CurState;
+	void (*eventActFun)();
+	int NextState;
 }FsmTable_t;
 
 
 typedef struct FSM_s
 {
-	FsmTable_t* FsmTable;   //指向的状态表
-	int curState;  //FSM当前所处的状态
-
+	FsmTable_t* FsmTable;
+	int curState;
 }FSM_t;
-
 
 int g_max_num;  //状态表里含有的状态个数
 
 
-
-void GetUp()
+void GetUserInfo()
 {
-	// do something
-	printf("xiao ming gets up!\n");
-
+	//send request to server to get userinfo
+	printf("send request to server to get userinfo!\n");
 }
 
-void Go2School()
+void DealUserInfo()
 {
-	// do something
-	printf("xiao ming goes to school!\n");
+	//Recv UserInfo from server 
+	printf("recv userinfo from server!\n");
 }
 
-void HaveLunch()
+void ScanLock()
 {
-	// do something
-	printf("xiao ming has lunch!\n");
+	//Scan and connect with locks
+	printf("scan & connect with locks!\n");
 }
 
-void DoHomework()
+void UpdateLockState()
 {
-	// do something
-	printf("xiao ming does homework!\n");
+	//update lock status to server
+	printf("update lock status to server!\n");
 }
 
-void Go2Bed()
+void UnLock()
 {
-	// do something
-	printf("xiao ming goes to bed!\n");
+	//unlock
+	printf("unlock!\n");
 }
 
 /*状态机注册*/
@@ -132,18 +124,6 @@ void FSM_EventHandle(FSM_t* pFsm, int event)
 		// do nothing
 	}
 }
-
-FsmTable_t XiaoMingTable[] =
-{
-	//{到来的事件，当前的状态，将要要执行的函数，下一个状态}
-	{ EVENT1,  SLEEP,           GetUp,        GET_UP },
-	{ EVENT2,  GET_UP,          Go2School,    GO_TO_SCHOOL },
-	{ EVENT3,  GO_TO_SCHOOL,    HaveLunch,    HAVE_LUNCH },
-	{ EVENT1,  HAVE_LUNCH,      DoHomework,   DO_HOMEWORK },
-	{ EVENT2,  DO_HOMEWORK,     Go2Bed,       SLEEP },
-
-	//add your codes here
-};
 
 //初始化FSM
 void InitFsm(FSM_t* pFsm)
