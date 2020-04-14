@@ -7,6 +7,7 @@
 #include <pthread.h>
 #include <stdarg.h>
 #include <sys/time.h>
+#include <syslog.h>
 
 #include "MQTTClient.h"
 #include "util.h"
@@ -30,7 +31,9 @@ static char LOG_FILE[] = "./log_ign";
 #define LL_VERBOSE 1
 #define LL_NOTICE 2
 #define LL_WARNING 3
+#define LL_ERROR 4
 #define LL_RAW (1<<10) /* Modifier to log without timestamp */
+
 
 /* We use a private localtime implementation which is fork-safe. The logging
  * function of Redis may be called from other threads. */
@@ -242,6 +245,11 @@ static int FSM(MQTTClient_message *msg){
     return 0;
 }
 
+int HeartBeat(){
+    //send MQTT HB to Server
+    return 0;
+}
+
 void RunMQTT(sysinfo_t *si){
     while(1){
         char *topic = NULL;
@@ -254,26 +262,12 @@ void RunMQTT(sysinfo_t *si){
         if(msg){
             //state machine
             FSM(msg);
-            /*
-            if(strcmp(topic,topic_abc)==0){
-                printf("recv [%s:%d][%s]\n",topic,msg->payloadlen,(char*)msg->payload);
-            }else if(strcmp(topic,topic_proto)==0){
-                printf("recv [%s:%d]",topic,msg->payloadlen);
-                Proto__Question* qst = proto_unPackQuestion(msg->payload,msg->payloadlen);
-                if(qst!=NULL){
-                    printf("[topic=%s][tips=%s]",qst->topic,qst->tips);
-                }else{
-                    printf(" pack faild !!!");
-                }
-                printf("\n");
-            }else{
-                printf("recv undefined topic [%s] !!!\n",topic);
-            }
-            */
+            
             MQTTClient_freeMessage(&msg);
             MQTTClient_free(topic);
         } else {
             //err log
+            HeartBeat();
         }
     }
 }
@@ -300,6 +294,10 @@ mutex_type Thread_create_mutex(void)
     //FUNC_ENTRY;
     mutex = malloc(sizeof(pthread_mutex_t));
     int rc = pthread_mutex_init(mutex, NULL);
+    if (0>rc)
+        serverLog(LL_ERROR,"create thread error, rc[%d].", rc);
+    else
+        serverLog(LL_NOTICE,"create thread rc[%d].", rc);
     //FUNC_EXIT_RC(rc);
     return mutex;
 }
