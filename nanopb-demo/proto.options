@@ -1,0 +1,4 @@
+proto.question.topic max_size:100
+proto.question.tips max_size:200
+proto.answer.result max_size:1024
+
