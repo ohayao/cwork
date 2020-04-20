@@ -10,12 +10,12 @@ int main() {
     INIT_LIST_HEAD(&task_head);
 
 
-    InsertTask(&task_head, 1, NULL, NULL, 10);
-    InsertTask(&task_head, 2, NULL, NULL, 9);
-    InsertTask(&task_head, 3, NULL, NULL, 8);
-    InsertTask(&task_head, 4, NULL, NULL, 7);
-    InsertTask(&task_head, 5, NULL, NULL, 6);
-    InsertTask(&task_head, 6, NULL, NULL, 5);
+    InsertTask(&task_head, 1, 10, NULL, NULL);
+    InsertTask(&task_head, 2, 9, NULL, NULL);
+    InsertTask(&task_head, 3, 8, NULL, NULL);
+    InsertTask(&task_head, 4, 7, NULL, NULL);
+    InsertTask(&task_head, 5, 6, NULL, NULL);
+    InsertTask(&task_head, 6, 5, NULL, NULL);
 
     printf("task_head.prev:%x.\n", task_head.prev);
     task_node_t *ptn=NULL;

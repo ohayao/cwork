@@ -6,5 +6,5 @@ list: test_list.c list.h task_queue.h
 	gcc -g -Wall test_list.c  -o list
 
 clean:
-	rm ign list
+	rm ign list log_ign 
 
