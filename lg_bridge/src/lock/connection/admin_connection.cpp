@@ -8,6 +8,8 @@
 #include "messages/AdminConnectionStep2.h"
 #include "messages/AdminConnectionStep3.h"
 #include <stdio.h>
+#include <iostream>
+using namespace std;
 
 int igloohome_ble_lock_crypto_AdminConnection_beginConnection(uint8_t *jKey, int keyLen) 
 {
@@ -18,10 +20,18 @@ int igloohome_ble_lock_crypto_AdminConnection_genConnStep2Native(int connectionI
   uint8_t *jConnectionStep1, int step1Len, uint8_t **retBytes) {
   Connection *connection = getConnection(connectionId);
   if (!connection)
+  {
+    cerr << "!connection" << endl;
     return 0;
+  }
+    
 
   if (!jConnectionStep1)
+  {
+    cerr << "!jConnectionStep1" << endl;
     return 0;
+  }
+    
 
   uint8_t step1Bytes[step1Len];
   memcpy(step1Bytes, jConnectionStep1, step1Len);
@@ -33,6 +43,7 @@ int igloohome_ble_lock_crypto_AdminConnection_genConnStep2Native(int connectionI
   if (step1_err || !ig_AdminConnectionStep1_is_valid(&step1) 
                                         || step1.nonce_size != kNonceLength) {
       ig_AdminConnectionStep1_deinit(&step1);
+      cerr << "step1_err" << endl;
       return 0;
   }
 
@@ -59,6 +70,7 @@ int igloohome_ble_lock_crypto_AdminConnection_genConnStep2Native(int connectionI
   if (err != IgSerializerNoError) {
     ig_AdminConnectionStep1_deinit(&step1);
     ig_AdminConnectionStep2_deinit(&step2);
+    cerr << "ig_AdminConnectionStep2_encode error" << endl;
     return 0;
   }
 
@@ -75,6 +87,7 @@ int igloohome_ble_lock_crypto_AdminConnection_genConnStep2Native(int connectionI
     ig_AdminConnectionStep1_deinit(&step1);
     ig_AdminConnectionStep2_deinit(&step2);
     free(retvalBytes);
+    cerr << "incrementNonce error" << endl;
     return 0;
   }
   ig_AdminConnectionStep1_deinit(&step1);

@@ -91,8 +91,15 @@ struct paired_igm_lock_t {
   {
     lock = lock_;
     paired = paired_;
-    admin_key = admin_key_;
     admin_key_len = admin_key_len_;
+    admin_key = (uint8_t *)calloc(admin_key_len, 1);
+    memcpy(admin_key, admin_key_, admin_key_len); 
+    cout << "paired lock admin key: " << endl;
+		for (int j = 0; j < admin_key_len; j++)
+		{
+			printf("%02x ", admin_key[j]);
+		}
+		printf("\n");
   }
 };
 
@@ -141,6 +148,7 @@ struct admin_connection_t {
 	gatt_connection_t* gatt_connection;
   std::mutex admin_complete_mutex;
   std::condition_variable admin_complete;
+  int connectionID;
   paired_igm_lock_t lock;
   std::mutex admin_step_mutex;
 	ADMIN_STEP admin_step;

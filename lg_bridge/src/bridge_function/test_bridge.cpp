@@ -131,6 +131,7 @@ int save_message_data(
 	// 如果还剩下的空间,不足够庄下, 那么就重新申请一块大一点的.
 	if (size_left < data_length)
 	{
+		cout << "size_left < data_length" << endl;
 		step_max_size = step_max_size + DEFAULT_STEP2_DATA_SIZE;
 		uint8_t *old_data = step_data;
 		step_data = (uint8_t *)malloc(step_max_size);
@@ -144,9 +145,9 @@ int save_message_data(
 	}
 
 	// 空间足够, 直接放下空间里面
-	for (int i = 0; i < data_length; i++) {
+	for (int i = 0; i < data_length; ) {
 		// printf("%02x ", data[i]);
-		step_data[step_cur_size++] = data[i];
+		step_data[step_cur_size++] = data[i++];
 	}
 	// printf("\n");
 
@@ -219,18 +220,19 @@ void *ble_write_pairing_commit(void *arg)
 		cout << "name : " << (connection->lock).name << endl;
 		uint8_t *admin_key;
 		int key_len = igloohome_ble_lock_crypto_PairingConnection_getAdminKeyNative(
-			time(NULL), &admin_key);
-		for (int i = 0; i < key_len; i++)
+			time(NULL), &admin_key);		
+		sp_lock_list->push_back(
+			paired_igm_lock_t(connection->lock, true, admin_key, key_len));
+		cout << "admin key: " << endl;
+		for (int j = 0; j < key_len; j++)
 		{
-			printf("%2x", admin_key[i]);
+			printf("%02x ", admin_key[j]);
 		}
 		printf("\n");
 		if (admin_key)
 		{
 			free(admin_key);
 		}
-		sp_lock_list->push_back(
-			paired_igm_lock_t(connection->lock, true, admin_key, key_len));
 		cout << "g_main_loop_quit connection->properties_changes_loop" << endl;
 		g_main_loop_quit(connection->properties_changes_loop);
 		cout << "g_main_loop_quit connection->properties_changes_loop end" << endl;
@@ -295,8 +297,6 @@ STEP3_EXIT:
 	free(payloadBytes);
 	return NULL;
 }
-
-
 
 int handle_step2_message(
 	connection_t *connection, const uint8_t* data, size_t data_length,
@@ -590,7 +590,6 @@ CONNECTION_EXIT:
 void *ble_admin_write_step2(void *arg)
 {
 	int ret, i;
-	int connectionID;
 	admin_connection_t *connection = (admin_connection_t *)arg;
 	gatt_connection_t* gatt_connection = connection->gatt_connection;
 	char *addr = (connection->lock).lock.addr;
@@ -601,6 +600,7 @@ void *ble_admin_write_step2(void *arg)
 	size_t &n_size_byte = connection->n_size_byte;
 	uint8_t *&admin_key = (connection->lock).admin_key;
 	size_t &admin_key_len = (connection->lock).admin_key_len;
+	int &connectionID = connection->connectionID;
 	uint8_t *step2Bytes;
 	int step2Len;
 	size_t payload_len = 0;
@@ -654,6 +654,10 @@ void *ble_admin_write_step2(void *arg)
 	{
 		cout << "admin write step2 write_char_by_uuid_multi_atts success in writing packages" << endl;
 		admin_step = ConnectionStep2;
+		step_max_size = 0;
+		n_size_byte = 0;
+		free(step_data);
+		step_data = NULL;
 	}
 
 ADMIN_FREE_PAYLOAD:
@@ -664,6 +668,47 @@ ADMIN_FREE_STEP2:
 
 ADMIN_STEP2_EXIT:
 	return NULL;
+}
+
+int handle_admin_step3_message(
+	admin_connection_t *connection, const uint8_t* data, size_t data_length,
+	size_t &step_max_size, size_t &step_cur_size, uint8_t *&step_data,
+  size_t &n_size_byte, ADMIN_STEP &admin_step, 
+  std::mutex &admin_step_mutex
+)
+{
+	cout << "------------------------------debug line-------------------" << endl;
+	cout << "----------------handle_admin_step3_message" << endl;
+	if (admin_step != ConnectionStep2)
+	{
+		cerr << "handle_admin_step1_message admin_step != ConnectionStepNone, error" << endl;
+		return 1;
+	}
+
+	save_message_data(
+		data, data_length, step_max_size, step_cur_size, step_data, 
+		n_size_byte);
+
+	if (step_max_size == step_cur_size)
+	{
+		int ret;
+		cout << "RECV admin_step3 data finished" << endl;
+		// debug
+		for(int j = 0; j < step_max_size; j++)
+		{
+			printf("%02x ", step_data[j]);
+		}
+		printf("\n");
+		admin_step = ConnectionEstablished;
+
+		bool rec_ret = igloohome_ble_lock_crypto_AdminConnection_recConnStep3Native(
+			connection->connectionID, step_data+n_size_byte, step_max_size-n_size_byte
+		);
+		if (!rec_ret){
+			cerr << "igloohome_ble_lock_crypto_AdminConnection_recConnStep3Native err" << endl;
+		}
+		cout << "igloohome_ble_lock_crypto_AdminConnection_recConnStep3Native success" << endl;
+	}
 }
 
 int handle_admin_step1_message(
@@ -702,6 +747,13 @@ int handle_admin_step1_message(
 			free(connection);
 			return 6;
 		}
+		// 清空之前的数据, 表明当前数据已经处理完,不再需要
+		// 不能在这处理, 因为数据还要给write step2用
+		// step_max_size = 0;
+		// step_cur_size = 0;
+		// n_size_byte = 0;
+		// free(step_data);
+		// step_data = NULL;
 	}
 	return 0;
 }
@@ -723,18 +775,32 @@ void admin_message_handler(
 	printf("admin message from ADDR %s\n", addr);
 	printf("admin message Handler: data_length %d \n", data_length);
 	printf("connection->admin_step %d\n", connection->admin_step);
-	for (int j = 0; j < data_length; j++)
-	{
-		printf("%02x ", data[j]);
-	}
 	switch (connection->admin_step)
 	{
 	case ConnectionStepNone:
+	{
 		handle_admin_step1_message(
 			connection, data, data_length, step_max_size, step_cur_size, step_data,
   		n_size_byte, admin_step, admin_step_mutex);
 		break;
-	
+	}
+	case ConnectionStep2:
+	{
+		handle_admin_step3_message(
+			connection, data, data_length, step_max_size, step_cur_size, step_data,
+  		n_size_byte, admin_step, admin_step_mutex);
+		break;
+	}
+	case ConnectionEstablished:
+	{
+		cout << "admin connection Established" << endl;
+		for (int j = 0; j < data_length; j++)
+		{
+			printf("%02x ", data[j]);
+		}
+		printf("\n");
+		break;
+	}
 	default:
 	{	
 		cerr << "admin connection step wrong in admin message handle" << endl;
