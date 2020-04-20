@@ -27,7 +27,7 @@ int beginConnection(ConnectionType type, uint8_t *jKey, int keyLen) {
             connections_[i].connnectionId = i;
             connections_[i].type = type;
             if (keyLen != kConnectionKeyLength) {
-                return -1;
+                return ERROR_CONNECTION_ID;
             }
             memcpy((uint8_t*)(connections_[i].key), jKey, keyLen);
             generateRandomNonce( kNonceLength, (uint8_t*)connections_[i].rxNonce);
@@ -35,7 +35,8 @@ int beginConnection(ConnectionType type, uint8_t *jKey, int keyLen) {
             return i;
         }
     }
-    return -1;
+    printf("beginConnection end\n");
+    return ERROR_CONNECTION_ID;
 }
 
 // void endConnection(JNIEnv *env, jobject pThis, jint connectionId) {

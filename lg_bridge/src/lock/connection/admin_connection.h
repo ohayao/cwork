@@ -1,13 +1,8 @@
-#include "cifra/modes.h"
-#include "cifra/aes.h"
+
 #include <string.h>
 #include <cstring>
-
-#include "encryption.h"
+#include <cstdint>
 #include "connection_common.h"
-#include "messages/AdminConnectionStep1.h"
-#include "messages/AdminConnectionStep2.h"
-#include "messages/AdminConnectionStep3.h"
 
 static const char *kTag = "JNI_admin_connection";
 

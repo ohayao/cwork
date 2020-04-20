@@ -6,6 +6,7 @@
 
 //#ifdef NDEBUG
 #define Log_d(tag, ...)
+#define ERROR_CONNECTION_ID (-1)
 //#else
 //#define Log_d(tag, ...) __android_log_print(ANDROID_LOG_DEBUG, tag, __VA_ARGS__)
 //#endif

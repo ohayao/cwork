@@ -1,5 +1,13 @@
 #include "admin_connection.h"
 
+#include "cifra/modes.h"
+#include "cifra/aes.h"
+#include "encryption.h"
+#include "connection_common.h"
+#include "messages/AdminConnectionStep1.h"
+#include "messages/AdminConnectionStep2.h"
+#include "messages/AdminConnectionStep3.h"
+#include <stdio.h>
 
 int igloohome_ble_lock_crypto_AdminConnection_beginConnection(uint8_t *jKey, int keyLen) 
 {
@@ -10,10 +18,10 @@ int igloohome_ble_lock_crypto_AdminConnection_genConnStep2Native(int connectionI
   uint8_t *jConnectionStep1, int step1Len, uint8_t **retBytes) {
   Connection *connection = getConnection(connectionId);
   if (!connection)
-    return NULL;
+    return 0;
 
   if (!jConnectionStep1)
-    return NULL;
+    return 0;
 
   uint8_t step1Bytes[step1Len];
   memcpy(step1Bytes, jConnectionStep1, step1Len);
@@ -25,10 +33,20 @@ int igloohome_ble_lock_crypto_AdminConnection_genConnStep2Native(int connectionI
   if (step1_err || !ig_AdminConnectionStep1_is_valid(&step1) 
                                         || step1.nonce_size != kNonceLength) {
       ig_AdminConnectionStep1_deinit(&step1);
-      return NULL;
+      return 0;
   }
 
   memcpy(connection->txNonce, step1.nonce, step1.nonce_size);
+  for (int j = 0; j < step1.nonce_size; j++)
+  {
+    printf("%02x ", step1.nonce[j]);
+  }
+  printf("\n");
+  for (int j = 0; j < step1.nonce_size; j++)
+  {
+    printf("%02x ", (connection->txNonce)[j]);
+  }
+  printf("\n");
 
   IgAdminConnectionStep2 step2;
   ig_AdminConnectionStep2_init(&step2);
@@ -41,7 +59,7 @@ int igloohome_ble_lock_crypto_AdminConnection_genConnStep2Native(int connectionI
   if (err != IgSerializerNoError) {
     ig_AdminConnectionStep1_deinit(&step1);
     ig_AdminConnectionStep2_deinit(&step2);
-    return NULL;
+    return 0;
   }
 
   uint32_t retvalMaxLen = encryptDataSize(plaintextLen);
@@ -57,7 +75,7 @@ int igloohome_ble_lock_crypto_AdminConnection_genConnStep2Native(int connectionI
     ig_AdminConnectionStep1_deinit(&step1);
     ig_AdminConnectionStep2_deinit(&step2);
     free(retvalBytes);
-    return NULL;
+    return 0;
   }
   ig_AdminConnectionStep1_deinit(&step1);
   ig_AdminConnectionStep2_deinit(&step2);

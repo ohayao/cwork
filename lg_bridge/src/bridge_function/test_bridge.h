@@ -11,6 +11,7 @@
 #include <gattlib/include/gattlib.h>
 #include <lock/connection/pairing_connection.h>
 #include <ctime>
+#include <lock/connection/admin_connection.h>
 
 using namespace std;
 
@@ -79,14 +80,19 @@ struct igm_lock_t {
 struct paired_igm_lock_t {
   igm_lock_t lock;
   bool paired;
+  uint8_t *admin_key;
+  size_t admin_key_len;
   paired_igm_lock_t()
   {
     paired = false;
   }
-  paired_igm_lock_t(igm_lock_t lock_, bool paired_)
+  paired_igm_lock_t(
+    igm_lock_t lock_, bool paired_, uint8_t *admin_key_, size_t admin_key_len_)
   {
     lock = lock_;
     paired = paired_;
+    admin_key = admin_key_;
+    admin_key_len = admin_key_len_;
   }
 };
 
@@ -121,9 +127,32 @@ struct connection_t {
   GMainLoop *properties_changes_loop;
 };
 
+enum ADMIN_STEP {
+  ConnectionStepNone=0,
+  ConnectionStep1,
+  ConnectionStep2,
+  ConnectionEstablished
+};
+
+
+struct admin_connection_t {
+	pthread_t thread;
+	pthread_t write_thread;
+	gatt_connection_t* gatt_connection;
+  std::mutex admin_complete_mutex;
+  std::condition_variable admin_complete;
+  paired_igm_lock_t lock;
+  std::mutex admin_step_mutex;
+	ADMIN_STEP admin_step;
+  GMainLoop *properties_changes_loop;
+  size_t step_max_size, step_cur_size, n_size_byte;
+  uint8_t *step_data;
+};
+
 static pthread_mutex_t g_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 std::vector<connection_t *> g_ble_connections;
+std::vector<admin_connection_t *> g_admin_connections;
 
 // helper functions
 int write_char_by_uuid_multi_atts (
