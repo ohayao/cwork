@@ -25,13 +25,11 @@ int igloohome_ble_lock_crypto_AdminConnection_genConnStep2Native(int connectionI
     return 0;
   }
     
-
   if (!jConnectionStep1)
   {
     cerr << "!jConnectionStep1" << endl;
     return 0;
   }
-    
 
   uint8_t step1Bytes[step1Len];
   memcpy(step1Bytes, jConnectionStep1, step1Len);
@@ -48,16 +46,6 @@ int igloohome_ble_lock_crypto_AdminConnection_genConnStep2Native(int connectionI
   }
 
   memcpy(connection->txNonce, step1.nonce, step1.nonce_size);
-  for (int j = 0; j < step1.nonce_size; j++)
-  {
-    printf("%02x ", step1.nonce[j]);
-  }
-  printf("\n");
-  for (int j = 0; j < step1.nonce_size; j++)
-  {
-    printf("%02x ", (connection->txNonce)[j]);
-  }
-  printf("\n");
 
   IgAdminConnectionStep2 step2;
   ig_AdminConnectionStep2_init(&step2);
