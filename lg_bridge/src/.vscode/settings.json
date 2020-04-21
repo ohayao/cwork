@@ -1,0 +1,7 @@
+{
+  "files.associations": {
+    "*.inc": "cpp",
+    "uecc_vli.h": "c",
+    "ostream": "cpp"
+  }
+}
