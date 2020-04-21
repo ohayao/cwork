@@ -212,9 +212,11 @@ void WaitMQTT(sysinfo_t *si){
             task_node_t *ptn = NULL;
             ptn = FindTaskByMsgID(msg_id, &waiting_task_head);
             
-            if (NULL!=ptn) //move task_node into doing_list task queue
+            if (NULL!=ptn) {//move task_node into doing_list task queue
                 printf("find task_node.msg_id[%u], current_state[%d].\n", ptn->msg_id, ptn->cur_state);
                 //MoveTask();
+                MoveTask(&ptn->list, &doing_task_head);
+            }
             else {//if not exist, add into task queue
                 printf("find ptn==NULL.\n");
                 InsertTask(&doing_task_head, msg_id, current_state, NULL, NULL);
@@ -289,7 +291,8 @@ int main() {
                 ptn = NextTask(po, &doing_task_head);
                 if (NULL != ptn) {
                     FSMHandle(ptn);
-                    //move ptn to waiting_task_list
+                    //move ptn to waiting_task_head
+                    MoveTask(&ptn->list, &waiting_task_head);
                 }
             }
         }

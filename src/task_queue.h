@@ -15,6 +15,10 @@ void DeleteTask(task_node_t* tn) {
     free(tn);
 }
 
+void MoveTask(list_head_t *list, list_head_t* to_list) {
+    list_move(list, to_list);
+}
+
 int DeleteTaskByMsgID(unsigned int msg_id, list_head_t* plh) {
     list_head_t *pos = NULL;
     task_node_t *pnode = NULL;
