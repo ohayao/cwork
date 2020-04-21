@@ -1,24 +1,12 @@
 #include "list.h"
+#include "ign.h"
 
-typedef struct task_node {
-    struct list_head list;
-	//struct task_node *next;
-	unsigned int msg_id;
-    void * req;
-    void * res;
-    unsigned char current_state;
-}task_node_t;
-
-//LIST_HEAD(task_head);
-//INIT_LIST_HEAD(task_head);
-
-
-void InsertTask(struct list_head* th, unsigned int msg_id, void * req, void *rsp, unsigned char cs) {
+void InsertTask(struct list_head* th, unsigned int msg_id, unsigned char cs, void * p_dataMQTT, void *p_dataBLE) {
 	task_node_t *new_task = (task_node_t *)malloc(sizeof(struct task_node));
     new_task->msg_id = msg_id;
-	new_task->req = req;
-	new_task->res = rsp;
-    new_task->current_state = cs;
+	new_task->dataMQTT = p_dataMQTT;
+	new_task->dataBLE = p_dataBLE;
+    new_task->cur_state = cs;
     list_add(&new_task->list, th);
 }
 
@@ -41,12 +29,15 @@ int DeleteTaskByMsgID(unsigned int msg_id, list_head_t* plh) {
     return -1;
 }
 
-
 task_node_t* NextTask(list_head_t* cur, list_head_t* lh) {
     if (list_is_last(cur, lh))
         return NULL;
     else
         return list_entry(cur->next, task_node_t, list);
+}
+
+int IsEmpty(list_head_t* plh) {
+    return list_empty(plh);
 }
 
 task_node_t* FindTaskByMsgID(unsigned int msg_id, list_head_t* plh) {

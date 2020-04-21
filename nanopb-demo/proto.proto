@@ -1,0 +1,20 @@
+syntax="proto3";
+option optimize_for=LITE_RUNTIME;
+package proto;
+
+service proto{
+	//学习
+	rpc learn(question) returns(answer){};
+}
+
+//提问
+message question{
+	string topic=1;
+	string tips=2;
+}
+
+//回答
+message answer{
+	string result=1;
+	int32 times=2;
+}
