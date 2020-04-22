@@ -32,7 +32,7 @@ enum EventType {
 }
 
 message MsgInfo {
-    uint32 msg_id      = 1; // remove repeated proto3 no supported
+    uint32 msg_id      = 1; // remove required proto3 no supported
     uint32 time        = 2; // remove required ... ...
     EventType       event_type  = 3;
     BridgeEventData bridge_data = 4;
