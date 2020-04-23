@@ -1,3 +1,6 @@
+#ifndef __IGN_LIST__
+#define __IGN_LIST__
+
 //#include <linux/types.h>
 //#include <linux/stddef.h>
 #include "poison.h"
@@ -229,4 +232,4 @@ static inline int list_is_singular(const struct list_head *head)
 	     &pos->member != (head);					\
 	     pos = list_next_entry(pos, member))
 
-
+#endif
