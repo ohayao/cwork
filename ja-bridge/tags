@@ -281,16 +281,16 @@ _UTIL_H_	./mqtt_util.h	2;"	d
 _ign_BridgeEventData	./bridge.pb.h	/^typedef struct _ign_BridgeEventData {$/;"	s
 _ign_BridgeProfile	./bridge.pb.h	/^typedef struct _ign_BridgeProfile {$/;"	s
 _ign_EventType	./bridge.pb.h	/^typedef enum _ign_EventType {$/;"	g
-_ign_EventType_ARRAYSIZE	./bridge.pb.h	85;"	d
-_ign_EventType_MAX	./bridge.pb.h	84;"	d
-_ign_EventType_MIN	./bridge.pb.h	83;"	d
+_ign_EventType_ARRAYSIZE	./bridge.pb.h	86;"	d
+_ign_EventType_MAX	./bridge.pb.h	85;"	d
+_ign_EventType_MIN	./bridge.pb.h	84;"	d
 _ign_LockJob	./bridge.pb.h	/^typedef struct _ign_LockJob {$/;"	s
 _ign_LockLog	./bridge.pb.h	/^typedef struct _ign_LockLog {$/;"	s
 _ign_MsgInfo	./bridge.pb.h	/^typedef struct _ign_MsgInfo {$/;"	s
 _ign_OSType	./bridge.pb.h	/^typedef enum _ign_OSType {$/;"	g
-_ign_OSType_ARRAYSIZE	./bridge.pb.h	89;"	d
-_ign_OSType_MAX	./bridge.pb.h	88;"	d
-_ign_OSType_MIN	./bridge.pb.h	87;"	d
+_ign_OSType_ARRAYSIZE	./bridge.pb.h	90;"	d
+_ign_OSType_MAX	./bridge.pb.h	89;"	d
+_ign_OSType_MIN	./bridge.pb.h	88;"	d
 _ign_ServerEventData	./bridge.pb.h	/^typedef struct _ign_ServerEventData {$/;"	s
 advance_iterator	./pb_common.c	/^static void advance_iterator(pb_field_iter_t *iter)$/;"	f	file:
 allocate_field	./pb_decode.c	/^static bool checkreturn allocate_field(pb_istream_t *stream, void *pData, size_t data_size, size_t array_size)$/;"	f	file:
@@ -353,34 +353,34 @@ has_job	./bridge.pb.h	/^    bool has_job;$/;"	m	struct:_ign_ServerEventData
 has_profile	./bridge.pb.h	/^    bool has_profile;$/;"	m	struct:_ign_BridgeEventData
 has_server_data	./bridge.pb.h	/^    bool has_server_data;$/;"	m	struct:_ign_MsgInfo
 ign_BridgeEventData	./bridge.pb.h	/^} ign_BridgeEventData;$/;"	t	typeref:struct:_ign_BridgeEventData
-ign_BridgeEventData_CALLBACK	./bridge.pb.h	169;"	d
-ign_BridgeEventData_DEFAULT	./bridge.pb.h	170;"	d
-ign_BridgeEventData_FIELDLIST	./bridge.pb.h	165;"	d
-ign_BridgeEventData_bt_ids_tag	./bridge.pb.h	122;"	d
-ign_BridgeEventData_fields	./bridge.pb.h	199;"	d
-ign_BridgeEventData_init_default	./bridge.pb.h	96;"	d
-ign_BridgeEventData_init_zero	./bridge.pb.h	102;"	d
-ign_BridgeEventData_logs_MSGTYPE	./bridge.pb.h	172;"	d
-ign_BridgeEventData_logs_tag	./bridge.pb.h	123;"	d
-ign_BridgeEventData_profile_MSGTYPE	./bridge.pb.h	171;"	d
-ign_BridgeEventData_profile_tag	./bridge.pb.h	121;"	d
+ign_BridgeEventData_CALLBACK	./bridge.pb.h	170;"	d
+ign_BridgeEventData_DEFAULT	./bridge.pb.h	171;"	d
+ign_BridgeEventData_FIELDLIST	./bridge.pb.h	166;"	d
+ign_BridgeEventData_bt_ids_tag	./bridge.pb.h	123;"	d
+ign_BridgeEventData_fields	./bridge.pb.h	200;"	d
+ign_BridgeEventData_init_default	./bridge.pb.h	97;"	d
+ign_BridgeEventData_init_zero	./bridge.pb.h	103;"	d
+ign_BridgeEventData_logs_MSGTYPE	./bridge.pb.h	173;"	d
+ign_BridgeEventData_logs_tag	./bridge.pb.h	124;"	d
+ign_BridgeEventData_profile_MSGTYPE	./bridge.pb.h	172;"	d
+ign_BridgeEventData_profile_tag	./bridge.pb.h	122;"	d
 ign_BridgeProfile	./bridge.pb.h	/^} ign_BridgeProfile;$/;"	t	typeref:struct:_ign_BridgeProfile
-ign_BridgeProfile_CALLBACK	./bridge.pb.h	156;"	d
-ign_BridgeProfile_DEFAULT	./bridge.pb.h	157;"	d
-ign_BridgeProfile_FIELDLIST	./bridge.pb.h	145;"	d
-ign_BridgeProfile_bt_id_tag	./bridge.pb.h	108;"	d
-ign_BridgeProfile_fields	./bridge.pb.h	197;"	d
-ign_BridgeProfile_init_default	./bridge.pb.h	94;"	d
-ign_BridgeProfile_init_zero	./bridge.pb.h	100;"	d
-ign_BridgeProfile_inited_time_tag	./bridge.pb.h	115;"	d
-ign_BridgeProfile_local_ip_tag	./bridge.pb.h	110;"	d
-ign_BridgeProfile_mac_addr_tag	./bridge.pb.h	109;"	d
-ign_BridgeProfile_name_tag	./bridge.pb.h	116;"	d
-ign_BridgeProfile_os_info_tag	./bridge.pb.h	107;"	d
-ign_BridgeProfile_public_ip_tag	./bridge.pb.h	111;"	d
-ign_BridgeProfile_sys_statics_tag	./bridge.pb.h	112;"	d
-ign_BridgeProfile_wifi_signal_tag	./bridge.pb.h	114;"	d
-ign_BridgeProfile_wifi_ssid_tag	./bridge.pb.h	113;"	d
+ign_BridgeProfile_CALLBACK	./bridge.pb.h	157;"	d
+ign_BridgeProfile_DEFAULT	./bridge.pb.h	158;"	d
+ign_BridgeProfile_FIELDLIST	./bridge.pb.h	146;"	d
+ign_BridgeProfile_bt_id_tag	./bridge.pb.h	109;"	d
+ign_BridgeProfile_fields	./bridge.pb.h	198;"	d
+ign_BridgeProfile_init_default	./bridge.pb.h	95;"	d
+ign_BridgeProfile_init_zero	./bridge.pb.h	101;"	d
+ign_BridgeProfile_inited_time_tag	./bridge.pb.h	116;"	d
+ign_BridgeProfile_local_ip_tag	./bridge.pb.h	111;"	d
+ign_BridgeProfile_mac_addr_tag	./bridge.pb.h	110;"	d
+ign_BridgeProfile_name_tag	./bridge.pb.h	117;"	d
+ign_BridgeProfile_os_info_tag	./bridge.pb.h	108;"	d
+ign_BridgeProfile_public_ip_tag	./bridge.pb.h	112;"	d
+ign_BridgeProfile_sys_statics_tag	./bridge.pb.h	113;"	d
+ign_BridgeProfile_wifi_signal_tag	./bridge.pb.h	115;"	d
+ign_BridgeProfile_wifi_ssid_tag	./bridge.pb.h	114;"	d
 ign_EventType	./bridge.pb.h	/^} ign_EventType;$/;"	t	typeref:enum:_ign_EventType
 ign_EventType_GET_JOBS	./bridge.pb.h	/^    ign_EventType_GET_JOBS = 4,$/;"	e	enum:_ign_EventType
 ign_EventType_GET_USER_INFO	./bridge.pb.h	/^    ign_EventType_GET_USER_INFO = 2,$/;"	e	enum:_ign_EventType
@@ -390,52 +390,53 @@ ign_EventType_LOCK_LOG	./bridge.pb.h	/^    ign_EventType_LOCK_LOG = 1,$/;"	e	enu
 ign_EventType_UPDATE_LOCK_STATUS	./bridge.pb.h	/^    ign_EventType_UPDATE_LOCK_STATUS = 3,$/;"	e	enum:_ign_EventType
 ign_EventType_UPDATE_USER_INFO	./bridge.pb.h	/^    ign_EventType_UPDATE_USER_INFO = 128,$/;"	e	enum:_ign_EventType
 ign_LockJob	./bridge.pb.h	/^} ign_LockJob;$/;"	t	typeref:struct:_ign_LockJob
-ign_LockJob_CALLBACK	./bridge.pb.h	177;"	d
-ign_LockJob_DEFAULT	./bridge.pb.h	178;"	d
-ign_LockJob_FIELDLIST	./bridge.pb.h	174;"	d
-ign_LockJob_bt_id_tag	./bridge.pb.h	117;"	d
-ign_LockJob_fields	./bridge.pb.h	200;"	d
-ign_LockJob_init_default	./bridge.pb.h	97;"	d
-ign_LockJob_init_zero	./bridge.pb.h	103;"	d
-ign_LockJob_lock_cmd_tag	./bridge.pb.h	118;"	d
+ign_LockJob_CALLBACK	./bridge.pb.h	178;"	d
+ign_LockJob_DEFAULT	./bridge.pb.h	179;"	d
+ign_LockJob_FIELDLIST	./bridge.pb.h	175;"	d
+ign_LockJob_bt_id_tag	./bridge.pb.h	118;"	d
+ign_LockJob_fields	./bridge.pb.h	201;"	d
+ign_LockJob_init_default	./bridge.pb.h	98;"	d
+ign_LockJob_init_zero	./bridge.pb.h	104;"	d
+ign_LockJob_lock_cmd_tag	./bridge.pb.h	119;"	d
 ign_LockLog	./bridge.pb.h	/^} ign_LockLog;$/;"	t	typeref:struct:_ign_LockLog
-ign_LockLog_CALLBACK	./bridge.pb.h	162;"	d
-ign_LockLog_DEFAULT	./bridge.pb.h	163;"	d
-ign_LockLog_FIELDLIST	./bridge.pb.h	159;"	d
-ign_LockLog_bt_id_tag	./bridge.pb.h	119;"	d
-ign_LockLog_fields	./bridge.pb.h	198;"	d
-ign_LockLog_init_default	./bridge.pb.h	95;"	d
-ign_LockLog_init_zero	./bridge.pb.h	101;"	d
-ign_LockLog_log_data_tag	./bridge.pb.h	120;"	d
+ign_LockLog_CALLBACK	./bridge.pb.h	163;"	d
+ign_LockLog_DEFAULT	./bridge.pb.h	164;"	d
+ign_LockLog_FIELDLIST	./bridge.pb.h	160;"	d
+ign_LockLog_bt_id_tag	./bridge.pb.h	120;"	d
+ign_LockLog_fields	./bridge.pb.h	199;"	d
+ign_LockLog_init_default	./bridge.pb.h	96;"	d
+ign_LockLog_init_zero	./bridge.pb.h	102;"	d
+ign_LockLog_log_data_tag	./bridge.pb.h	121;"	d
+ign_LockLog_size	./bridge.pb.h	207;"	d
 ign_MsgInfo	./bridge.pb.h	/^} ign_MsgInfo;$/;"	t	typeref:struct:_ign_MsgInfo
-ign_MsgInfo_CALLBACK	./bridge.pb.h	140;"	d
-ign_MsgInfo_DEFAULT	./bridge.pb.h	141;"	d
-ign_MsgInfo_FIELDLIST	./bridge.pb.h	134;"	d
-ign_MsgInfo_bridge_data_MSGTYPE	./bridge.pb.h	142;"	d
-ign_MsgInfo_bridge_data_tag	./bridge.pb.h	130;"	d
-ign_MsgInfo_event_type_tag	./bridge.pb.h	129;"	d
-ign_MsgInfo_fields	./bridge.pb.h	196;"	d
-ign_MsgInfo_init_default	./bridge.pb.h	93;"	d
-ign_MsgInfo_init_zero	./bridge.pb.h	99;"	d
-ign_MsgInfo_msg_id_tag	./bridge.pb.h	127;"	d
-ign_MsgInfo_server_data_MSGTYPE	./bridge.pb.h	143;"	d
-ign_MsgInfo_server_data_tag	./bridge.pb.h	131;"	d
-ign_MsgInfo_time_tag	./bridge.pb.h	128;"	d
+ign_MsgInfo_CALLBACK	./bridge.pb.h	141;"	d
+ign_MsgInfo_DEFAULT	./bridge.pb.h	142;"	d
+ign_MsgInfo_FIELDLIST	./bridge.pb.h	135;"	d
+ign_MsgInfo_bridge_data_MSGTYPE	./bridge.pb.h	143;"	d
+ign_MsgInfo_bridge_data_tag	./bridge.pb.h	131;"	d
+ign_MsgInfo_event_type_tag	./bridge.pb.h	130;"	d
+ign_MsgInfo_fields	./bridge.pb.h	197;"	d
+ign_MsgInfo_init_default	./bridge.pb.h	94;"	d
+ign_MsgInfo_init_zero	./bridge.pb.h	100;"	d
+ign_MsgInfo_msg_id_tag	./bridge.pb.h	128;"	d
+ign_MsgInfo_server_data_MSGTYPE	./bridge.pb.h	144;"	d
+ign_MsgInfo_server_data_tag	./bridge.pb.h	132;"	d
+ign_MsgInfo_time_tag	./bridge.pb.h	129;"	d
 ign_OSType	./bridge.pb.h	/^} ign_OSType;$/;"	t	typeref:enum:_ign_OSType
 ign_OSType_LINUX	./bridge.pb.h	/^    ign_OSType_LINUX = 1,$/;"	e	enum:_ign_OSType
 ign_OSType_RTOS	./bridge.pb.h	/^    ign_OSType_RTOS = 2$/;"	e	enum:_ign_OSType
 ign_OSType_Unknow	./bridge.pb.h	/^    ign_OSType_Unknow = 0,$/;"	e	enum:_ign_OSType
 ign_ServerEventData	./bridge.pb.h	/^} ign_ServerEventData;$/;"	t	typeref:struct:_ign_ServerEventData
-ign_ServerEventData_CALLBACK	./bridge.pb.h	184;"	d
-ign_ServerEventData_DEFAULT	./bridge.pb.h	185;"	d
-ign_ServerEventData_FIELDLIST	./bridge.pb.h	180;"	d
-ign_ServerEventData_bt_ids_tag	./bridge.pb.h	124;"	d
-ign_ServerEventData_ekey_tag	./bridge.pb.h	125;"	d
-ign_ServerEventData_fields	./bridge.pb.h	201;"	d
-ign_ServerEventData_init_default	./bridge.pb.h	98;"	d
-ign_ServerEventData_init_zero	./bridge.pb.h	104;"	d
-ign_ServerEventData_job_MSGTYPE	./bridge.pb.h	186;"	d
-ign_ServerEventData_job_tag	./bridge.pb.h	126;"	d
+ign_ServerEventData_CALLBACK	./bridge.pb.h	185;"	d
+ign_ServerEventData_DEFAULT	./bridge.pb.h	186;"	d
+ign_ServerEventData_FIELDLIST	./bridge.pb.h	181;"	d
+ign_ServerEventData_bt_ids_tag	./bridge.pb.h	125;"	d
+ign_ServerEventData_ekey_tag	./bridge.pb.h	126;"	d
+ign_ServerEventData_fields	./bridge.pb.h	202;"	d
+ign_ServerEventData_init_default	./bridge.pb.h	99;"	d
+ign_ServerEventData_init_zero	./bridge.pb.h	105;"	d
+ign_ServerEventData_job_MSGTYPE	./bridge.pb.h	187;"	d
+ign_ServerEventData_job_tag	./bridge.pb.h	127;"	d
 index	./pb.h	/^    pb_size_t index;                 \/* Index of the field *\/$/;"	m	struct:pb_field_iter_s
 inited_time	./bridge.pb.h	/^    uint32_t inited_time;$/;"	m	struct:_ign_BridgeProfile
 initialize_pointer_field	./pb_decode.c	/^static void initialize_pointer_field(void *pItem, pb_field_iter_t *field)$/;"	f	file:
@@ -443,7 +444,7 @@ job	./bridge.pb.h	/^    ign_LockJob job;$/;"	m	struct:_ign_ServerEventData
 load_descriptor_values	./pb_common.c	/^static bool load_descriptor_values(pb_field_iter_t *iter)$/;"	f	file:
 local_ip	./bridge.pb.h	/^    pb_callback_t local_ip;$/;"	m	struct:_ign_BridgeProfile
 lock_cmd	./bridge.pb.h	/^    pb_callback_t lock_cmd;$/;"	m	struct:_ign_LockJob
-log_data	./bridge.pb.h	/^    pb_callback_t log_data;$/;"	m	struct:_ign_LockLog
+log_data	./bridge.pb.h	/^    ign_LockLog_log_data_t log_data;$/;"	m	struct:_ign_LockLog
 logs	./bridge.pb.h	/^    pb_callback_t logs;$/;"	m	struct:_ign_BridgeEventData
 mac_addr	./bridge.pb.h	/^    pb_callback_t mac_addr;$/;"	m	struct:_ign_BridgeProfile
 main	./main.c	/^int main()$/;"	f
@@ -589,6 +590,7 @@ submsg_desc	./pb.h	/^    const pb_msgdesc_t *submsg_desc; \/* For submessage fie
 submsg_info	./pb.h	/^    const pb_msgdesc_t * const * submsg_info;$/;"	m	struct:pb_msgdesc_s
 sys_statics	./bridge.pb.h	/^    pb_callback_t sys_statics;$/;"	m	struct:_ign_BridgeProfile
 tag	./pb.h	/^    pb_size_t tag;                   \/* Tag of current field *\/$/;"	m	struct:pb_field_iter_s
+testSubscribe	./main.c	/^void testSubscribe(){$/;"	f
 time	./bridge.pb.h	/^    uint32_t time;$/;"	m	struct:_ign_MsgInfo
 type	./pb.h	/^    const pb_extension_type_t *type;$/;"	m	struct:pb_extension_s
 type	./pb.h	/^    pb_type_t type;                  \/* Type of current field *\/$/;"	m	struct:pb_field_iter_s

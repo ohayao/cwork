@@ -14,10 +14,10 @@
 
 #define HOST "ssl://aa85fsnk5qn58-ats.iot.ap-southeast-1.amazonaws.com:8883"
 #define PUBLISH_CLIENT_ID "JasonPublishID"
-#define CA_PATH "/root/project/cwbak/igkey/"
-#define TRUST_STORE "/root/project/cwbak/igkey/ca.pem"
-#define PRIVATE_KEY "/root/project/cwbak/igkey/key.pem"
-#define KEY_STORE "/root/project/cwbak/igkey/cert.pem"
+#define CA_PATH "../igkey/"
+#define TRUST_STORE "../igkey/ca.pem"
+#define PRIVATE_KEY "../igkey/key.pem"
+#define KEY_STORE "../igkey/cert.pem"
 
 
 void testSubscribe();
@@ -54,8 +54,11 @@ Over:
 int main()
 {
     pthread_t recv;
-    pthread_create(&recv,NULL,(void *)testSubscribe,NULL);
-    //pthread_join(recv,NULL);
+    int stid=pthread_create(&recv,NULL,(void *)testSubscribe,NULL);
+    if(stid>0){
+        printf("create thread success\n");
+        pthread_join(recv,NULL);    
+    }else printf("create thread error\n");
     printf("Publish start join... ...\n");
     MQTTClient cli=util_initClients(HOST,PUBLISH_CLIENT_ID,60,1,CA_PATH,TRUST_STORE,PRIVATE_KEY,KEY_STORE);
     if(cli==NULL) goto Over;
@@ -86,7 +89,6 @@ int main()
         MQTTClient_yield();
         sleep(10);
     }
-    
 Over:
     if(cli!=NULL){
         MQTTClient_disconnect(cli,0);
