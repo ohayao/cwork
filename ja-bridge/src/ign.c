@@ -175,7 +175,7 @@ int HeartBeat(){
     pb_ostream_t out=pb_ostream_from_buffer(buf,sizeof(buf));
     if(pb_encode(&out,ign_MsgInfo_fields,&hb)){
         size_t len=out.bytes_written;
-        if((publish_result=util_sendMessage(g_sysif.mqtt_c,SUB_TOPIC,1,buf,(int)len))!=MQTTCLIENT_SUCCESS){
+        if((publish_result=util_sendMessage(g_sysif.mqtt_c,PUB_TOPIC,1,buf,(int)len))!=MQTTCLIENT_SUCCESS){
             printf("SEND MQTT HB ERROR WITH CODE[%d]\n",publish_result);
         }else{
             printf("SEND MQTT HB SUCCESS\n");
