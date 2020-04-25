@@ -1,0 +1,7 @@
+{
+  "files.associations": {
+    "gattlib_internal.h": "c",
+    "uuid.h": "c",
+    "memory_resource": "c"
+  }
+}

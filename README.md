@@ -19,3 +19,13 @@
 
 ### 第二阶段 迁移至 paho.mqtt.embedded-c进行通信
 - TODO
+
+### BLE 开发
+编译环境: ubuntu 18.04
+编译工具: cmake
+蓝牙底层: bluez
+使用语言: c++
+编译依赖:
+  libbluetooth-dev (也就是bluez的开发版本, bluez版本5.48, 使用dbus接口)
+
+
