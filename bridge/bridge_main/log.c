@@ -110,8 +110,10 @@ void serverLogRaw(int level, const char *msg) {
     FILE *fp;
     char buf[64];
     int rawmode = (level & LL_RAW);
-    int log_to_stdout = strcmp(LOG_FILE,'\0');
-
+    int log_to_stdout = LOG_FILE =='\0';
+    
+    // debug 
+    log_to_stdout = 1;
     level &= 0xff; /* clear flags */
     //if (level < server.verbosity) return;
 

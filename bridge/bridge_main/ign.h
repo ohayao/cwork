@@ -16,9 +16,6 @@
 #include <bridge/bridge_main/task_queue.h>
 
 
-#define thread_type pthread_t
-#define mutex_type pthread_mutex_t*
-
 // atomic_int g_msg_id;
 
 //LIST_HEAD(task_head);

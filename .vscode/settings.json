@@ -66,6 +66,11 @@
     "stdio.h": "c",
     "adminconnectionstep1.h": "c",
     "pairingcommit.h": "c",
-    "guesttoken.h": "c"
+    "guesttoken.h": "c",
+    "thread_helper.h": "c",
+    "sysinfo.h": "c",
+    "task.h": "c",
+    "list.h": "c",
+    "stdlib.h": "c"
   }
 }

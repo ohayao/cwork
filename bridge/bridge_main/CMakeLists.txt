@@ -1,3 +1,4 @@
+
 set(IGN_DEPENDENCIES
   pthread
 )
@@ -6,6 +7,11 @@ set(IGN_SRCS
   ./log.c
   ./sysinfo.c
   ./task_queue.c
+  ./mutex_helper.c
+  ./bleData.c
+  ./mqttData.c
+  ./task.c
+  ./thread_helper.c
 )
 
 add_executable(ign ${IGN_SRCS})

@@ -14,7 +14,7 @@ void DTask2Waiting(task_node_t* tn);
 // waiting operation
 int IsWEmpty();
 void WTask2Doing(task_node_t* tn);
-void DeleteWTask(task_node_t* tn)
+void DeleteWTask(task_node_t* tn);
 
 // void InsertTask(
 //     struct list_head* th, unsigned int msg_id, unsigned char cs, 

@@ -19,7 +19,6 @@ typedef struct TaskNode {
     unsigned char cur_state;
     sysinfo_t *sysif;
     fsm_table_t *p_sm_table; // 外部数据, 如何保证生命周期? 其实要用weak_ptr模式保证声明周期
-
 }task_node_t;
 
 

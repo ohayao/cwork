@@ -13,8 +13,11 @@
 // #include "task_queue.h"
 #include "ign.h"
 #include "bridge/bridge_main/sysinfo.h"
-#include <bridge/bridge_main/fsm.h>
+// #include <bridge/bridge_main/fsm.h>
 #include <bridge/bridge_main/task.h>
+#include <bridge/bridge_main/thread_helper.h>
+// #include <bridge/bridge_main/mutex_helper.h>
+// #include <bridge/bridge_main/task_queue.h>
 
 
 // LIST_HEAD(waiting_task_head);
@@ -117,7 +120,7 @@ fsm_table_t g_fsm_table[] = {
     // {  CMD_UPDATE_USERINFO,     DealUserInfo,       CMD_CONNECT_LOCK},
     {  CMD_CONNECT_LOCK,        ScanLock,           CMD_UPDATE_LOCKSTATUS},
     {  CMD_UPDATE_LOCKSTATUS,   UpdateLockState,    DONE},
-    {  CMD_UNLOCK,              UnLock,             CMD_UPDATE_LOCKSTATUS},
+    {  CMD_UNLOCK,              UnLock,             CMD_UPDATE_LOCKSTATUS}
 };
 
 
@@ -225,9 +228,9 @@ int WaitBtn(void *arg){
 
 int main() {
     serverLog(LL_NOTICE,"Ready to start.");
-    // sp_g_fsm_table.reset(g_fsm_table);
-    // sp_g_sysinfo.reset(new SysInfo());
+
     //daemon(1, 0);
+    // 有g_sysinfo,还需要这个吗?
     // sysinfo_t *si = (sysinfo_t *)malloc(sizeof(sysinfo_t));
     // sysinfoInit(si);
     //Init for paring
@@ -237,16 +240,25 @@ int main() {
         return -1;
     }*/
 
-    
-    // while(1) {
-    //     //if empty, sleep(0.5);
-    //     //do it , after set into waiting_list
-    //     if (IsEmpty(&doing_task_head)) {
-    //         serverLog(LL_NOTICE,"doing_task_head is empty, ready to sleep.");
-    //         sleep(1);
-    //     } else {
-    //         task_node_t *ptn=NULL;
+    pthread_t mqtt_thread = Thread_start(WaitMQTT, &g_sysif);
+    serverLog(LL_NOTICE,"new thread to WaitMQTT[%u].", mqtt_thread);
+    pthread_t ble_thread = Thread_start(WaitBLE, &g_sysif);
+    serverLog(LL_NOTICE,"new thread to WaitMQTT[%u].", ble_thread);
+    pthread_t bt_thread = Thread_start(WaitBtn, &g_sysif);
+    serverLog(LL_NOTICE,"new thread to WaitMQTT[%u].", bt_thread);
+    while(1) {
+        //if empty, sleep(0.5);
+        //do it , after set into waiting_list
+        if (IsDEmpty()) {
+            serverLog(LL_NOTICE,"doing_task_head is empty, ready to sleep.");
+            sleep(1);
+        } 
+        else {
+        // if doing list has task
+            task_node_t *ptn=NULL;
     //         list_head_t* po=&doing_task_head;
+        // iterate thought the doing list
+        // 如果任务是卡着的呢? 所以这个任务的写法
     //         for(; po != NULL; po = &ptn->list) { 
     //             ptn = NextTask(po, &doing_task_head);
     //             if (NULL != ptn) {
@@ -258,8 +270,8 @@ int main() {
     //                 pthread_mutex_unlock(g_sysif.mutex);
     //             }
     //         }
-    //     }
-    // }
+        }
+    }
 
     return 0;
 }

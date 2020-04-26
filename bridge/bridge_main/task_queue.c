@@ -1,6 +1,7 @@
 #include <bridge/bridge_main/task_queue.h>
 #include <bridge/bridge_main/list.h>
-
+#include <string.h>
+#include <stdlib.h>
 list_head_t waiting_task_head = {&waiting_task_head, &waiting_task_head};
 list_head_t doing_task_head = {&doing_task_head, &doing_task_head};
 int waiting_task_inited = 0;
@@ -22,7 +23,7 @@ int IsDEmpty()
 task_node_t *GetDHeadNode()
 {
   task_node_t *result;
-  if (IsDoingEmpty())
+  if (IsDEmpty())
   {
     return NULL;
   }

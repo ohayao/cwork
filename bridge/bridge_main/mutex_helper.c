@@ -9,9 +9,9 @@ void Thread_destroy_mutex(pthread_mutex_t* mutex)
     //FUNC_EXIT_RC(rc);
 }
 
-pthread_mutex_t* Thread_create_mutex(void)
+pthread_mutex_t *Thread_create_mutex()
 {
-    pthread_mutex_t* mutex = NULL;
+    pthread_mutex_t *mutex = NULL;
 
     //FUNC_ENTRY;
     mutex = (pthread_mutex_t*)malloc(sizeof(pthread_mutex_t));

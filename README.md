@@ -24,15 +24,21 @@
 编译环境: ubuntu 18.04  
 编译工具: cmake  
 蓝牙底层: bluez  
-使用语言: c++  
+使用语言: c
 编译依赖:  
   libbluetooth-dev (也就是bluez的开发版本, bluez版本5.48, 使用dbus接口)   
 
 ### BLE 开发   
 文件组织  
-bridge
-  gattlib
-  lock
-  ble-sdk(test)
+bridge  
+  gattlib  
+    linux下主要的访问gatt的方法, 当前使用dbus  
+  lock  
+    与锁相关的信息  
+  ble-sdk(test)  
+    访问ble的主要子任务的函数  
+  bridge_main  
+    用于管理bridge的进程和任务  
+
 
 
