@@ -59,6 +59,7 @@ int FSMHandle(task_node_t* tn) {
 //     return 0;
 // }
 
+// 首先实现这个扫描的 
 int ScanLock(void* tn) {
 	//Scan and connect with locks
 	printf("scan & connect with locks!\n");
@@ -112,7 +113,8 @@ fsm_table_t g_fsm_table[] = {
     // {  CMD_UPDATE_USERINFO,     DealUserInfo,       CMD_CONNECT_LOCK},
     {  CMD_CONNECT_LOCK,        ScanLock,           CMD_UPDATE_LOCKSTATUS},
     {  CMD_UPDATE_LOCKSTATUS,   UpdateLockState,    DONE},
-    {  CMD_UNLOCK,              UnLock,             CMD_UPDATE_LOCKSTATUS}
+    {  CMD_UNLOCK,              UnLock,             CMD_UPDATE_LOCKSTATUS},
+    { }
 };
 
 

@@ -40,5 +40,8 @@ bridge
   bridge_main  
     用于管理bridge的进程和任务  
 
-
+### 命名:
+  结构体: IGMLock形式, igm_lock_t
+  变量:addr_len 形式
+  函数: updateCachedTime 形式
 

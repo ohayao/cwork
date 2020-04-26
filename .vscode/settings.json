@@ -73,6 +73,8 @@
     "list.h": "c",
     "stdlib.h": "c",
     "ign_constants.h": "c",
-    "mqttdata.h": "c"
+    "mqttdata.h": "c",
+    "pairing_connection.h": "c",
+    "string.h": "c"
   }
 }
