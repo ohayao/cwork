@@ -1,7 +1,7 @@
 #ifndef ANDROIDSDKTESTINGFORIGLOOCHIP_ENCRYPTION_H
 #define ANDROIDSDKTESTINGFORIGLOOCHIP_ENCRYPTION_H
 
-#include <cstdint>
+#include <stdint.h>
 
 const int kNonceLength = 12;
 

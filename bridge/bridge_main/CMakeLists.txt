@@ -2,13 +2,13 @@ set(IGN_DEPENDENCIES
   pthread
 )
 set(IGN_SRCS
-  ./ign.cc
-  ./log.cc
-  ./sysinfo.cc
-  ./task.cc
-  ./mqttData.cc
-  ./sysinfo.cc
-  ./task_queue.cc
+  ./ign.c
+  ./log.c
+  ./sysinfo.c
+  ./task.c
+  ./mqttData.c
+  ./sysinfo.c
+  ./task_queue.c
 
 )
 

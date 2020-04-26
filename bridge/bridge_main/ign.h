@@ -16,7 +16,9 @@
 #include <bridge/bridge_main/log.h>
 #include <bridge/bridge_main/sysinfo.h>
 
-using std::atomic_int;
+
+#define thread_type pthread_t
+#define mutex_type pthread_mutex_t*
 
 // atomic_int g_msg_id;
 

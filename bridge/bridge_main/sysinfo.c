@@ -1,7 +1,7 @@
 #include <bridge/bridge_main/sysinfo.h>
 #include <string.h>
-#include <iostream>
-using namespace std;
+#include <stdio.h>
+
 SysInfo::SysInfo()
 {
   inited = true;

@@ -1,6 +1,6 @@
 #ifndef PAIRING_CONNECTION_H
 #define PAIRING_CONNECTION_H
-#include <cstdint>
+#include <stdint.h>
 #ifdef __cplusplus
 extern "C" {
 #endif

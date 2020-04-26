@@ -2,7 +2,8 @@
 #define ANDROIDSDKTESTINGFORIGLOOCHIP_CONNECTION_COMMON_H
 
 #include "encryption.h"
-#include <cstdint>
+#include <stdint.h>
+#include "stdbool.h"
 
 //#ifdef NDEBUG
 #define Log_d(tag, ...)
@@ -14,20 +15,20 @@
 const int kMaxConnections = 32;
 const int kConnectionKeyLength = 16;
 
-enum ConnectionType {
+typedef enum ConnectionType {
     kConnectionTypeNone,
     kConnectionTypeAdmin,
     kConnectionTypeGuest,
-};
+}ConnectionType;
 
-struct Connection {
+typedef struct Connection {
     bool active;
     int connnectionId;
     ConnectionType type;
     uint8_t txNonce[kNonceLength];
     uint8_t rxNonce[kNonceLength];
     uint8_t key[kConnectionKeyLength];
-};
+}Connection;
 
 // void generateRandomNonce(JNIEnv *env, jbyte *buffer, int nonceLength);
 // int beginConnection(JNIEnv *env, jobject pThis, ConnectionType type, jbyteArray jKey);

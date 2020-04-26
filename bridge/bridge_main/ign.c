@@ -8,8 +8,6 @@
 #include <sys/time.h>
 #include <syslog.h>
 #include <stdlib.h>
-#include <thread>
-#include <memory>
 
 // #include "util.h"
 // #include "task_queue.h"
@@ -127,8 +125,7 @@ fsm_table_t g_fsm_table[] = {
     {  CMD_UPDATE_LOCKSTATUS,   UpdateLockState,    DONE},
     {  CMD_UNLOCK,              UnLock,             CMD_UPDATE_LOCKSTATUS},
 };
-std::shared_ptr<fsm_table_t> sp_g_fsm_table;
-std::shared_ptr<sysinfo_t> sp_g_sysinfo;
+
 
 // void GoExit(sysinfo_t *si) {
 //     //BLE  
@@ -167,7 +164,7 @@ static int FSM(MQTTClient_message *msg){
 //     return 0;
 // }
 
-void WaitMQTT(shared_ptr<SysInfo> sp_ysinfo){
+void WaitMQTT(void *arg){
     while(1){
         sleep(1);
 //         //if (NULL == si->mqtt_c)
@@ -212,7 +209,7 @@ void WaitMQTT(shared_ptr<SysInfo> sp_ysinfo){
     }
 }
 
-int WaitBLE(shared_ptr<SysInfo> sp_ysinfo){
+int WaitBLE(void *arg){
     //Thread_start(wait_BLE, sysinfo)
     for(;;) {
         sleep(1);
@@ -221,7 +218,7 @@ int WaitBLE(shared_ptr<SysInfo> sp_ysinfo){
     return 0;
 }
 
-int WaitBtn(shared_ptr<SysInfo> sp_ysinfo){
+int WaitBtn(void *arg){
     //if btn
     //add Init into doing_list
     for(;;) {
@@ -235,7 +232,7 @@ int WaitBtn(shared_ptr<SysInfo> sp_ysinfo){
 int main() {
     serverLog(LL_NOTICE,"Ready to start.");
     // sp_g_fsm_table.reset(g_fsm_table);
-    sp_g_sysinfo.reset(new SysInfo());
+    // sp_g_sysinfo.reset(new SysInfo());
     //daemon(1, 0);
     // sysinfo_t *si = (sysinfo_t *)malloc(sizeof(sysinfo_t));
     // sysinfoInit(si);

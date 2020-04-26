@@ -15,7 +15,7 @@
 #include "messages/PairingStep4.h"
 #include "messages/PairingCommit.h"
 #include "messages/GuestToken.h"
-
+#include <iostream>
 using namespace std;
 
 static const char *kTag = "JNI_pairing_connection";
