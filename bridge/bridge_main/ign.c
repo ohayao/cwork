@@ -8,52 +8,44 @@
 #include <sys/time.h>
 #include <syslog.h>
 #include <stdlib.h>
-
-// #include "util.h"
-// #include "task_queue.h"
-#include "ign.h"
-#include "bridge/bridge_main/sysinfo.h"
-// #include <bridge/bridge_main/fsm.h>
+#include <bridge/bridge_main/ign_constants.h>
+#include <bridge/bridge_main/log.h>
+#include <bridge/bridge_main/sysinfo.h>
+#include <bridge/bridge_main/ign.h>
 #include <bridge/bridge_main/task.h>
 #include <bridge/bridge_main/thread_helper.h>
-// #include <bridge/bridge_main/mutex_helper.h>
-// #include <bridge/bridge_main/task_queue.h>
-
-
-// LIST_HEAD(waiting_task_head);
-// LIST_HEAD(doing_task_head);
- 
+#include <bridge/bridge_main/mutex_helper.h>
+#include <bridge/bridge_main/task_queue.h>
 
 sysinfo_t g_sysif;
 
 
-// int FSMHandle(task_node_t* tn) {
-//     if(NULL == tn->p_sm_table) {
-//         serverLog(LL_ERROR, "sm_table is NULL.");
-//         return -1;
-//     }
+int FSMHandle(task_node_t* tn) {
+    if(NULL == tn->p_sm_table) {
+        serverLog(LL_ERROR, "sm_table is NULL.");
+        return -1;
+    }
 
-// 	unsigned int table_max_num = sizeof(*tn->p_sm_table) / sizeof(fsm_table_t);
-// 	int flag = 0;
+	unsigned int table_max_num = sizeof(*tn->p_sm_table) / sizeof(fsm_table_t);
+	int flag = 0;
 
-// 	for (int i = 0; i<table_max_num; i++) {
-// 		if (tn->cur_state == tn->p_sm_table[i].cur_state) {
-// 			tn->p_sm_table[i].eventActFun(tn);
-// 			tn->cur_state = tn->p_sm_table[i].next_state;
-//             flag = 1;
-// 			break;
-// 		}
-// 	}
+	for (int i = 0; i<table_max_num; i++) {
+		if (tn->cur_state == tn->p_sm_table[i].cur_state) {
+			tn->p_sm_table[i].eventActFun(tn);
+			tn->cur_state = tn->p_sm_table[i].next_state;
+            flag = 1;
+			break;
+		}
+	}
 
-//     if (0 == flag) {
-// 		// do nothing
-//         // sm or cur_state err
-//         serverLog(LL_ERROR, "NO state(%d).", tn->cur_state);
-//         return -1;
-// 	}
-//     return 0;
-// }
-
+    if (0 == flag) {
+		// do nothing
+        // sm or cur_state err
+        serverLog(LL_ERROR, "NO state(%d).", tn->cur_state);
+        return -1;
+	}
+    return 0;
+}
 
 // int GetUserInfo(void* si) {
 // 	//send request to server to get userinfo

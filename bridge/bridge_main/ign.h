@@ -10,10 +10,6 @@
 #include <time.h>
 #include <sys/time.h>
 // #include "MQTTClient.h"
-#include "bridge/bridge_main/ign_constants.h"
-#include <bridge/bridge_main/log.h>
-#include <bridge/bridge_main/sysinfo.h>
-#include <bridge/bridge_main/task_queue.h>
 
 
 // atomic_int g_msg_id;

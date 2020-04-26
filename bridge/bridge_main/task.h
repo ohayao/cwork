@@ -1,5 +1,6 @@
 #ifndef _TASK_H_
 #define _TASK_H_
+
 #include <bridge/bridge_main/sysinfo.h>
 #include <bridge/bridge_main/fsm.h>
 #include <bridge/bridge_main/mqttData.h>
@@ -18,7 +19,7 @@ typedef struct TaskNode {
     unsigned int start_time;
     unsigned char cur_state;
     sysinfo_t *sysif;
-    fsm_table_t *p_sm_table; // 外部数据, 如何保证生命周期? 其实要用weak_ptr模式保证声明周期
+    fsm_table_t *p_sm_table; // 外部数据
 }task_node_t;
 
 

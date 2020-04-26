@@ -8,7 +8,6 @@
 #define PRIVATE_KEY "/tmp/igkey/key.pem"
 #define KEY_STORE "/tmp/igkey/cert.pem"
 
-
 enum FSM_STATE
 {
   BEGIN,
@@ -20,7 +19,7 @@ enum FSM_STATE
   CMD_UPDATE_USERINFO,
   CMD_CONNECT_LOCK,
   CMD_UPDATE_LOCKSTATUS,
-  CMD_UNLOCK,
+  CMD_UNLOCK
 };
 
 #endif
