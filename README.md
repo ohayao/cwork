@@ -30,5 +30,9 @@
 
 ### BLE 开发   
 文件组织  
+bridge
+  gattlib
+  lock
+  ble-sdk(test)
 
 

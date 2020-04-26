@@ -3,10 +3,12 @@ cmake_minimum_required(VERSION 3.0)
 find_package(PkgConfig REQUIRED)
 
 # Added Glib support to ensure we have 'gdbus-codegen'
-pkg_search_module(GLIB REQUIRED glib-2.0)
+#pkg_search_module(GLIB REQUIRED glib-2.0)
+
 
 # For DBus support
-pkg_search_module(GIO_UNIX REQUIRED gio-unix-2.0)
+#pkg_search_module(GIO_UNIX REQUIRED gio-unix-2.0)
+#include_directories(${GIO_UNIX_INCLUDE_DIRS})
 
 # Needed by 'bluez5/lib/uuid.c'
 pkg_search_module(BLUEZ REQUIRED bluez)

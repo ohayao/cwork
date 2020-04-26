@@ -7,6 +7,9 @@ option(GATTLIB_SHARED_LIB "Build GattLib as a shared library" YES)
 option(GATTLIB_BUILD_DOCS "Build GattLib docs" NO)
 
 find_package(PkgConfig REQUIRED)
+pkg_search_module(GLIB REQUIRED glib-2.0)
+pkg_search_module(GIO_UNIX REQUIRED gio-unix-2.0)
+include_directories(${GIO_UNIX_INCLUDE_DIRS})
 
 # Define 'Debug' as the default build type
 if (NOT CMAKE_BUILD_TYPE)
