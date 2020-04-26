@@ -1,4 +1,4 @@
 add_subdirectory("gattlib")
 add_subdirectory("lock")
 add_subdirectory("ble")
-# add_subdirectory("bridge_main")
+add_subdirectory("bridge_main")

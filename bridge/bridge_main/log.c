@@ -9,8 +9,6 @@
 
 #include <fcntl.h>
 #include <unistd.h>
-#include <atomic>
-#define _Atomic(X) std::atomic< X >
 
 unsigned long getTimeZone(void) {
     struct timeval tv;
@@ -34,7 +32,7 @@ long long get_ustime(void) {
 int updateCachedTime() {
     long long ustime = get_ustime();
     long long mstime = ustime / 1000;
-    _Atomic(time_t) unixtime(mstime / 1000);    /* Unix time sampled every cron cycle. */
+    _Atomic time_t  unixtime = (mstime / 1000);    /* Unix time sampled every cron cycle. */
 
     /* To get information about daylight saving time, we need to call
      * localtime_r and cache the result. However calling localtime_r in this
@@ -112,12 +110,12 @@ void serverLogRaw(int level, const char *msg) {
     FILE *fp;
     char buf[64];
     int rawmode = (level & LL_RAW);
-    int log_to_stdout = (LOG_FILE.compare("\0"));
+    int log_to_stdout = strcmp(LOG_FILE,'\0');
 
     level &= 0xff; /* clear flags */
     //if (level < server.verbosity) return;
 
-    fp = log_to_stdout ? stdout : fopen(LOG_FILE.c_str(), "a");
+    fp = log_to_stdout ? stdout : fopen(LOG_FILE, "a");
     if (!fp) return;
 
     if (rawmode) {

@@ -1,12 +1,11 @@
 #ifndef _SYSINFO_H_
 #define _SYSINFO_H_
-#include <mutex>
+#include <pthread.h>
 
-class SysInfo {
-public:
+typedef struct SysInfo {
     int inited;
     // MQTTClient mqtt_c;
-    std::mutex mutex;
+    pthread_mutex_t *p_mutex;
     char wifi_ssid[128];
     char wifi_pswd[32];
     char user_id[64];
@@ -22,9 +21,6 @@ public:
     void* lock3info;
     void* lock4info;
     void* lock5info;
-    SysInfo();
-};
-
-typedef SysInfo sysinfo_t;
+}sysinfo_t;
 
 #endif

@@ -3,7 +3,8 @@
 #include <time.h>
 #include <stdio.h>
 #include <stdarg.h>
-#include <string>
+#include <string.h>
+
 #define LOG_MAX_LEN    1024 /* Default maximum length of syslog messages.*/
 #define LL_DEBUG 0
 #define LL_VERBOSE 1
@@ -12,7 +13,7 @@
 #define LL_ERROR 4
 #define LL_RAW (1<<10) /* Modifier to log without timestamp */
 
-static std::string LOG_FILE("./log_ign");
+static char LOG_FILE[] = "./log_ign";
 int updateCachedTime();
 long long get_ustime(void);
 int updateCachedTime();

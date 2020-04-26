@@ -16,18 +16,12 @@
 #include <bridge/bridge_main/fsm.h>
 #include <bridge/bridge_main/task.h>
 
-using std::thread;
-using std::shared_ptr;
-
-shared_ptr<thread> sp_ble_thread;
-shared_ptr<thread> sp_btn_thread;
-shared_ptr<thread> sp_mqtt_thread;
 
 // LIST_HEAD(waiting_task_head);
 // LIST_HEAD(doing_task_head);
  
 
-
+sysinfo_t g_sysif;
 
 
 // int FSMHandle(task_node_t* tn) {
@@ -244,19 +238,6 @@ int main() {
     }*/
 
     
-    // thread_type thread = Thread_start(WaitMQTT, &g_sysif);
-    serverLog(LL_NOTICE,"new thread to WaitMQTT.");
-    sp_mqtt_thread.reset(new thread(WaitMQTT, sp_g_sysinfo));
-    sp_mqtt_thread->detach();
-
-    // thread = Thread_start(WaitBLE, &g_sysif);
-    serverLog(LL_NOTICE,"new thread to WaitBLE.");
-    sp_ble_thread.reset(new thread(WaitBLE, sp_g_sysinfo));
-    sp_ble_thread->detach();
-    // thread = Thread_start(WaitBtn, &g_sysif);
-    serverLog(LL_NOTICE,"new thread to WaitBtn.");
-    sp_btn_thread.reset(new thread(WaitBtn, sp_g_sysinfo));
-    sp_btn_thread->detach();
     // while(1) {
     //     //if empty, sleep(0.5);
     //     //do it , after set into waiting_list

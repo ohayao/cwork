@@ -1,11 +1,10 @@
 #ifndef _BLE_DATA_H_
 #define _BLE_DATA_H_
 
-class BleData
+typedef struct BleData
 {
-public:
-  BleData();
-};
+  void *data;
+}ble_data_t;
 
 
 #endif

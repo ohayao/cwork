@@ -6,15 +6,14 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <stdarg.h>
-// #include <stdatomic.h>
-#include <atomic>
+#include <stdatomic.h>
 #include <time.h>
 #include <sys/time.h>
-#include <memory>
 // #include "MQTTClient.h"
 #include "bridge/bridge_main/ign_constants.h"
 #include <bridge/bridge_main/log.h>
 #include <bridge/bridge_main/sysinfo.h>
+#include <bridge/bridge_main/task_queue.h>
 
 
 #define thread_type pthread_t

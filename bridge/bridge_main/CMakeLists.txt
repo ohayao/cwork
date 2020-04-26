@@ -5,11 +5,7 @@ set(IGN_SRCS
   ./ign.c
   ./log.c
   ./sysinfo.c
-  ./task.c
-  ./mqttData.c
-  ./sysinfo.c
   ./task_queue.c
-
 )
 
 add_executable(ign ${IGN_SRCS})

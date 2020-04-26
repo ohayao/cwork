@@ -1,6 +1,20 @@
+#ifndef _TASK_QUEUE_H_
+#define _TASK_QUEUE_H_
 #include <bridge/bridge_main/task.h>
-#include <memory>
-#include <deque>
+
+// doing operation
+int IsDEmpty();
+task_node_t *GetDHeadNode();
+task_node_t *NextDTask(task_node_t *task_node);
+task_node_t *InsertDTaskFront(
+  unsigned int msg_id, unsigned char cs, mqtt_data_t *p_dataMQTT, ble_data_t *p_dataBLE);
+void DeleteDTask(task_node_t* tn);
+void DTask2Waiting(task_node_t* tn);
+
+// waiting operation
+int IsWEmpty();
+void WTask2Doing(task_node_t* tn);
+void DeleteWTask(task_node_t* tn)
 
 // void InsertTask(
 //     struct list_head* th, unsigned int msg_id, unsigned char cs, 
@@ -59,3 +73,4 @@
 //     return NULL;
 // }
 
+#endif
