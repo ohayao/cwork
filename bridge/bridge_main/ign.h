@@ -10,11 +10,11 @@
 #include <atomic>
 #include <time.h>
 #include <sys/time.h>
-
-// #include "list.h"
+#include <memory>
 // #include "MQTTClient.h"
 #include "bridge/bridge_main/ign_constants.h"
 #include <bridge/bridge_main/log.h>
+#include <bridge/bridge_main/sysinfo.h>
 
 using std::atomic_int;
 

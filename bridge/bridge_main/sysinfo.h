@@ -2,7 +2,8 @@
 #define _SYSINFO_H_
 #include <mutex>
 
-typedef struct st_sysinfo {
+class SysInfo {
+public:
     int inited;
     // MQTTClient mqtt_c;
     std::mutex mutex;
@@ -21,7 +22,9 @@ typedef struct st_sysinfo {
     void* lock3info;
     void* lock4info;
     void* lock5info;
-}sysinfo_t;
+    SysInfo();
+};
 
-void sysinfoInit(sysinfo_t *system_inff);
+typedef SysInfo sysinfo_t;
+
 #endif

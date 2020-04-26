@@ -8,6 +8,8 @@
 #include <sys/time.h>
 #include <syslog.h>
 #include <stdlib.h>
+#include <thread>
+#include <memory>
 
 // #include "util.h"
 // #include "task_queue.h"
@@ -16,11 +18,18 @@
 #include <bridge/bridge_main/fsm.h>
 #include <bridge/bridge_main/task.h>
 
+using std::thread;
+using std::shared_ptr;
+
+shared_ptr<thread> sp_ble_thread;
+shared_ptr<thread> sp_btn_thread;
+shared_ptr<thread> sp_mqtt_thread;
+
 // LIST_HEAD(waiting_task_head);
 // LIST_HEAD(doing_task_head);
  
 
-sysinfo_t g_sysif;
+
 
 
 // int FSMHandle(task_node_t* tn) {
@@ -108,7 +117,8 @@ int BLEParing(void* tn){
 //     return 0;
 // }
 
-fsm_table_t g_sm_table[] = {
+
+fsm_table_t g_fsm_table[] = {
     // {  CMD_INIT,                Init,               GET_WIFI_USER},
     // {  GET_WIFI_USER,           BLEParing,          CMD_REQ_USERINFO},
     // {  CMD_REQ_USERINFO,        GetUserInfo,        CMD_UPDATE_USERINFO},
@@ -117,7 +127,8 @@ fsm_table_t g_sm_table[] = {
     {  CMD_UPDATE_LOCKSTATUS,   UpdateLockState,    DONE},
     {  CMD_UNLOCK,              UnLock,             CMD_UPDATE_LOCKSTATUS},
 };
-
+std::shared_ptr<fsm_table_t> sp_g_fsm_table;
+std::shared_ptr<sysinfo_t> sp_g_sysinfo;
 
 // void GoExit(sysinfo_t *si) {
 //     //BLE  
@@ -156,8 +167,9 @@ static int FSM(MQTTClient_message *msg){
 //     return 0;
 // }
 
-// void WaitMQTT(sysinfo_t *si){
-//     while(1){
+void WaitMQTT(shared_ptr<SysInfo> sp_ysinfo){
+    while(1){
+        sleep(1);
 //         //if (NULL == si->mqtt_c)
 //         char *topic = NULL;
 //         int topicLen;
@@ -197,34 +209,36 @@ static int FSM(MQTTClient_message *msg){
 //             //err log
 //             HeartBeat();
 //         }
-//     }
-// }
+    }
+}
 
-// int WaitBLE(sysinfo_t *si){
-//     //Thread_start(wait_BLE, sysinfo)
-//     for(;;) {
-//         sleep(1);
-//         serverLog(LL_DEBUG, "waiting for BLE...");
-//     }
-//     return 0;
-// }
+int WaitBLE(shared_ptr<SysInfo> sp_ysinfo){
+    //Thread_start(wait_BLE, sysinfo)
+    for(;;) {
+        sleep(1);
+        serverLog(LL_DEBUG, "waiting for BLE...");
+    }
+    return 0;
+}
 
-// int WaitBtn(sysinfo_t *si){
-//     //if btn
-//     //add Init into doing_list
-//     for(;;) {
-//         sleep(1);
-//         serverLog(LL_DEBUG, "waiting for Btn...");
-//     }
+int WaitBtn(shared_ptr<SysInfo> sp_ysinfo){
+    //if btn
+    //add Init into doing_list
+    for(;;) {
+        sleep(1);
+        serverLog(LL_DEBUG, "waiting for Btn...");
+    }
 
-//     return 0;
-// }
+    return 0;
+}
 
 int main() {
     serverLog(LL_NOTICE,"Ready to start.");
+    // sp_g_fsm_table.reset(g_fsm_table);
+    sp_g_sysinfo.reset(new SysInfo());
     //daemon(1, 0);
-    sysinfo_t *si = (sysinfo_t *)malloc(sizeof(sysinfo_t));
-    sysinfoInit(si);
+    // sysinfo_t *si = (sysinfo_t *)malloc(sizeof(sysinfo_t));
+    // sysinfoInit(si);
     //Init for paring
     /*int rc = Init(si);
     if (0 != rc) {
@@ -232,21 +246,20 @@ int main() {
         return -1;
     }*/
 
-    // 这句可以不用了, 因为用了std::mutex, 不用再创建了
-    // g_sysif.mutex = Thread_create_mutex();
-
-    // 使用
-    // INIT_LIST_HEAD(&waiting_task_head);
-    // INIT_LIST_HEAD(&doing_task_head);
-
-
+    
     // thread_type thread = Thread_start(WaitMQTT, &g_sysif);
-    // serverLog(LL_NOTICE,"new thread to WaitMQTT[%u].", thread);
-    // thread = Thread_start(WaitBLE, &g_sysif);
-    // serverLog(LL_NOTICE,"new thread to WaitBLE[%u].", thread);
-    // thread = Thread_start(WaitBtn, &g_sysif);
-    // serverLog(LL_NOTICE,"new thread to WaitBtn[%u].", thread);
+    serverLog(LL_NOTICE,"new thread to WaitMQTT.");
+    sp_mqtt_thread.reset(new thread(WaitMQTT, sp_g_sysinfo));
+    sp_mqtt_thread->detach();
 
+    // thread = Thread_start(WaitBLE, &g_sysif);
+    serverLog(LL_NOTICE,"new thread to WaitBLE.");
+    sp_ble_thread.reset(new thread(WaitBLE, sp_g_sysinfo));
+    sp_ble_thread->detach();
+    // thread = Thread_start(WaitBtn, &g_sysif);
+    serverLog(LL_NOTICE,"new thread to WaitBtn.");
+    sp_btn_thread.reset(new thread(WaitBtn, sp_g_sysinfo));
+    sp_btn_thread->detach();
     // while(1) {
     //     //if empty, sleep(0.5);
     //     //do it , after set into waiting_list

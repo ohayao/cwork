@@ -1,7 +1,14 @@
 #include <bridge/bridge_main/task.h>
-#include <deque>
-static std::deque<task_node_t> waiting_task;
-static std::deque<task_node_t> doing_task;
+
+task_node::task_node(unsigned int msg_id, MqttData dataMQTT)
+{
+
+}
+
+task_node::task_node(unsigned int msg_id, BleData dataBLE)
+{
+  
+}
 
 // void InsertTask(
 //     struct list_head* th, unsigned int msg_id, unsigned char cs, 
@@ -13,7 +20,3 @@ static std::deque<task_node_t> doing_task;
 //     new_task->cur_state = cs;
 //     list_add(&new_task->list, th);
 // }
-void InsertTask(unsigned int msg_id, unsigned char cs, void * p_dataMQTT, void *p_dataBLE)
-{
-  
-}
