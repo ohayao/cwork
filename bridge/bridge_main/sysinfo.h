@@ -28,6 +28,8 @@ typedef struct SysInfo {
     void* lock5info;
     int ble_task; // task标示不同的任务,
     int ble_task_state; // 不同task里面的不同状态
+    void *ble_param;
+    void *ble_result;
 }sysinfo_t;
 
 #endif

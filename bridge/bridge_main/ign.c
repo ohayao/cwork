@@ -202,9 +202,12 @@ void WaitMQTT(void *arg){
 
 int WaitBLE(void *arg){
     //Thread_start(wait_BLE, sysinfo)
+    sysinfo_t *g_sysif = (sysinfo_t *)arg;
+    
     for(;;) {
         sleep(1);
         serverLog(LL_DEBUG, "waiting for BLE...");
+
     }
     return 0;
 }
