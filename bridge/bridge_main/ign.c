@@ -17,24 +17,25 @@
 #include <bridge/bridge_main/mutex_helper.h>
 #include <bridge/bridge_main/task_queue.h>
 #include <bridge/bridge_main/wait_ble.h>
+#include <bridge/ble/ble_discover.h>
 
 sysinfo_t g_sysif;
 
 extern int WaitBtn(void *arg);
 
 int FSMHandle(task_node_t* tn) {
-    if(NULL == tn->p_sm_table) {
+    if(NULL == tn->task_sm_table) {
         serverLog(LL_ERROR, "sm_table is NULL.");
         return -1;
     }
 
-	unsigned int table_max_num = sizeof(*tn->p_sm_table) / sizeof(fsm_table_t);
+	unsigned int table_max_num = sizeof(*tn->task_sm_table) / sizeof(fsm_table_t);
 	int flag = 0;
 
 	for (int i = 0; i<table_max_num; i++) {
-		if (tn->cur_state == tn->p_sm_table[i].cur_state) {
-			tn->p_sm_table[i].eventActFun(tn);
-			tn->cur_state = tn->p_sm_table[i].next_state;
+		if (tn->cur_state == tn->task_sm_table[i].cur_state) {
+			tn->task_sm_table[i].eventActFun(tn);
+			tn->cur_state = tn->task_sm_table[i].next_state;
             flag = 1;
 			break;
 		}
@@ -215,6 +216,27 @@ int WaitBtn(void *arg){
     return 0;
 }
 
+void addDiscoverTask()
+{
+    // 设置需要的参数
+    serverLog(LL_DEBUG, "addDiscoverTask");
+    ble_discover_param_t discover_param;
+    discover_param.scan_timeout = 5;
+    int msg_id = 0;
+    // 把参数写入data
+    serverLog(LL_DEBUG, "ble_discover_param_t end");
+    ble_data_t *ble_data = calloc(sizeof(ble_data_t), 1);
+    bleSetBleParam(ble_data, &discover_param, sizeof(ble_discover_param_t));
+    serverLog(LL_DEBUG, "bleSetBleParam end");
+    // 插入系统的队列
+    InsertBle2DFront(msg_id, BLE_DISCOVER_BEGIN, 
+        ble_data, sizeof(ble_data_t),
+        getDiscoverFsmTable(), getDiscoverFsmTableLen()
+    );
+    
+    serverLog(LL_DEBUG, "addDiscoverTask end");
+}
+
 int main() {
     serverLog(LL_NOTICE,"Ready to start.");
 
@@ -229,12 +251,13 @@ int main() {
         return -1;
     }*/
 
-    pthread_t mqtt_thread = Thread_start(WaitMQTT, &g_sysif);
-    serverLog(LL_NOTICE,"new thread to WaitMQTT[%u].", mqtt_thread);
-    pthread_t ble_thread = Thread_start(WaitBLE, &g_sysif);
-    serverLog(LL_NOTICE,"new thread to WaitMQTT[%u].", ble_thread);
-    pthread_t bt_thread = Thread_start(WaitBtn, &g_sysif);
-    serverLog(LL_NOTICE,"new thread to WaitMQTT[%u].", bt_thread);
+    // pthread_t mqtt_thread = Thread_start(WaitMQTT, &g_sysif);
+    // serverLog(LL_NOTICE,"new thread to WaitMQTT[%u].", mqtt_thread);
+    // pthread_t ble_thread = Thread_start(WaitBLE, &g_sysif);
+    // serverLog(LL_NOTICE,"new thread to WaitMQTT[%u].", ble_thread);
+    // pthread_t bt_thread = Thread_start(WaitBtn, &g_sysif);
+    // serverLog(LL_NOTICE,"new thread to WaitMQTT[%u].", bt_thread);
+    addDiscoverTask();
     while(1) {
         //if empty, sleep(0.5);
         //do it , after set into waiting_list
@@ -245,21 +268,13 @@ int main() {
         } 
         else {
         // if doing list has task
-            task_node_t *ptn=NULL;
-    //         list_head_t* po=&doing_task_head;
-        // iterate thought the doing list
-        // 如果任务是卡着的呢? 所以这个任务的写法
-    //         for(; po != NULL; po = &ptn->list) { 
-    //             ptn = NextTask(po, &doing_task_head);
-    //             if (NULL != ptn) {
-    //                 FSMHandle(ptn);
-    //                 //move ptn to waiting_task_head
-
-    //                 pthread_mutex_lock(g_sysif.mutex);
-    //                 MoveTask(&ptn->list, &waiting_task_head);
-    //                 pthread_mutex_unlock(g_sysif.mutex);
-    //             }
-    //         }
+            // 获取当前doing list 的头部
+            task_node_t *ptn=GetDHeadNode();
+            while (ptn)
+            {
+                FSMHandle(ptn);
+                ptn = NextDTask(ptn);
+            }
         }
     }
 

@@ -1,6 +1,7 @@
 
 set(IGN_DEPENDENCIES
   pthread
+  ble
 )
 set(IGN_SRCS
   ./ign.c

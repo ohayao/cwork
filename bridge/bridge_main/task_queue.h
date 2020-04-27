@@ -7,7 +7,14 @@ int IsDEmpty();
 task_node_t *GetDHeadNode();
 task_node_t *NextDTask(task_node_t *task_node);
 task_node_t *InsertDTaskFront(
-  unsigned int msg_id, unsigned char cs, mqtt_data_t *p_dataMQTT, ble_data_t *p_dataBLE);
+  unsigned int msg_id, unsigned char cs, 
+  mqtt_data_t *mqtt_data, int mqtt_data_len,
+  ble_data_t *ble_data, int ble_data_len, 
+  fsm_table_t *task_sm_table, int sm_table_len);
+task_node_t *InsertBle2DFront(
+  unsigned int msg_id, unsigned char cs, 
+  ble_data_t *ble_data, int ble_data_len, 
+  fsm_table_t *task_sm_table, int sm_table_len);
 void DeleteDTask(task_node_t* tn);
 void DTask2Waiting(task_node_t* tn);
 

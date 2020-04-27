@@ -13,14 +13,34 @@ typedef struct TaskNode {
     // void* lockinfo; // 外部数据?
 	//struct task_node *next;
 	unsigned int msg_id;
-    ble_data_t *dataBLE; // 外部数据, 外部释放?
-    mqtt_data_t *dataMQTT; // 外部数据, 外部释放?
+    ble_data_t *ble_data; // 外部数据, 外部释放?
+    int ble_data_len;
+    mqtt_data_t *mqtt_data; // 外部数据, 外部释放?
+    int mqtt_data_len;
     //void * dataBtn;
     unsigned int start_time;
     unsigned char cur_state;
     sysinfo_t *sysif;
-    fsm_table_t *p_sm_table; // 外部数据
+    fsm_table_t *task_sm_table; // 外部数据
+    int sm_table_len;
 }task_node_t;
 
+// 获取param长度
+int taskGetBleParamLen(task_node_t *sysinfo, int *result_len);
+// 自备上述长度内存, 拷贝内容到自己相应区域
+int taskGetBleParam(task_node_t *sysinfo, void *result);
+// 释放已经设置的内容
+int taskReleaseBleParam(task_node_t *sysinfo);
+// 设置相应的参数内容
+int taskSetBleParam(task_node_t *sysinfo, void *ble_param, int ble_param_len);
+
+// 获取长度
+int taskGetBleResultLen(task_node_t *sysinfo, int *result_len);
+// 自备上诉长度内存, 拷贝结果内容到自备内存
+int taskGetBleResult(task_node_t *sysinfo, void *result);
+// 释放Ble,结果的内容
+int taskReleaseBleResult(task_node_t *sysinfo);
+// 设置相应结果
+int taskSetBleResult(task_node_t *sysinfo, void *ble_result, int ble_result_len);
 
 #endif
