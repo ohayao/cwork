@@ -98,11 +98,17 @@ message LockJob {
         
 }
 
-message ServerEventData {
-  // List of lock bt id
-  repeated string bt_ids = 1;
-  // Ekey to communicate with lock
-  repeated bytes ekeys = 2; // 更新
-  // Job belonging to a lock
-  LockJob job = 3;
+message LockEntry {
+  // Lock bluetooth ID
+  string bt_id = 1;
+  // 'ekey' (with permissions) used to communicate with lock
+  bytes ekey = 2;
 }
+
+message ServerEventData {
+  // List of lock entries
+  repeated LockEntry lockEntries = 1;
+  // Job belonging to a lock
+  LockJob job = 2;
+}
+
