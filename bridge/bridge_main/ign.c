@@ -114,7 +114,7 @@ fsm_table_t g_fsm_table[] = {
     {  CMD_CONNECT_LOCK,        ScanLock,           CMD_UPDATE_LOCKSTATUS},
     {  CMD_UPDATE_LOCKSTATUS,   UpdateLockState,    DONE},
     {  CMD_UNLOCK,              UnLock,             CMD_UPDATE_LOCKSTATUS},
-    { }
+    {  }
 };
 
 
@@ -245,6 +245,7 @@ int main() {
         //do it , after set into waiting_list
         if (IsDEmpty()) {
             serverLog(LL_NOTICE,"doing_task_head is empty, ready to sleep.");
+            // 应该去检查waiting list
             sleep(1);
         } 
         else {

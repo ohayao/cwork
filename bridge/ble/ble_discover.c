@@ -3,7 +3,9 @@
 #include <gattlib/include/gattlib.h>
 
 
-void ble_discovered_device(void *adapter, const char* addr, const char* name, void *user_data) {
+void ble_discovered_device(
+  void *adapter, const char* addr, const char* name, void *user_data) {
+  // 通过 user_data, 传入一个数据结构, 然后返回结果
 	int ret;
 	int addr_size;
 	char *up_addr;

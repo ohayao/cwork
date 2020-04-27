@@ -2,6 +2,11 @@
 #define _SYSINFO_H_
 #include <pthread.h>
 
+enum BLE_TASK {
+    BLE_NONE_TASK = 0, // 没有任务
+    BLE_DISCOVER_LOCK = 1, // 扫描锁
+};
+
 typedef struct SysInfo {
     int inited;
     // MQTTClient mqtt_c;
@@ -21,6 +26,8 @@ typedef struct SysInfo {
     void* lock3info;
     void* lock4info;
     void* lock5info;
+    int ble_task; // task标示不同的任务,
+    int ble_task_state; // 不同task里面的不同状态
 }sysinfo_t;
 
 #endif
