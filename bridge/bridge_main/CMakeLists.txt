@@ -12,6 +12,7 @@ set(IGN_SRCS
   ./mqttData.c
   ./task.c
   ./thread_helper.c
+  ./wait_Ble.c
 )
 
 add_executable(ign ${IGN_SRCS})

@@ -16,9 +16,11 @@
 #include <bridge/bridge_main/thread_helper.h>
 #include <bridge/bridge_main/mutex_helper.h>
 #include <bridge/bridge_main/task_queue.h>
+#include <bridge/bridge_main/wait_ble.h>
 
 sysinfo_t g_sysif;
 
+extern int WaitBtn(void *arg);
 
 int FSMHandle(task_node_t* tn) {
     if(NULL == tn->p_sm_table) {
@@ -200,27 +202,7 @@ void WaitMQTT(void *arg){
     }
 }
 
-int WaitBLE(void *arg){
-    //Thread_start(wait_BLE, sysinfo)
-    sysinfo_t *g_sysif = (sysinfo_t *)arg;
-    int ble_task = g_sysif->ble_task;
-    for(;;) {
-        switch (ble_task)
-        {
-        case /* constant-expression */:
-            /* code */
-            break;
-        
-        default:
-            break;
-        }
-        
-        serverLog(LL_DEBUG, "waiting for BLE...");
 
-        sleep(1);
-    }
-    return 0;
-}
 
 int WaitBtn(void *arg){
     //if btn
