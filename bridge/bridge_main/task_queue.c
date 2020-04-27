@@ -2,6 +2,8 @@
 #include <bridge/bridge_main/list.h>
 #include <string.h>
 #include <stdlib.h>
+#include <bridge/bridge_main/log.h>
+
 list_head_t waiting_task_head = {&waiting_task_head, &waiting_task_head};
 list_head_t doing_task_head = {&doing_task_head, &doing_task_head};
 int waiting_task_inited = 0;
@@ -83,6 +85,7 @@ task_node_t *NextDTask(task_node_t *task_node)
   _lockD();
   if (list_is_last(cur, &doing_task_head))
   {
+    _unlockD();
     return NULL;
   }
   result = list_entry(cur->next, task_node_t, list);

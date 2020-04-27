@@ -30,6 +30,7 @@ int FSMHandle(task_node_t* tn) {
     }
 
 	unsigned int table_max_num = sizeof(*tn->task_sm_table) / sizeof(fsm_table_t);
+    serverLog(LL_DEBUG, "table_max_num: %d", table_max_num);
 	int flag = 0;
 
 	for (int i = 0; i<table_max_num; i++) {
@@ -40,13 +41,14 @@ int FSMHandle(task_node_t* tn) {
 			break;
 		}
 	}
-
+    serverLog(LL_DEBUG, "eventActFun end");
     if (0 == flag) {
 		// do nothing
         // sm or cur_state err
         serverLog(LL_ERROR, "NO state(%d).", tn->cur_state);
         return -1;
 	}
+    serverLog(LL_DEBUG, "FSMHandle end");
     return 0;
 }
 
@@ -273,7 +275,8 @@ int main() {
             while (ptn)
             {
                 FSMHandle(ptn);
-                ptn = NextDTask(ptn);
+                task_node_t *tmp = NextDTask(ptn);
+                ptn = tmp;
             }
         }
     }
