@@ -28,8 +28,10 @@ typedef struct SysInfo {
     void* lock5info;
     int ble_task; // task标示不同的任务,
     int ble_task_state; // 不同task里面的不同状态
-    void *ble_param;
-    void *ble_result;
+    // 参数, 不同的任务,参数不同
+    // 这些使用完,设置为Null,使用前, 不是Null,都释放?保证不会泄漏内存.?
+    void *ble_param;    
+    void *ble_result;   // 结果, 不同的任务,解析结果的方式不同,
 }sysinfo_t;
 
 #endif

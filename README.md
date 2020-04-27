@@ -49,7 +49,7 @@ bridge
     4.2  然后这个task 进入了 doing list, 当FSM_handle函数检查到当前的task, 判断当前操作是否合法(可能存在多个蓝牙任务,需要派对等情况), 假设合法, 那么就设置system info里面的BLE_TASK 为 BLE_DISCOVER_LOCK
     4.3 Wait BLE 线程, 不断检查sysinf里面的 task 是否有任务,如果有, 就调用相应的处理函数.
     4.4 Wait BLE 线程, 负责创建内存, 给相关的BLE函数, 保存返回数据
-    4.5 Wait BLE 线程, 通过sysinfo返回相应的数据给调用task的
+    4.5 Wait BLE 线程, 通过sysinfo返回相应的数据给调用task的 
 
 
 
