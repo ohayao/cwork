@@ -17,6 +17,8 @@ enum BLE_PAIRING_STATE {
 
 // 总得让我知道需要pairing 哪把锁
 typedef struct BLEPairingParam {
+  // 别用指针, 深拷贝问题,会相当麻烦,如果里面还有指针
+  // 会疯
   igm_lock_t *lock;
 }ble_pairing_param_t;
 
@@ -32,6 +34,8 @@ typedef struct BLEPairingResult {
   size_t password_size;
 }ble_pairing_result_t;
 
+fsm_table_t *getPairingFsmTable();
+int getPairingFsmTableLen();
 
 
 #endif

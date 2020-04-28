@@ -100,6 +100,8 @@ task_node_t *InsertDTaskFront(
   fsm_table_t *task_sm_table, int sm_table_len)
 {
   task_node_t *new_task = (task_node_t *)malloc(sizeof(task_node_t));
+  task_node_t *task_node = (task_node_t *)new_task;
+  serverLog(LL_NOTICE, "1. InsertDTaskFront set pairing param lock memory %x", task_node);
   new_task->msg_id = msg_id;
   // copy mqtt data
   if (mqtt_data_len && mqtt_data)
@@ -109,19 +111,24 @@ task_node_t *InsertDTaskFront(
     // TODO, 内存分配不了?
     memcpy(new_task->mqtt_data, mqtt_data, new_task->mqtt_data_len);
   }
+  
   if (ble_data_len && ble_data)
   {
+    // 只是将指针值复制过去.
     new_task->ble_data_len = ble_data_len;
     new_task->ble_data = calloc(new_task->ble_data_len, 1);
     // TODO, 内存分配不了?
     memcpy(new_task->ble_data, ble_data, new_task->ble_data_len);
+    serverLog(LL_NOTICE, "1. InsertDTaskFront set pairing param lock memory %x", new_task->ble_data);
+    serverLog(LL_NOTICE, "1. InsertDTaskFront set pairing param lock memory %x", new_task->ble_data->ble_param);
+    serverLog(LL_NOTICE, "1. InsertDTaskFront set pairing param lock memory %x", new_task->ble_data->ble_param);
   }
   if (task_sm_table && sm_table_len)
   {
     new_task->sm_table_len = sm_table_len;
-    new_task->task_sm_table = calloc(new_task->sm_table_len, 1);
+    new_task->task_sm_table = calloc(new_task->sm_table_len, sizeof(fsm_table_t));
     // TODO, 内存分配不了?
-    memcpy(new_task->task_sm_table, task_sm_table, new_task->sm_table_len);
+    memcpy(new_task->task_sm_table, task_sm_table, new_task->sm_table_len*sizeof(fsm_table_t));
   }
   new_task->cur_state = cs;
   _lockD();

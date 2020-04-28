@@ -7,7 +7,11 @@
 
 int discoverLock(void *arg);
 
-fsm_table_t discover_fsm_table[1] = {
+enum{
+  DISCOVER_SM_TABLE_LEN = 1
+};
+
+fsm_table_t discover_fsm_table[DISCOVER_SM_TABLE_LEN] = {
   {BLE_DISCOVER_BEGIN, discoverLock,  BLE_DISCOVER_DONE}
 };
 
@@ -46,7 +50,7 @@ fsm_table_t *getDiscoverFsmTable()
 
 int getDiscoverFsmTableLen()
 {
-  return sizeof(discover_fsm_table);
+  return DISCOVER_SM_TABLE_LEN;
 }
 
 void ble_discovered_device(
@@ -57,8 +61,8 @@ void ble_discovered_device(
 	char *up_addr;
 	int name_size;
   task_node_t *task_node = (task_node_t *)user_data;
-  ble_data_t * ble_data = (ble_data_t *)task_node->ble_data;
-  ble_discover_param_t *param = (ble_discover_param_t *)ble_data->ble_param;
+  ble_data_t * ble_data = (ble_data_t *)(task_node->ble_data);
+  ble_discover_param_t *param = (ble_discover_param_t *)(ble_data->ble_param);
 
 	if (!name) {
     return ;

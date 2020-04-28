@@ -1,6 +1,7 @@
 #include <bridge/bridge_main/bleData.h>
 #include <string.h>
 #include <stdlib.h>
+#include <bridge/bridge_main/log.h>
 
 int bleInitData(ble_data_t *data)
 {
@@ -45,7 +46,8 @@ int bleSetBleParam(ble_data_t *data, void *ble_param, int ble_param_len)
   bleReleaseBleParam(data);
   data->ble_param = calloc(ble_param_len, 1);
   // TODO 申请内存可能出错
-  data->ble_param_len = ble_param_len;
+  data->ble_param_len = ble_param_len;;
+  // 只会浅复制
   memcpy(data->ble_param, ble_param, data->ble_param_len);
   return 0;
 }

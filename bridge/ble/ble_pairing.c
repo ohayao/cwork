@@ -17,7 +17,6 @@ void* adapter;
 char pairing_str[] = "5c3a659e-897e-45e1-b016-007107c96df6";
 
 
-int discoverLock(void *arg);
 
 //步骤分别为
 // 1. BLE_PAIRING_BEGIN 监听变化
@@ -39,7 +38,14 @@ int save_message_data(const uint8_t* data, int data_length, void* user_data);
 int write_char_by_uuid_multi_atts (
 	gatt_connection_t* gatt_connection, uuid_t* uuid, const uint8_t* buffer, 
 	size_t buffer_len);
-fsm_table_t pairing_fsm_table[6] = {
+bool build_msg_payload(uint8_t **p_payloadBytes, 
+                      size_t *payload_len, uint8_t *stepBytes, size_t step_len);
+size_t resolve_payload_len(const size_t step_len);
+
+enum {
+  PAIRING_SM_TABLE_LEN =3
+};
+fsm_table_t pairing_fsm_table[PAIRING_SM_TABLE_LEN] = {
   {BLE_PAIRING_BEGIN,   register_pairing_notfication,  BLE_PAIRING_STEP1},
   {BLE_PAIRING_STEP1,   write_pairing_step1,           BLE_PAIRING_STEP2},
   {BLE_PAIRING_STEP2,   waiting_pairing_step2,         BLE_PAIRING_STEP3},
@@ -48,6 +54,15 @@ fsm_table_t pairing_fsm_table[6] = {
   // {BLE_PAIRING_COMMIT,  write_pairing_commit,          BLE_PAIRING_DONE},
 };
 
+fsm_table_t *getPairingFsmTable()
+{
+  return pairing_fsm_table;
+}
+
+int getPairingFsmTableLen()
+{
+  return PAIRING_SM_TABLE_LEN;
+}
 
 typedef struct ParingConnection {
 	gatt_connection_t* gatt_connection;
@@ -60,6 +75,41 @@ typedef struct ParingConnection {
 	uint8_t *step_data;
   uuid_t pairing_uuid;
 }pairing_connection_t;
+
+size_t resolve_payload_len(const size_t step_len)
+{
+	return step_len>254 ? (step_len+3) : (step_len+1);
+}
+
+
+bool build_msg_payload(uint8_t **p_payloadBytes, 
+                      size_t *payload_len, uint8_t *stepBytes, size_t step_len)
+{
+	*payload_len = resolve_payload_len(step_len);
+	size_t n_byte_for_len = *payload_len - step_len;
+	(*p_payloadBytes) = (uint8_t *)malloc(*payload_len);
+	if (n_byte_for_len == 1)
+	{
+		(*p_payloadBytes)[0] = step_len;
+	}
+	else if (n_byte_for_len == 3)
+	{
+		// 大端存储
+		uint8_t fst, sec;
+		sec = 254;
+		fst = step_len - sec;
+		(*p_payloadBytes)[0] = fst;
+		(*p_payloadBytes)[1] = sec;
+		(*p_payloadBytes)[3] = 0xff;  
+	}
+	else
+	{
+    serverLog(LL_ERROR, "wrong n_byte_for_len, error");
+		return false;
+	}
+	memcpy((*p_payloadBytes) + n_byte_for_len, stepBytes, step_len);
+	return true;
+}
 
 
 int write_char_by_uuid_multi_atts (
@@ -209,6 +259,7 @@ void message_handler(
 
 int write_pairing_step1(void *arg)
 {
+  serverLog(LL_NOTICE, "write_pairing_step1 start --------");
   int ret;
   task_node_t *task_node = (task_node_t *)arg;
   ble_data_t *ble_data = task_node->ble_data;
@@ -235,7 +286,7 @@ int write_pairing_step1(void *arg)
   }
   serverLog(LL_NOTICE, "igloohome_ble_lock_crypto_PairingConnection_genPairingStep1Native success");
 
-  if (!build_msg_payload(&payloadBytes, payload_len, step1Bytes, step1Bytes_len))
+  if (!build_msg_payload(&payloadBytes, &payload_len, step1Bytes, step1Bytes_len))
 	{
     serverLog(LL_ERROR, "failed in build_msg_payload");
 		goto STEP1_ERROR_EXIT;
@@ -254,6 +305,7 @@ int write_pairing_step1(void *arg)
   pthread_mutex_lock(&pairing_connection->wait_mutex);
 	pairing_connection->pairing_step = BLE_PAIRING_STEP1;
   pthread_mutex_unlock(&pairing_connection->wait_mutex);
+  serverLog(LL_NOTICE, "write_pairing_step1 end --------");
   return 0;
 STEP1_ERROR_EXIT:
   if (step1Bytes)
@@ -268,22 +320,29 @@ STEP1_ERROR_EXIT:
 
 int register_pairing_notfication(void *arg)
 {
+  serverLog(LL_NOTICE, "register_pairing_notfication start --------");
   int ret;
   task_node_t *task_node = (task_node_t *)arg;
-  ble_data_t *ble_data = task_node->ble_data;
-  ble_pairing_param_t *param = (ble_pairing_param_t *)ble_data->ble_param;
+  ble_data_t *ble_data = (ble_data_t *)(task_node->ble_data);
+  ble_pairing_param_t *param = (ble_pairing_param_t *)(ble_data->ble_param);
   ble_data->ble_connection = calloc(sizeof(pairing_connection_t), 1);
   pairing_connection_t *pairing_connection = 
                             (pairing_connection_t *)ble_data->ble_connection;
   memset(pairing_connection, 0, sizeof(pairing_connection_t));
   pthread_mutex_init(&pairing_connection->wait_mutex, PTHREAD_MUTEX_TIMED_NP);
-
+  // char *adapter_name = NULL;
+  // void *adapter = NULL;
+  ble_data->adapter_name = NULL;
+  ble_data->adapter = NULL;
   ret = gattlib_adapter_open(ble_data->adapter_name, &(ble_data->adapter));
   if (ret) {
 		serverLog(LL_ERROR, 
       "ERROR: register_pairing_notfication Failed to open adapter.");
 		return 1;
 	}
+  serverLog(LL_NOTICE, "register_pairing_notfication Success to open adapter.." );
+  serverLog(LL_NOTICE, "register_pairing_notfication ready to connection %s",
+                                                              param->lock->addr);
   pairing_connection->gatt_connection = gattlib_connect(
     NULL, param->lock->addr, GATTLIB_CONNECTION_OPTIONS_LEGACY_DEFAULT);
   if (pairing_connection->gatt_connection == NULL) {
@@ -300,15 +359,13 @@ int register_pairing_notfication(void *arg)
   {
     serverLog(LL_ERROR, "gattlib_string_to_uuid to pairing_uuid fail");
   }
-  else
-  {
-    serverLog(LL_NOTICE, "gattlib_string_to_uuid to pairing_uuid success." );
-  }
+  serverLog(LL_NOTICE, "gattlib_string_to_uuid to pairing_uuid success." );
+ 
 
   gattlib_register_notification(
     pairing_connection->gatt_connection, message_handler, arg);
   ret = gattlib_notification_start(
-      pairing_connection->gatt_connection, &(pairing_connection->pairing_uuid));
+      pairing_connection->gatt_connection, &pairing_connection->pairing_uuid);
   if (ret) {
     serverLog(LL_ERROR, "Fail to start notification.");
 		goto ERROR_EXIT;
@@ -317,8 +374,10 @@ int register_pairing_notfication(void *arg)
 	{
     serverLog(LL_NOTICE, "success to start notification" );
 	}
-
+  pthread_mutex_lock(&pairing_connection->wait_mutex);
   pairing_connection->pairing_step = BLE_PAIRING_STEP1;
+  pthread_mutex_unlock(&pairing_connection->wait_mutex);
+  serverLog(LL_NOTICE, "register_pairing_notfication end --------");
   return 0;
 
 ERROR_EXIT:
@@ -357,7 +416,9 @@ int bleSetPairingParam(ble_pairing_param_t *pairing_param, igm_lock_t *lock)
 {
   bleReleaseParingParam(pairing_param);
   pairing_param->lock = calloc(sizeof(igm_lock_t), 1);
-  memset(pairing_param->lock, 0, sizeof(igm_lock_t));
+  // lockCopy(pairing_param->lock, lock);
+  serverLog(LL_NOTICE, "bleSetPairingParam sizeof %d", sizeof(igm_lock_t));
+  memcpy(pairing_param->lock, lock, sizeof(igm_lock_t));
   return 0;
 }
 

@@ -30,26 +30,21 @@ int FSMHandle(task_node_t* tn) {
         serverLog(LL_ERROR, "sm_table is NULL.");
         return -1;
     }
-
-	unsigned int table_max_num = sizeof(*tn->task_sm_table) / sizeof(fsm_table_t);
+	unsigned int table_max_num = tn->sm_table_len;
+    serverLog(LL_NOTICE, "table_max_num %d", table_max_num);
 	int flag = 0;
-
     // 这儿是遍历所有的状态.
 	for (int i = 0; i<table_max_num; i++) {
         serverLog(LL_NOTICE, "FSMHandle i %d ", i);
 		if (tn->cur_state == tn->task_sm_table[i].cur_state) {
-            serverLog(LL_NOTICE, "eventActFun begin");
+            serverLog(LL_NOTICE, "eventActFun begin---------------");
 			tn->task_sm_table[i].eventActFun(tn);
-            serverLog(LL_NOTICE, "eventActFun end");
+            serverLog(LL_NOTICE, "eventActFun end-----------------");
 			tn->cur_state = tn->task_sm_table[i].next_state;
-
             flag = 1;
-            serverLog(LL_NOTICE, "flag in for %d ", flag);
-			break;
 		}
 	}
-    serverLog(LL_NOTICE, "flag out for %d ", flag);
-    serverLog(LL_NOTICE, "eventActFun end2 ");
+    serverLog(LL_NOTICE, "FSMHandle out for end-----------------");
     if (0 == flag) {
 		// do nothing
         // sm or cur_state err
@@ -226,6 +221,8 @@ int WaitBtn(void *arg){
     return 0;
 }
 
+void addPairingTask(igm_lock_t *lock);
+
 // 添加扫描方式样例
 // ble_data 里面全市
 void addDiscoverTask()
@@ -235,7 +232,7 @@ void addDiscoverTask()
     serverLog(LL_NOTICE, "1. set ble parameters");
     ble_discover_param_t discover_param;
     serverLog(LL_NOTICE, "1. set scan_timeout to 3");
-    discover_param.scan_timeout = 3;
+    discover_param.scan_timeout = 2;
     serverLog(LL_NOTICE, "2. set msg_id to 0(or anything you want)");
     int msg_id = 0;
     // 把参数写入data, 当前有个问题就是, 使用完, 得访问的人记的释放.
@@ -281,29 +278,26 @@ void addPairingTask(igm_lock_t *lock)
     // 设置需要的参数
     serverLog(LL_NOTICE, "Add Pairing task");
     serverLog(LL_NOTICE, "1. set ble pairing parameters");
-    ble_pairing_param_t *pairing_param = (ble_pairing_param_t *)calloc(sizeof(igm_lock_t), 1);
-    serverLog(LL_NOTICE, "1. set scan_timeout to 3");
+    ble_pairing_param_t *pairing_param = (ble_pairing_param_t *)calloc(sizeof(ble_pairing_param_t), 1);
+    serverLog(LL_NOTICE, "1. set pairing param lock to name %s addr %s", lock->name, lock->addr);
     bleSetPairingParam(pairing_param, lock);
-    // serverLog(LL_NOTICE, "2. set msg_id to 0(or anything you want)");
-    // int msg_id = 0;
-    // // 把参数写入data, 当前有个问题就是, 使用完, 得访问的人记的释放.
-    // serverLog(LL_NOTICE, "3. alloc ble data datatype, ble_data is used to devliver parameters and get result data");
-    // ble_data_t *ble_data = calloc(sizeof(ble_data_t), 1);
-    // serverLog(LL_NOTICE, "3. init ble_data");
-    // bleInitData(ble_data);
-    // serverLog(LL_NOTICE, "3. set ble parametes to ble data");
-    // bleSetBleParam(ble_data, &discover_param, sizeof(ble_discover_param_t));
-    // // 与记有多少个结果, 30个锁
-    // serverLog(LL_NOTICE, "3. init ble result memory, suppose the max num of locks is 30");
-    // bleInitResults(ble_data, 30, sizeof(igm_lock_t));
+    serverLog(LL_NOTICE, "2. set msg_id to 1(or anything you want)");
+    int msg_id = 1;
+    // 把参数写入data, 当前有个问题就是, 使用完, 得访问的人记的释放.
+    serverLog(LL_NOTICE, "3. alloc ble data datatype, ble_data is used to devliver parameters and get result data");
+    ble_data_t *ble_data = calloc(sizeof(ble_data_t), 1);
+    serverLog(LL_NOTICE, "3. init ble_data");
+    bleInitData(ble_data);
+    serverLog(LL_NOTICE, "3. set ble parametes to ble data");
+    bleSetBleParam(ble_data, pairing_param, sizeof(ble_pairing_param_t));
 
-    // // 插入系统的队列
-    // serverLog(LL_NOTICE, "4. used InsertBle2DFront to insert the task to system.");
-    // InsertBle2DFront(msg_id, BLE_DISCOVER_BEGIN, 
-    //     ble_data, sizeof(ble_data_t),
-    //     getDiscoverFsmTable(), getDiscoverFsmTableLen()
-    // );
-    // serverLog(LL_NOTICE, "5. Add Discover task.");
+    // 插入系统的队列
+    serverLog(LL_NOTICE, "4. used InsertBle2DFront to insert the task to system.");
+    InsertBle2DFront(msg_id, BLE_PAIRING_BEGIN, 
+        ble_data, sizeof(ble_data_t),
+        getPairingFsmTable(), getPairingFsmTableLen()
+    );
+    serverLog(LL_NOTICE, "5. Add Pairing task.");
     return;
 }
 
