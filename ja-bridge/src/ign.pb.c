@@ -9,16 +9,19 @@
 PB_BIND(ign_MsgInfo, ign_MsgInfo, 2)
 
 
-PB_BIND(ign_BridgeProfile, ign_BridgeProfile, AUTO)
+PB_BIND(ign_BridgeProfile, ign_BridgeProfile, 2)
 
 
 PB_BIND(ign_LockLog, ign_LockLog, 2)
 
 
-PB_BIND(ign_BridgeEventData, ign_BridgeEventData, AUTO)
+PB_BIND(ign_BridgeEventData, ign_BridgeEventData, 2)
 
 
 PB_BIND(ign_LockJob, ign_LockJob, AUTO)
+
+
+PB_BIND(ign_LockEntry, ign_LockEntry, AUTO)
 
 
 PB_BIND(ign_ServerEventData, ign_ServerEventData, AUTO)

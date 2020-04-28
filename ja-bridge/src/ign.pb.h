@@ -15,36 +15,49 @@ extern "C" {
 
 /* Enum definitions */
 typedef enum _ign_EventType {
-    ign_EventType_HEARTBEAT = 0,
-    ign_EventType_LOCK_LOG = 1,
-    ign_EventType_GET_USER_INFO = 2,
-    ign_EventType_UPDATE_LOCK_STATUS = 3,
-    ign_EventType_ADD_LOCK = 4,
-    ign_EventType_GET_JOBS = 5,
-    ign_EventType_UPDATE_JOB = 6,
+    ign_EventType_UNSPECIFIED = 0,
+    ign_EventType_HEARTBEAT = 1,
+    ign_EventType_LOCK_LOG = 2,
+    ign_EventType_GET_USER_INFO = 3,
+    ign_EventType_UPDATE_LOCK_STATUS = 4,
+    ign_EventType_ADD_LOCK = 5,
+    ign_EventType_GET_JOBS = 6,
+    ign_EventType_UPDATE_JOB = 7,
     ign_EventType_UPDATE_USER_INFO = 128,
     ign_EventType_LOCK_JOB = 129
 } ign_EventType;
 
 typedef enum _ign_OSType {
-    ign_OSType_Unknow = 0,
+    ign_OSType_UKNOWN = 0,
     ign_OSType_LINUX = 1,
     ign_OSType_RTOS = 2
 } ign_OSType;
 
 /* Struct definitions */
+typedef PB_BYTES_ARRAY_T(100) ign_BridgeProfile_bt_id_t;
+typedef PB_BYTES_ARRAY_T(100) ign_BridgeProfile_mac_addr_t;
+typedef PB_BYTES_ARRAY_T(100) ign_BridgeProfile_local_ip_t;
+typedef PB_BYTES_ARRAY_T(100) ign_BridgeProfile_public_ip_t;
+typedef PB_BYTES_ARRAY_T(100) ign_BridgeProfile_sys_statics_t;
+typedef PB_BYTES_ARRAY_T(100) ign_BridgeProfile_wifi_ssid_t;
+typedef PB_BYTES_ARRAY_T(100) ign_BridgeProfile_name_t;
 typedef struct _ign_BridgeProfile {
     ign_OSType os_info;
-    pb_callback_t bt_id;
-    pb_callback_t mac_addr;
-    pb_callback_t local_ip;
-    pb_callback_t public_ip;
-    pb_callback_t sys_statics;
-    pb_callback_t wifi_ssid;
+    ign_BridgeProfile_bt_id_t bt_id;
+    ign_BridgeProfile_mac_addr_t mac_addr;
+    ign_BridgeProfile_local_ip_t local_ip;
+    ign_BridgeProfile_public_ip_t public_ip;
+    ign_BridgeProfile_sys_statics_t sys_statics;
+    ign_BridgeProfile_wifi_ssid_t wifi_ssid;
     int32_t wifi_signal;
-    pb_callback_t name;
+    ign_BridgeProfile_name_t name;
     uint32_t inited_time;
 } ign_BridgeProfile;
+
+typedef struct _ign_LockEntry {
+    char bt_id[100];
+    pb_callback_t ekey;
+} ign_LockEntry;
 
 typedef struct _ign_LockJob {
     char bt_id[100];
@@ -65,8 +78,7 @@ typedef struct _ign_BridgeEventData {
 } ign_BridgeEventData;
 
 typedef struct _ign_ServerEventData {
-    pb_callback_t bt_ids;
-    pb_callback_t ekeys;
+    pb_callback_t lockEntries;
     bool has_job;
     ign_LockJob job;
 } ign_ServerEventData;
@@ -83,28 +95,30 @@ typedef struct _ign_MsgInfo {
 
 
 /* Helper constants for enums */
-#define _ign_EventType_MIN ign_EventType_HEARTBEAT
+#define _ign_EventType_MIN ign_EventType_UNSPECIFIED
 #define _ign_EventType_MAX ign_EventType_LOCK_JOB
 #define _ign_EventType_ARRAYSIZE ((ign_EventType)(ign_EventType_LOCK_JOB+1))
 
-#define _ign_OSType_MIN ign_OSType_Unknow
+#define _ign_OSType_MIN ign_OSType_UKNOWN
 #define _ign_OSType_MAX ign_OSType_RTOS
 #define _ign_OSType_ARRAYSIZE ((ign_OSType)(ign_OSType_RTOS+1))
 
 
 /* Initializer values for message structs */
 #define ign_MsgInfo_init_default                 {0, 0, _ign_EventType_MIN, false, ign_BridgeEventData_init_default, false, ign_ServerEventData_init_default}
-#define ign_BridgeProfile_init_default           {_ign_OSType_MIN, {{NULL}, NULL}, {{NULL}, NULL}, {{NULL}, NULL}, {{NULL}, NULL}, {{NULL}, NULL}, {{NULL}, NULL}, 0, {{NULL}, NULL}, 0}
+#define ign_BridgeProfile_init_default           {_ign_OSType_MIN, {0, {0}}, {0, {0}}, {0, {0}}, {0, {0}}, {0, {0}}, {0, {0}}, 0, {0, {0}}, 0}
 #define ign_LockLog_init_default                 {"", {0, {0}}}
 #define ign_BridgeEventData_init_default         {false, ign_BridgeProfile_init_default, {{NULL}, NULL}, {{NULL}, NULL}}
 #define ign_LockJob_init_default                 {"", {{NULL}, NULL}}
-#define ign_ServerEventData_init_default         {{{NULL}, NULL}, {{NULL}, NULL}, false, ign_LockJob_init_default}
+#define ign_LockEntry_init_default               {"", {{NULL}, NULL}}
+#define ign_ServerEventData_init_default         {{{NULL}, NULL}, false, ign_LockJob_init_default}
 #define ign_MsgInfo_init_zero                    {0, 0, _ign_EventType_MIN, false, ign_BridgeEventData_init_zero, false, ign_ServerEventData_init_zero}
-#define ign_BridgeProfile_init_zero              {_ign_OSType_MIN, {{NULL}, NULL}, {{NULL}, NULL}, {{NULL}, NULL}, {{NULL}, NULL}, {{NULL}, NULL}, {{NULL}, NULL}, 0, {{NULL}, NULL}, 0}
+#define ign_BridgeProfile_init_zero              {_ign_OSType_MIN, {0, {0}}, {0, {0}}, {0, {0}}, {0, {0}}, {0, {0}}, {0, {0}}, 0, {0, {0}}, 0}
 #define ign_LockLog_init_zero                    {"", {0, {0}}}
 #define ign_BridgeEventData_init_zero            {false, ign_BridgeProfile_init_zero, {{NULL}, NULL}, {{NULL}, NULL}}
 #define ign_LockJob_init_zero                    {"", {{NULL}, NULL}}
-#define ign_ServerEventData_init_zero            {{{NULL}, NULL}, {{NULL}, NULL}, false, ign_LockJob_init_zero}
+#define ign_LockEntry_init_zero                  {"", {{NULL}, NULL}}
+#define ign_ServerEventData_init_zero            {{{NULL}, NULL}, false, ign_LockJob_init_zero}
 
 /* Field tags (for use in manual encoding/decoding) */
 #define ign_BridgeProfile_os_info_tag            1
@@ -117,6 +131,8 @@ typedef struct _ign_MsgInfo {
 #define ign_BridgeProfile_wifi_signal_tag        12
 #define ign_BridgeProfile_inited_time_tag        14
 #define ign_BridgeProfile_name_tag               13
+#define ign_LockEntry_bt_id_tag                  1
+#define ign_LockEntry_ekey_tag                   2
 #define ign_LockJob_bt_id_tag                    1
 #define ign_LockJob_lock_cmd_tag                 2
 #define ign_LockLog_bt_id_tag                    1
@@ -124,9 +140,8 @@ typedef struct _ign_MsgInfo {
 #define ign_BridgeEventData_profile_tag          1
 #define ign_BridgeEventData_bt_ids_tag           2
 #define ign_BridgeEventData_logs_tag             3
-#define ign_ServerEventData_bt_ids_tag           1
-#define ign_ServerEventData_ekeys_tag            2
-#define ign_ServerEventData_job_tag              3
+#define ign_ServerEventData_lockEntries_tag      1
+#define ign_ServerEventData_job_tag              2
 #define ign_MsgInfo_msg_id_tag                   1
 #define ign_MsgInfo_time_tag                     2
 #define ign_MsgInfo_event_type_tag               3
@@ -147,16 +162,16 @@ X(a, STATIC,   OPTIONAL, MESSAGE,  server_data,       5)
 
 #define ign_BridgeProfile_FIELDLIST(X, a) \
 X(a, STATIC,   SINGULAR, UENUM,    os_info,           1) \
-X(a, CALLBACK, SINGULAR, BYTES,    bt_id,             2) \
-X(a, CALLBACK, SINGULAR, BYTES,    mac_addr,          3) \
-X(a, CALLBACK, SINGULAR, BYTES,    local_ip,          4) \
-X(a, CALLBACK, SINGULAR, BYTES,    public_ip,         5) \
-X(a, CALLBACK, SINGULAR, BYTES,    sys_statics,       6) \
-X(a, CALLBACK, SINGULAR, BYTES,    wifi_ssid,        11) \
+X(a, STATIC,   SINGULAR, BYTES,    bt_id,             2) \
+X(a, STATIC,   SINGULAR, BYTES,    mac_addr,          3) \
+X(a, STATIC,   SINGULAR, BYTES,    local_ip,          4) \
+X(a, STATIC,   SINGULAR, BYTES,    public_ip,         5) \
+X(a, STATIC,   SINGULAR, BYTES,    sys_statics,       6) \
+X(a, STATIC,   SINGULAR, BYTES,    wifi_ssid,        11) \
 X(a, STATIC,   SINGULAR, INT32,    wifi_signal,      12) \
-X(a, CALLBACK, SINGULAR, BYTES,    name,             13) \
+X(a, STATIC,   SINGULAR, BYTES,    name,             13) \
 X(a, STATIC,   SINGULAR, UINT32,   inited_time,      14)
-#define ign_BridgeProfile_CALLBACK pb_default_field_callback
+#define ign_BridgeProfile_CALLBACK NULL
 #define ign_BridgeProfile_DEFAULT NULL
 
 #define ign_LockLog_FIELDLIST(X, a) \
@@ -180,12 +195,18 @@ X(a, CALLBACK, SINGULAR, BYTES,    lock_cmd,          2)
 #define ign_LockJob_CALLBACK pb_default_field_callback
 #define ign_LockJob_DEFAULT NULL
 
+#define ign_LockEntry_FIELDLIST(X, a) \
+X(a, STATIC,   SINGULAR, STRING,   bt_id,             1) \
+X(a, CALLBACK, SINGULAR, BYTES,    ekey,              2)
+#define ign_LockEntry_CALLBACK pb_default_field_callback
+#define ign_LockEntry_DEFAULT NULL
+
 #define ign_ServerEventData_FIELDLIST(X, a) \
-X(a, CALLBACK, REPEATED, STRING,   bt_ids,            1) \
-X(a, CALLBACK, REPEATED, BYTES,    ekeys,             2) \
-X(a, STATIC,   OPTIONAL, MESSAGE,  job,               3)
+X(a, CALLBACK, REPEATED, MESSAGE,  lockEntries,       1) \
+X(a, STATIC,   OPTIONAL, MESSAGE,  job,               2)
 #define ign_ServerEventData_CALLBACK pb_default_field_callback
 #define ign_ServerEventData_DEFAULT NULL
+#define ign_ServerEventData_lockEntries_MSGTYPE ign_LockEntry
 #define ign_ServerEventData_job_MSGTYPE ign_LockJob
 
 extern const pb_msgdesc_t ign_MsgInfo_msg;
@@ -193,6 +214,7 @@ extern const pb_msgdesc_t ign_BridgeProfile_msg;
 extern const pb_msgdesc_t ign_LockLog_msg;
 extern const pb_msgdesc_t ign_BridgeEventData_msg;
 extern const pb_msgdesc_t ign_LockJob_msg;
+extern const pb_msgdesc_t ign_LockEntry_msg;
 extern const pb_msgdesc_t ign_ServerEventData_msg;
 
 /* Defines for backwards compatibility with code written before nanopb-0.4.0 */
@@ -201,14 +223,16 @@ extern const pb_msgdesc_t ign_ServerEventData_msg;
 #define ign_LockLog_fields &ign_LockLog_msg
 #define ign_BridgeEventData_fields &ign_BridgeEventData_msg
 #define ign_LockJob_fields &ign_LockJob_msg
+#define ign_LockEntry_fields &ign_LockEntry_msg
 #define ign_ServerEventData_fields &ign_ServerEventData_msg
 
 /* Maximum encoded size of messages (where known) */
 /* ign_MsgInfo_size depends on runtime parameters */
-/* ign_BridgeProfile_size depends on runtime parameters */
+#define ign_BridgeProfile_size                   733
 #define ign_LockLog_size                         1128
 /* ign_BridgeEventData_size depends on runtime parameters */
 /* ign_LockJob_size depends on runtime parameters */
+/* ign_LockEntry_size depends on runtime parameters */
 /* ign_ServerEventData_size depends on runtime parameters */
 
 #ifdef __cplusplus
