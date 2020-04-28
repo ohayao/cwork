@@ -1,27 +1,25 @@
 #include <string.h>
-#include <cstring>
 #include <stdlib.h>
-#include <iostream>
-#include "cifra/modes.h"
-#include "cifra/aes.h"
-#include "micro-ecc/uECC.h"
+#include <bridge/lock/cifra/modes.h>
+#include <bridge/lock/cifra/aes.h>
+#include <bridge/lock/micro-ecc/uECC.h>
 
-#include "encryption.h"
-#include "connection_common.h"
-
-#include "messages/PairingStep1.h"
-#include "messages/PairingStep2.h"
-#include "messages/PairingStep3.h"
-#include "messages/PairingStep4.h"
-#include "messages/PairingCommit.h"
-#include "messages/GuestToken.h"
-#include <iostream>
-using namespace std;
+#include <bridge/lock/connection/encryption.h>
+#include <bridge/lock/connection/connection_common.h>
+#include <bridge/lock/messages/PairingStep1.h>
+#include <bridge/lock/messages/PairingStep2.h>
+#include <bridge/lock/messages/PairingStep3.h>
+#include <bridge/lock/messages/PairingStep4.h>
+#include <bridge/lock/messages/PairingCommit.h>
+#include <bridge/lock/messages/GuestToken.h>
+#include <bridge/bridge_main/log.h>
 
 static const char *kTag = "JNI_pairing_connection";
 
-static const int kPrivateKeyLength = 32;
-static const int kPublicKeyLength = 64;
+enum {
+    kPrivateKeyLength=32,
+    kPublicKeyLength=64
+};
 
 static uint8_t privateKey_[kPrivateKeyLength] = {0x00};
 static uint8_t publicKey_[kPublicKeyLength] = {0x00};
@@ -30,9 +28,7 @@ static uint8_t txNonce_[kNonceLength] = {0x00};
 static uint8_t rxNonce_[kNonceLength] = {0x00};
 static uint8_t sharedKey_[kConnectionKeyLength] = {0x00};
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+
 
 bool igloohome_ble_lock_crypto_PairingConnection_beginConnection() {
     const struct uECC_Curve_t * p_curve = uECC_secp256r1();
@@ -53,7 +49,7 @@ int igloohome_ble_lock_crypto_PairingConnection_genPairingStep1Native(uint8_t **
     size_t retvalLen = 0;
     IgSerializerError err = ig_PairingStep1_encode(&step1, retvalBytes, retvalMaxLen, &retvalLen);
     if (err != IgSerializerNoError) {
-        cout << "IgSerializerNoError" << endl;
+        serverLog(LL_ERROR, "IgSerializerNoError");
         ig_PairingStep1_deinit(&step1);
         return 0;
     }
@@ -81,7 +77,7 @@ int igloohome_ble_lock_crypto_PairingConnection_genPairingStep3Native(
         step2Bytes, (size_t)step2Len, &step2, 0);
     if (step2_err || !ig_PairingStep2_is_valid(&step2) || step2.nonce_size != kNonceLength ||
             !step2.has_public_key || step2.public_key_size != kPublicKeyLength) {
-        cout << "step2_err" << step2_err << endl;
+        serverLog(LL_ERROR, "step2_err %d", step2_err);
         ig_PairingStep2_deinit(&step2);
         *ret = NULL;
         return 0;
@@ -93,7 +89,7 @@ int igloohome_ble_lock_crypto_PairingConnection_genPairingStep3Native(
     const struct uECC_Curve_t * p_curve = uECC_secp256r1();
     int shared_secret_ret = uECC_shared_secret(otherPublicKey_, privateKey_, sharedSecret, p_curve);
     if (shared_secret_ret != 1) {
-        cout << "shared_secret_ret" << endl;
+        serverLog(LL_ERROR, "shared_secret_ret");
         ig_PairingStep2_deinit(&step2);
         *ret = NULL;
         return 0;
@@ -217,7 +213,6 @@ int igloohome_ble_lock_crypto_PairingConnection_recPairingStep4Native(
             rxNonce_, kNonceLength
     );
     incrementNonce(rxNonce_);
-    printf("recPairingStep4Native: step4Len = %i\n", step4Len);
     if (step4Len < 0) {
         *ret = NULL;
         return 0;
@@ -226,21 +221,21 @@ int igloohome_ble_lock_crypto_PairingConnection_recPairingStep4Native(
     IgPairingStep4 step4;
     ig_PairingStep4_init(&step4);
     ig_PairingStep4_decode(step4Bytes, (size_t)step4Len, &step4, 0);
-    printf("------------ recPairingStep4Native: step4.has_success = %i, step4.success = %i\n", step4.has_success, step4.success);
-    if (step4.has_success && step4.success)
-    {
-        printf("-------------------------step4.has_success \n");
+    serverLog(LL_NOTICE, "step4.has_success = %i, step4.success = %i", step4.has_success, step4.success);
+    // if (step4.has_success && step4.success)
+    // {
+    //     printf("-------------------------step4.has_success \n");
         
-        if (step4.has_password)
-        {
-            printf("step4.has_password: ");
-            for (int j = 0; j < step4.password_size;j++)
-            {
-                printf("%02x ", (step4.password)[j]);
-            }
-            printf("\n");
-        }
-    }
+    //     if (step4.has_password)
+    //     {
+    //         printf("step4.has_password: ");
+    //         for (int j = 0; j < step4.password_size;j++)
+    //         {
+    //             printf("%02x ", (step4.password)[j]);
+    //         }
+    //         printf("\n");
+    //     }
+    // }
     if (!ig_PairingStep4_is_valid(&step4) || !step4.success) {
         ig_PairingStep4_deinit(&step4);
         *ret = NULL;
@@ -268,11 +263,11 @@ int igloohome_ble_lock_crypto_PairingConnection_genPairingCommitNative(
         return 0;
     }
 
-    printf("encoded pairingCommit = ");
-    for (int j = 0; j < plaintextLen; j++) {
-        printf("%02x ", plaintextBytes[j]);
-    }
-    printf("\n");
+    // printf("encoded pairingCommit = ");
+    // for (int j = 0; j < plaintextLen; j++) {
+    //     printf("%02x ", plaintextBytes[j]);
+    // }
+    // printf("\n");
 
     uint32_t retvalMaxLen = encryptDataSize(plaintextLen);
     uint8_t retvalBytes[retvalMaxLen];
@@ -337,7 +332,3 @@ int igloohome_ble_lock_crypto_PairingConnection_getAdminKeyNative(
 //     jsize nonceLen = env->GetArrayLength(jPublicKey);
 //     env->GetByteArrayRegion(jPublicKey, 0, nonceLen, (jbyte*)publicKey_);
 // }
-
-#ifdef __cplusplus
-}
-#endif

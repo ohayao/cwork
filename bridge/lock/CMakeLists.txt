@@ -7,7 +7,7 @@ set(ALL_LOCK_HDRS)
 set(ALL_LOCK_SRCS)
 
 file(GLOB_RECURSE ALL_CONNECTION_HDRS "connection/*.h")
-file(GLOB_RECURSE ALL_CONNECTION_SRCS "connection/*.cpp")
+file(GLOB_RECURSE ALL_CONNECTION_SRCS "connection/*.c")
 
 file(GLOB_RECURSE ALL_CIFRA_HDRS "cifra/*.h")
 file(GLOB_RECURSE ALL_CIFRA_SRCS "cifra/*.c")

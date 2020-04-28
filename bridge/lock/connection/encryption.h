@@ -3,7 +3,9 @@
 
 #include <stdint.h>
 
-const int kNonceLength = 12;
+enum {
+  kNonceLength = 12
+};
 
 void incrementNonce(uint8_t *nonce);
 uint32_t encryptDataSize(uint32_t dataLen);

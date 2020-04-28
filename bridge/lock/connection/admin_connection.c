@@ -1,15 +1,13 @@
-#include "admin_connection.h"
-
-#include "cifra/modes.h"
-#include "cifra/aes.h"
-#include "encryption.h"
-#include "connection_common.h"
-#include "messages/AdminConnectionStep1.h"
-#include "messages/AdminConnectionStep2.h"
-#include "messages/AdminConnectionStep3.h"
+#include <bridge/lock/connection/admin_connection.h>
+#include <bridge/lock/cifra/modes.h>
+#include <bridge/lock/cifra/aes.h>
+#include <bridge/lock/connection/encryption.h>
+#include <bridge/lock/connection/connection_common.h>
+#include <bridge/lock/messages/AdminConnectionStep1.h>
+#include <bridge/lock/messages/AdminConnectionStep2.h>
+#include <bridge/lock/messages/AdminConnectionStep3.h>
 #include <stdio.h>
-#include <iostream>
-using namespace std;
+#include <bridge/bridge_main/log.h>
 
 int igloohome_ble_lock_crypto_AdminConnection_beginConnection(uint8_t *jKey, int keyLen) 
 {
@@ -21,13 +19,13 @@ int igloohome_ble_lock_crypto_AdminConnection_genConnStep2Native(int connectionI
   Connection *connection = getConnection(connectionId);
   if (!connection)
   {
-    cerr << "!connection" << endl;
+    serverLog(LL_ERROR, "!connection");
     return 0;
   }
     
   if (!jConnectionStep1)
   {
-    cerr << "!jConnectionStep1" << endl;
+    serverLog(LL_ERROR, "!jConnectionStep1" );
     return 0;
   }
 
@@ -41,7 +39,7 @@ int igloohome_ble_lock_crypto_AdminConnection_genConnStep2Native(int connectionI
   if (step1_err || !ig_AdminConnectionStep1_is_valid(&step1) 
                                         || step1.nonce_size != kNonceLength) {
       ig_AdminConnectionStep1_deinit(&step1);
-      cerr << "step1_err" << endl;
+      serverLog(LL_ERROR, "step1_err");
       return 0;
   }
 
@@ -58,7 +56,7 @@ int igloohome_ble_lock_crypto_AdminConnection_genConnStep2Native(int connectionI
   if (err != IgSerializerNoError) {
     ig_AdminConnectionStep1_deinit(&step1);
     ig_AdminConnectionStep2_deinit(&step2);
-    cerr << "ig_AdminConnectionStep2_encode error" << endl;
+    serverLog(LL_ERROR, "ig_AdminConnectionStep2_encode error");
     return 0;
   }
 
@@ -75,7 +73,7 @@ int igloohome_ble_lock_crypto_AdminConnection_genConnStep2Native(int connectionI
     ig_AdminConnectionStep1_deinit(&step1);
     ig_AdminConnectionStep2_deinit(&step2);
     free(retvalBytes);
-    cerr << "incrementNonce error" << endl;
+    serverLog(LL_ERROR, "incrementNonce error");
     return 0;
   }
   ig_AdminConnectionStep1_deinit(&step1);

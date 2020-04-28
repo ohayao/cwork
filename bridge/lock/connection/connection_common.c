@@ -1,21 +1,23 @@
-#include "connection_common.h"
 
-#include <cstdint>
-#include <cstring>
-#include <cstdio>
-#include <random>
+
+#include <bridge/lock/connection/connection_common.h>
+
+#include <stdint.h>
+#include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
 
 static const char *kTag = "JNI_connection_common";
 
 static Connection connections_[kMaxConnections];    // auto initialized to 0
 
 void generateRandomNonce(int nonceLength, uint8_t resultNonceArrar[]) {
-    std::random_device r;
-    std::default_random_engine char_random_engine(r());
-    std::uniform_int_distribution<uint8_t> uniform_dist(0, 255);
+    time_t t;
+    srand((unsigned) time(&t));
     for (int i = 0; i < nonceLength; i++)
     {
-        resultNonceArrar[i] = uniform_dist(char_random_engine);
+        resultNonceArrar[i] = rand() % 256; // [0 - 255]
     }
     return;
 }
@@ -31,11 +33,9 @@ int beginConnection(ConnectionType type, uint8_t *jKey, int keyLen) {
             }
             memcpy((uint8_t*)(connections_[i].key), jKey, keyLen);
             generateRandomNonce( kNonceLength, (uint8_t*)connections_[i].rxNonce);
-            printf("\n");
             return i;
         }
     }
-    printf("beginConnection end\n");
     return ERROR_CONNECTION_ID;
 }
 
@@ -56,8 +56,8 @@ int encryptNative(int connectionId, uint8_t *jPlaintext, int plaintextLen,
     uint8_t **retBytes) {
     // validate arguments
     if (connectionId > kMaxConnections || connectionId < 0)
-        return NULL;
-    Connection &connection = connections_[connectionId];
+        return 0;
+    Connection *connection = &(connections_[connectionId]);
 
     uint8_t *plaintext = jPlaintext;
 
@@ -66,9 +66,9 @@ int encryptNative(int connectionId, uint8_t *jPlaintext, int plaintextLen,
     int32_t retvalLen = encryptData(
         plaintext, plaintextLen,
         messageBytes, messageLen,
-        connection.key, kConnectionKeyLength,
-        connection.txNonce, kNonceLength);
-    incrementNonce(connection.txNonce);
+        connection->key, kConnectionKeyLength,
+        connection->txNonce, kNonceLength);
+    incrementNonce(connection->txNonce);
     if (retvalLen <= 0 || retvalLen != messageLen) {
         return 0;
     }
@@ -81,20 +81,20 @@ int decryptNative(
     int connectionId, uint8_t *jMessage, int messageLen, uint8_t **retBytes) {
     // validate arguments
     if (connectionId > kMaxConnections || connectionId < 0)
-        return NULL;
-    Connection &connection = connections_[connectionId];
+        return 0;
+    Connection *connection = &connections_[connectionId];
     uint8_t *messageBytes = jMessage;
 
     int plaintextLen = decryptDataSize(messageLen);
     uint8_t plaintext[plaintextLen];
     int32_t retvalLen = decryptData(messageBytes, messageLen,
                                     plaintext, plaintextLen,
-                                    connection.key, kConnectionKeyLength,
-                                    connection.rxNonce, kNonceLength);
+                                    connection->key, kConnectionKeyLength,
+                                    connection->rxNonce, kNonceLength);
 
-    incrementNonce(connection.rxNonce);
+    incrementNonce(connection->rxNonce);
     if (retvalLen <= 0 || retvalLen != plaintextLen) {
-        return NULL;
+        return 0;
     }
     *retBytes = (uint8_t*)calloc(retvalLen, 1);
     memcpy(retBytes, plaintext, retvalLen);

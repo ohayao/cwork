@@ -1,17 +1,17 @@
-#include "encryption.h"
-#include "connection_common.h"
 
-#include <string>
-#include <cstring>
+#include <bridge/lock/connection/encryption.h>
+#include <bridge/lock/connection/encryption.h>
+#include <string.h>
 
-extern "C" {
-#include "cifra/modes.h"
-#include "cifra/aes.h"
-}
+#include <bridge/lock/cifra/modes.h>
+#include <bridge/lock/cifra/aes.h>
 
 static const char *kTag = "JNI encryption";
-const int kCcmTagLength = 8;
-const int kCcmInternalCounterLength = 3;
+
+enum {
+    kCcmInternalCounterLength = 3,
+    kCcmTagLength = 8
+};
 
 void incrementNonce(uint8_t *nonce) {
     // nonce interpreted as big endian (most significant byte has lowest address/index)
@@ -108,10 +108,6 @@ int32_t decryptData(uint8_t *dataIn, uint32_t dataInLen, uint8_t *dataOut,
 
     return bytesWritten;
 }
-
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 // JNIEXPORT jbyteArray JNICALL
 // Java_co_igloohome_ble_lock_crypto_Encryption_encrypt(JNIEnv *env, jobject pThis, jbyteArray jPlaintext, jbyteArray jKey, jbyteArray jNonce) {

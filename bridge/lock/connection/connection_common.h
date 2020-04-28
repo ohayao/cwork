@@ -12,8 +12,10 @@
 //#define Log_d(tag, ...) __android_log_print(ANDROID_LOG_DEBUG, tag, __VA_ARGS__)
 //#endif
 
-const int kMaxConnections = 32;
-const int kConnectionKeyLength = 16;
+enum {
+    kConnectionKeyLength = 16,
+    kMaxConnections = 32
+};
 
 typedef enum ConnectionType {
     kConnectionTypeNone,

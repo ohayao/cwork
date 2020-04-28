@@ -19,6 +19,7 @@
 #include <bridge/bridge_main/wait_ble.h>
 #include <bridge/ble/ble_discover.h>
 #include <bridge/ble/lock.h>
+#include <bridge/ble/ble_pairing.h>
 
 sysinfo_t g_sysif;
 
@@ -269,9 +270,41 @@ void visitScanResult(ble_data_t *ble_data)
         serverLog(LL_NOTICE, "8. get the j:% lock.", j);
         igm_lock_t *lock = bleGetNResult(ble_data, j, sizeof(igm_lock_t));
         serverLog(LL_NOTICE, "name %s  addr: %s", lock->name, lock->addr);
+        addPairingTask(lock);
     }
     serverLog(LL_NOTICE, "9. Release the ble data");
     bleReleaseData(&ble_data);
+}
+
+void addPairingTask(igm_lock_t *lock)
+{
+    // 设置需要的参数
+    serverLog(LL_NOTICE, "Add Pairing task");
+    serverLog(LL_NOTICE, "1. set ble pairing parameters");
+    ble_pairing_param_t *pairing_param = (ble_pairing_param_t *)calloc(sizeof(igm_lock_t), 1);
+    serverLog(LL_NOTICE, "1. set scan_timeout to 3");
+    bleSetPairingParam(pairing_param, lock);
+    // serverLog(LL_NOTICE, "2. set msg_id to 0(or anything you want)");
+    // int msg_id = 0;
+    // // 把参数写入data, 当前有个问题就是, 使用完, 得访问的人记的释放.
+    // serverLog(LL_NOTICE, "3. alloc ble data datatype, ble_data is used to devliver parameters and get result data");
+    // ble_data_t *ble_data = calloc(sizeof(ble_data_t), 1);
+    // serverLog(LL_NOTICE, "3. init ble_data");
+    // bleInitData(ble_data);
+    // serverLog(LL_NOTICE, "3. set ble parametes to ble data");
+    // bleSetBleParam(ble_data, &discover_param, sizeof(ble_discover_param_t));
+    // // 与记有多少个结果, 30个锁
+    // serverLog(LL_NOTICE, "3. init ble result memory, suppose the max num of locks is 30");
+    // bleInitResults(ble_data, 30, sizeof(igm_lock_t));
+
+    // // 插入系统的队列
+    // serverLog(LL_NOTICE, "4. used InsertBle2DFront to insert the task to system.");
+    // InsertBle2DFront(msg_id, BLE_DISCOVER_BEGIN, 
+    //     ble_data, sizeof(ble_data_t),
+    //     getDiscoverFsmTable(), getDiscoverFsmTableLen()
+    // );
+    // serverLog(LL_NOTICE, "5. Add Discover task.");
+    return;
 }
 
 int main() {

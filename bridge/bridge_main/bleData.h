@@ -4,11 +4,13 @@
 typedef struct BleData
 {
   char *adapter_name; // 蓝牙接口的名字
+  void *adapter;
   void *ble_param;  // 设置什么参数
   int  ble_param_len;    
   void *ble_result;   // 返回给逆什么结果
   int ble_result_len;
   int n_of_result;
+  void *ble_connection; // 为了能够线程安全, 所以不要用全局变量 
 }ble_data_t;
 
 int bleInitData(ble_data_t *data);
