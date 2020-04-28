@@ -140,12 +140,14 @@ task_node_t *InsertBle2DFront(
   );
 }
 
-void DeleteDTask(task_node_t* tn)
+void DeleteDTask(task_node_t **ptn)
 {
+  task_node_t *tn = *ptn;
   _lockD();
   list_del(&tn->list);
   _unlockD();
   free(tn);
+  *ptn = NULL;
 }
 
 void DTask2Waiting(task_node_t* tn) {
@@ -171,10 +173,12 @@ void WTask2Doing(task_node_t* tn) {
   _unlockDW();
 }
 
-void DeleteWTask(task_node_t* tn)
+void DeleteWTask(task_node_t **ptn)
 {
+  task_node_t *tn = *ptn;
   _lockW();
   list_del(&tn->list);
   _unlockW();
   free(tn);
+  *ptn = NULL;
 }

@@ -1,5 +1,6 @@
 #include <bridge/ble/lock.h>
 #include <string.h>
+#include <bridge/bridge_main/log.h>
 
 int lockInit(igm_lock_t *lock)
 {
@@ -17,7 +18,7 @@ int lockCopy(igm_lock_t *to, igm_lock_t *from)
   return 0;
 }
 
-int lockSetName(igm_lock_t *lock, char *name_, int name_len_)
+int lockSetName(igm_lock_t *lock, const char *name_, int name_len_)
 {
   memset(lock->name, 0, MAX_DEVICE_NAME);
   lock->name_len = name_len_;
@@ -25,7 +26,7 @@ int lockSetName(igm_lock_t *lock, char *name_, int name_len_)
   return 0;
 }
 
-int lockSetAddr(igm_lock_t *lock, char *addr_, int addr_len_)
+int lockSetAddr(igm_lock_t *lock, const char *addr_, int addr_len_)
 {
   memset(lock->addr, 0, MAX_DEVICE_ADDR);
   lock->addr_len = addr_len_;

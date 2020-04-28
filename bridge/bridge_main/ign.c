@@ -18,6 +18,7 @@
 #include <bridge/bridge_main/task_queue.h>
 #include <bridge/bridge_main/wait_ble.h>
 #include <bridge/ble/ble_discover.h>
+#include <bridge/ble/lock.h>
 
 sysinfo_t g_sysif;
 
@@ -30,25 +31,31 @@ int FSMHandle(task_node_t* tn) {
     }
 
 	unsigned int table_max_num = sizeof(*tn->task_sm_table) / sizeof(fsm_table_t);
-    serverLog(LL_DEBUG, "table_max_num: %d", table_max_num);
 	int flag = 0;
 
+    // 这儿是遍历所有的状态.
 	for (int i = 0; i<table_max_num; i++) {
+        serverLog(LL_NOTICE, "FSMHandle i %d ", i);
 		if (tn->cur_state == tn->task_sm_table[i].cur_state) {
+            serverLog(LL_NOTICE, "eventActFun begin");
 			tn->task_sm_table[i].eventActFun(tn);
+            serverLog(LL_NOTICE, "eventActFun end");
 			tn->cur_state = tn->task_sm_table[i].next_state;
+
             flag = 1;
+            serverLog(LL_NOTICE, "flag in for %d ", flag);
 			break;
 		}
 	}
-    serverLog(LL_DEBUG, "eventActFun end");
+    serverLog(LL_NOTICE, "flag out for %d ", flag);
+    serverLog(LL_NOTICE, "eventActFun end2 ");
     if (0 == flag) {
 		// do nothing
         // sm or cur_state err
         serverLog(LL_ERROR, "NO state(%d).", tn->cur_state);
         return -1;
 	}
-    serverLog(LL_DEBUG, "FSMHandle end");
+    serverLog(LL_NOTICE, "FSMHandle end");
     return 0;
 }
 
@@ -218,25 +225,53 @@ int WaitBtn(void *arg){
     return 0;
 }
 
+// 添加扫描方式样例
+// ble_data 里面全市
 void addDiscoverTask()
 {
     // 设置需要的参数
-    serverLog(LL_DEBUG, "addDiscoverTask");
+    serverLog(LL_NOTICE, "Add Discover task");
+    serverLog(LL_NOTICE, "1. set ble parameters");
     ble_discover_param_t discover_param;
-    discover_param.scan_timeout = 5;
+    serverLog(LL_NOTICE, "1. set scan_timeout to 3");
+    discover_param.scan_timeout = 3;
+    serverLog(LL_NOTICE, "2. set msg_id to 0(or anything you want)");
     int msg_id = 0;
-    // 把参数写入data
-    serverLog(LL_DEBUG, "ble_discover_param_t end");
+    // 把参数写入data, 当前有个问题就是, 使用完, 得访问的人记的释放.
+    serverLog(LL_NOTICE, "3. alloc ble data datatype, ble_data is used to devliver parameters and get result data");
     ble_data_t *ble_data = calloc(sizeof(ble_data_t), 1);
+    serverLog(LL_NOTICE, "3. init ble_data");
+    bleInitData(ble_data);
+    serverLog(LL_NOTICE, "3. set ble parametes to ble data");
     bleSetBleParam(ble_data, &discover_param, sizeof(ble_discover_param_t));
-    serverLog(LL_DEBUG, "bleSetBleParam end");
+    // 与记有多少个结果, 30个锁
+    serverLog(LL_NOTICE, "3. init ble result memory, suppose the max num of locks is 30");
+    bleInitResults(ble_data, 30, sizeof(igm_lock_t));
+
     // 插入系统的队列
+    serverLog(LL_NOTICE, "4. used InsertBle2DFront to insert the task to system.");
     InsertBle2DFront(msg_id, BLE_DISCOVER_BEGIN, 
         ble_data, sizeof(ble_data_t),
         getDiscoverFsmTable(), getDiscoverFsmTableLen()
     );
-    
-    serverLog(LL_DEBUG, "addDiscoverTask end");
+    serverLog(LL_NOTICE, "5. Add Discover task.");
+    return;
+}
+
+void visitScanResult(ble_data_t *ble_data)
+{
+    serverLog(LL_NOTICE, "6. after the task is finished, we can get the data like this.");
+    serverLog(LL_NOTICE, "7. get the result point.");
+    int num_of_result = bleGetNumsOfResult(ble_data);
+    void *result = ble_data->ble_result;
+    for (int j=0; j < num_of_result; j++)
+    {
+        serverLog(LL_NOTICE, "8. get the j:% lock.", j);
+        igm_lock_t *lock = bleGetNResult(ble_data, j, sizeof(igm_lock_t));
+        serverLog(LL_NOTICE, "name %s  addr: %s", lock->name, lock->addr);
+    }
+    serverLog(LL_NOTICE, "9. Release the ble data");
+    bleReleaseData(&ble_data);
 }
 
 int main() {
@@ -274,8 +309,25 @@ int main() {
             task_node_t *ptn=GetDHeadNode();
             while (ptn)
             {
-                FSMHandle(ptn);
+                // TODO, 当任务完成,需要怎么处理?
+                int ret = FSMHandle(ptn);
+                if(ret)
+                {
+                    serverLog(LL_NOTICE, "one mission error");
+                }
+                else
+                {
+                    serverLog(LL_NOTICE, "one mission finished, delete this task");
+                    visitScanResult(ptn->ble_data);
+                    DeleteDTask(&ptn); // 自动置 ptn 为 NULL
+                }
+                
                 task_node_t *tmp = NextDTask(ptn);
+                if (tmp)
+                {
+                    serverLog(LL_NOTICE, "NextDTask not NULL");
+                }
+                
                 ptn = tmp;
             }
         }

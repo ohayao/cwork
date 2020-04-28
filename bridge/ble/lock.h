@@ -11,4 +11,9 @@ typedef struct IGMLock{
   int name_len;
 }igm_lock_t;
 
+int lockInit(igm_lock_t *lock);
+int lockCopy(igm_lock_t *to, igm_lock_t *from);
+int lockSetName(igm_lock_t *lock, const char *name_, int name_len_);
+int lockSetAddr(igm_lock_t *lock, const char *addr_, int addr_len_);
+
 #endif

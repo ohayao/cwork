@@ -2,6 +2,8 @@
 #include <regex.h>
 #include <bridge/gattlib/gattlib.h>
 #include <bridge/bridge_main/task.h>
+#include <regex.h>
+#include <bridge/ble/lock.h>
 
 int discoverLock(void *arg);
 
@@ -27,7 +29,7 @@ int discoverLock(void *arg)
 	}
 
   ret = gattlib_adapter_scan_enable(
-		adapter, ble_discovered_device, param->scan_timeout, NULL /* user_data */);
+		adapter, ble_discovered_device, param->scan_timeout, arg /* task node*/);
 	if (ret) {
 		fprintf(stderr, "ERROR: Failed to scan.\n");
 		goto EXIT;
@@ -54,43 +56,43 @@ void ble_discovered_device(
 	int addr_size;
 	char *up_addr;
 	int name_size;
+  task_node_t *task_node = (task_node_t *)user_data;
+  ble_data_t * ble_data = (ble_data_t *)task_node->ble_data;
+  ble_discover_param_t *param = (ble_discover_param_t *)ble_data->ble_param;
 
-	// if (name) {
-		// IGM303e31a5c
-    // regex IGM_regex("^IGM.*?",  std::regex_constants::icase);
-		
-		// regex IGM_regex("IGM303e31a5c",  std::regex_constants::icase);
-    // if (regex_match(name, IGM_regex))
-    // {
-		// 	up_addr = strdup(addr);
-		// 	addr_size = strlen(up_addr);
-		// 	name_size = strlen(name);
-    //   // printf("result Discovered %s - '%s '\n", addr, name);
-    // }
-    // else
-    // {
-    //   return;
-    // }
-  //   regex_t regex;
-  //   int reti;
-  //   if (reti) {
-  //     fprintf(stderr, "Could not compile regex\n");
-  //     return;
-  //   }
-  //   reti = regexec(&regex, name, 0, NULL, 0);
-  //   if (!reti) {
-  //     puts("Match");
-  //   }
-  //   else
-  //   {
-  //     return;
-  //   }
-	// } 
-  // else 
-  // {
-	// 	// printf("Discovered %s, don't have name, return\n", addr);
-	// 	return;
-  // }
-  printf("Discovered %s, don't have name, return\n", addr);
+	if (!name) {
+    return ;
+	} 
+  // IGM303e31a5c
+  // regex IGM_regex("^IGM.*?",  std::regex_constants::icase);
+  // regex IGM_regex("IGM303e31a5c",  std::regex_constants::icase);
+  regex_t regex;
+  int reti;
+  reti = regcomp(&regex, "^IGM", 0);
+  if (reti) {
+    fprintf(stderr, "Could not compile regex\n");
+    return;
+  }
+  reti = regexec(&regex, name, 0, NULL, 0);
+  if (!reti) {
+    // match
+    igm_lock_t nearby_lock;
+    lockInit(&nearby_lock);
+    lockSetName(&nearby_lock, name, strlen(name));
+    lockSetAddr(&nearby_lock, addr, strlen(addr));
+    blePutResults(ble_data, &nearby_lock, sizeof(igm_lock_t));
+  }
+  else
+  {
+    return;
+  }
+  // 测试多个数据的返回
+  // serverLog(LL_NOTICE, "match name %s add %s", name, addr);
+  //   igm_lock_t nearby_lock;
+  //   lockInit(&nearby_lock);
+  //   lockSetName(&nearby_lock, name, strlen(name));
+  //   lockSetAddr(&nearby_lock, addr, strlen(addr));
+  //   blePutResults(ble_data, &nearby_lock, sizeof(igm_lock_t));
+  // printf("Discovered %s, don't have name, return\n", addr);
 	return;
 }

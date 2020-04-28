@@ -8,7 +8,11 @@ typedef struct BleData
   int  ble_param_len;    
   void *ble_result;   // 返回给逆什么结果
   int ble_result_len;
+  int n_of_result;
 }ble_data_t;
+
+int bleInitData(ble_data_t *data);
+int bleReleaseData(ble_data_t **pp_data);
 
 int bleGetBleParamLen(ble_data_t *data, int *result_len);
 int bleGetBleParam(ble_data_t *data, void *result);
@@ -17,8 +21,15 @@ int bleSetBleParam(ble_data_t *data, void *ble_param, int ble_param_len);
 
 int bleGetBleResultLen(ble_data_t *data, int *result_len);
 int bleGetBleResult(ble_data_t *data, void *result);
+
+// 设置单个结果可以,问题是有些是多次多个结果
 int bleReleaseBleResult(ble_data_t *data);
 int bleSetBleResult(ble_data_t *data, void *ble_result, int ble_result_len);
 
+// 所以有这个每次放入一个,但是要首先设置一个长度, 然后再一个一个放进去
+int bleInitResults(ble_data_t *data, int n_results, int size_of_result);
+int blePutResults(ble_data_t *data, void *ble_result, int size_of_result);
+int bleGetNumsOfResult(ble_data_t *data);
+void *bleGetNResult(ble_data_t *data, int n, int size_of_result);
 
 #endif
