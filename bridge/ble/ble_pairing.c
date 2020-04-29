@@ -176,7 +176,7 @@ int save_message_data(const uint8_t* data, int data_length, void* user_data)
       }
     }
   }
-
+  
   int size_left = 
         pairing_connection->step_max_size - pairing_connection->step_cur_size;
 
@@ -207,17 +207,14 @@ int save_message_data(const uint8_t* data, int data_length, void* user_data)
 int waiting_pairing_step2(void *arg)
 {
   task_node_t *task_node = (task_node_t *)arg;
-  ble_data_t *ble_data = task_node->ble_data;
-  pairing_connection_t *pairing_connection = 
-                              (pairing_connection_t *)ble_data->ble_connection;
-  while (1)
-  {
-    serverLog(LL_NOTICE, "waiting_pairing_step2 waiting");
-    pthread_mutex_lock(&pairing_connection->wait_mutex);
-    if (pairing_connection->pairing_step == BLE_PAIRING_STEP2) break;
-    pthread_mutex_unlock(&pairing_connection->wait_mutex);
-    usleep(5000000);
-  }
+
+  // 在这儿用g_main_loop_run等待, 用线程锁和睡眠的方法不行, 就像是bluez不会调用
+  // 我的回调函数, 在 rtos 应该会有相应的方法实现这样的等待事件到来的方法.
+  // 当前 Linux 下, 这样用, works 
+  serverLog(LL_NOTICE, "waiting_pairing_step2 new loop waiting");
+  task_node->loop = g_main_loop_new(NULL, 0);
+  g_main_loop_run(task_node->loop);
+
   return 0;
 }
 
@@ -233,9 +230,10 @@ int handle_step2_message(const uint8_t* data, int data_length,void* user_data)
   {
     int ret;
     serverLog(LL_NOTICE, "handle_step2_message RECV step2 data finished");
-    pthread_mutex_lock(&pairing_connection->wait_mutex);
+    // pthread_mutex_lock(&pairing_connection->wait_mutex);
     pairing_connection->pairing_step = BLE_PAIRING_STEP2;
-    pthread_mutex_unlock(&pairing_connection->wait_mutex);
+    // pthread_mutex_unlock(&pairing_connection->wait_mutex);
+    g_main_loop_quit(task_node->loop);
 
   }
 }
@@ -302,9 +300,9 @@ int write_pairing_step1(void *arg)
 	}
   serverLog(LL_NOTICE, "write_char_by_uuid_multi_atts success in writing packages");
 	// std::lock_guard<std::mutex> lock(pairing_step_mutex);
-  pthread_mutex_lock(&pairing_connection->wait_mutex);
+  // pthread_mutex_lock(&pairing_connection->wait_mutex);
 	pairing_connection->pairing_step = BLE_PAIRING_STEP1;
-  pthread_mutex_unlock(&pairing_connection->wait_mutex);
+  // pthread_mutex_unlock(&pairing_connection->wait_mutex);
   serverLog(LL_NOTICE, "write_pairing_step1 end --------");
   return 0;
 STEP1_ERROR_EXIT:
@@ -374,9 +372,9 @@ int register_pairing_notfication(void *arg)
 	{
     serverLog(LL_NOTICE, "success to start notification" );
 	}
-  pthread_mutex_lock(&pairing_connection->wait_mutex);
+  // pthread_mutex_lock(&pairing_connection->wait_mutex);
   pairing_connection->pairing_step = BLE_PAIRING_STEP1;
-  pthread_mutex_unlock(&pairing_connection->wait_mutex);
+  // pthread_mutex_unlock(&pairing_connection->wait_mutex);
   serverLog(LL_NOTICE, "register_pairing_notfication end --------");
   return 0;
 

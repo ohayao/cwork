@@ -30,6 +30,11 @@ int FSMHandle(task_node_t* tn) {
         serverLog(LL_ERROR, "sm_table is NULL.");
         return -1;
     }
+    // sizeof 在定义某数组的时候, sizeof 指针 返回整个数组的字节数
+    // sizeof 对指针的时候, 只能返回指针大小
+    // sizeof 对指针所知数组的某个内容的时候, 只能返回该项大小, 
+    // 也就是只会返回 sm_table 当中某一项的大小
+    // 所以我手动返回了长度.
 	unsigned int table_max_num = tn->sm_table_len;
     serverLog(LL_NOTICE, "table_max_num %d", table_max_num);
 	int flag = 0;

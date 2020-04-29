@@ -6,7 +6,7 @@
 #include <bridge/bridge_main/mqttData.h>
 #include <bridge/bridge_main/bleData.h>
 #include <bridge/bridge_main/list.h>
-
+#include <glib.h>
 typedef struct TaskNode {
     struct list_head list;
     char lock_id[32];
@@ -23,6 +23,7 @@ typedef struct TaskNode {
     sysinfo_t *sysif;
     fsm_table_t *task_sm_table; // 外部数据
     int sm_table_len;
+    GMainLoop *loop;
 }task_node_t;
 
 // 获取param长度
