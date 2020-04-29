@@ -7,6 +7,7 @@
 #include <bridge/bridge_main/bleData.h>
 #include <bridge/bridge_main/list.h>
 #include <glib.h>
+
 typedef struct TaskNode {
     struct list_head list;
     char lock_id[32];

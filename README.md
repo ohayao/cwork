@@ -20,6 +20,19 @@
 ### 第二阶段 迁移至 paho.mqtt.embedded-c进行通信
 - TODO
 
+
+### BLE 编译依赖
+* build-essential  
+* cmake  
+* pkg-config  
+* libbluetooth-dev  
+* libpcre++-dev  
+* libglib2.0-dev  
+* apt-get install libdbus-1-dev  
+* apt-get install libudev-dev  
+* apt-get install libical-dev  
+* apt-get install libreadline-dev  
+
 ### BLE 开发
 编译环境: ubuntu 18.04  
 编译工具: cmake  

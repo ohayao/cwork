@@ -11,6 +11,7 @@
 #include <bridge/lock/messages/PairingStep4.h>
 #include <bridge/lock/messages/PairingCommit.h>
 #include <bridge/lock/connection/pairing_connection.h>
+#include <bridge/ble/ble_operation.h>
 
 char* adapter_name;
 void* adapter;
@@ -34,24 +35,19 @@ int write_pairing_commit(void *arg);
 void message_handler(
 	const uuid_t* uuid, const uint8_t* data, size_t data_length, void* user_data);
 int handle_step2_message(const uint8_t* data, int data_length,void* user_data);
+int handle_step4_message(const uint8_t* data, int data_length,void* user_data);
 int save_message_data(const uint8_t* data, int data_length, void* user_data);
-int write_char_by_uuid_multi_atts (
-	gatt_connection_t* gatt_connection, uuid_t* uuid, const uint8_t* buffer, 
-	size_t buffer_len);
-bool build_msg_payload(uint8_t **p_payloadBytes, 
-                      size_t *payload_len, uint8_t *stepBytes, size_t step_len);
-size_t resolve_payload_len(const size_t step_len);
 
 enum {
-  PAIRING_SM_TABLE_LEN =3
+  PAIRING_SM_TABLE_LEN =6
 };
 fsm_table_t pairing_fsm_table[PAIRING_SM_TABLE_LEN] = {
   {BLE_PAIRING_BEGIN,   register_pairing_notfication,  BLE_PAIRING_STEP1},
   {BLE_PAIRING_STEP1,   write_pairing_step1,           BLE_PAIRING_STEP2},
   {BLE_PAIRING_STEP2,   waiting_pairing_step2,         BLE_PAIRING_STEP3},
-  // {BLE_PAIRING_STEP3,   write_pairing_step3,           BLE_PAIRING_STEP4},
-  // {BLE_PAIRING_STEP4,   waiting_pairing_step4,         BLE_PAIRING_COMMIT},
-  // {BLE_PAIRING_COMMIT,  write_pairing_commit,          BLE_PAIRING_DONE},
+  {BLE_PAIRING_STEP3,   write_pairing_step3,           BLE_PAIRING_STEP4},
+  {BLE_PAIRING_STEP4,   waiting_pairing_step4,         BLE_PAIRING_COMMIT},
+  {BLE_PAIRING_COMMIT,  write_pairing_commit,          BLE_PAIRING_DONE},
 };
 
 fsm_table_t *getPairingFsmTable()
@@ -75,67 +71,6 @@ typedef struct ParingConnection {
 	uint8_t *step_data;
   uuid_t pairing_uuid;
 }pairing_connection_t;
-
-size_t resolve_payload_len(const size_t step_len)
-{
-	return step_len>254 ? (step_len+3) : (step_len+1);
-}
-
-
-bool build_msg_payload(uint8_t **p_payloadBytes, 
-                      size_t *payload_len, uint8_t *stepBytes, size_t step_len)
-{
-	*payload_len = resolve_payload_len(step_len);
-	size_t n_byte_for_len = *payload_len - step_len;
-	(*p_payloadBytes) = (uint8_t *)malloc(*payload_len);
-	if (n_byte_for_len == 1)
-	{
-		(*p_payloadBytes)[0] = step_len;
-	}
-	else if (n_byte_for_len == 3)
-	{
-		// 大端存储
-		uint8_t fst, sec;
-		sec = 254;
-		fst = step_len - sec;
-		(*p_payloadBytes)[0] = fst;
-		(*p_payloadBytes)[1] = sec;
-		(*p_payloadBytes)[3] = 0xff;  
-	}
-	else
-	{
-    serverLog(LL_ERROR, "wrong n_byte_for_len, error");
-		return false;
-	}
-	memcpy((*p_payloadBytes) + n_byte_for_len, stepBytes, step_len);
-	return true;
-}
-
-
-int write_char_by_uuid_multi_atts (
-	gatt_connection_t* gatt_connection, uuid_t* uuid, const uint8_t* buffer, 
-	size_t buffer_len)
-{
-  int BLE_ATT_MAX_BYTES = 20;
-	int ret = GATTLIB_SUCCESS;
-	uint8_t *tmp_bytes[BLE_ATT_MAX_BYTES];
-	size_t size_left;
-	int i;
-	for (i = 0; i < buffer_len; i += BLE_ATT_MAX_BYTES)
-	{
-		size_left = buffer_len-i>=BLE_ATT_MAX_BYTES?BLE_ATT_MAX_BYTES:buffer_len-i;
-		memset(tmp_bytes, 0, BLE_ATT_MAX_BYTES);
-		memcpy(tmp_bytes, buffer+i, size_left);
-		ret = gattlib_write_char_by_uuid(
-			gatt_connection, uuid, tmp_bytes, size_left);
-		if (ret != GATTLIB_SUCCESS) {
-      serverLog(LL_ERROR, "write_char_by_uuid_multi_atts: gattlib_write_char_by_uuid failed in writint ");
-			return ret;
-		}
-    serverLog(LL_NOTICE, "write_char_by_uuid_multi_atts: gattlib_write_char_by_uuid success in writing");
-	}
-	return ret;
-}
 
 int save_message_data(const uint8_t* data, int data_length, void* user_data)
 {
@@ -176,7 +111,7 @@ int save_message_data(const uint8_t* data, int data_length, void* user_data)
       }
     }
   }
-  
+
   int size_left = 
         pairing_connection->step_max_size - pairing_connection->step_cur_size;
 
@@ -204,8 +139,20 @@ int save_message_data(const uint8_t* data, int data_length, void* user_data)
 	}
 }
 
+int waiting_pairing_step4(void *arg)
+{
+  serverLog(LL_NOTICE, "waiting_pairing_step4");
+  task_node_t *task_node = (task_node_t *)arg;
+  serverLog(LL_NOTICE, "waiting_pairing_step4 new loop waiting");
+  task_node->loop = g_main_loop_new(NULL, 0);
+  g_main_loop_run(task_node->loop);
+  serverLog(LL_NOTICE, "waiting_pairing_step4 exit task_node->loop");
+  return 0;
+}
+
 int waiting_pairing_step2(void *arg)
 {
+  serverLog(LL_NOTICE, "waiting_pairing_step2");
   task_node_t *task_node = (task_node_t *)arg;
 
   // 在这儿用g_main_loop_run等待, 用线程锁和睡眠的方法不行, 就像是bluez不会调用
@@ -214,8 +161,27 @@ int waiting_pairing_step2(void *arg)
   serverLog(LL_NOTICE, "waiting_pairing_step2 new loop waiting");
   task_node->loop = g_main_loop_new(NULL, 0);
   g_main_loop_run(task_node->loop);
-
+  serverLog(LL_NOTICE, "waiting_pairing_step2 exit task_node->loop");
   return 0;
+}
+
+int handle_step4_message(const uint8_t* data, int data_length,void* user_data)
+{
+  serverLog(LL_NOTICE, "handle_step4_message");
+  task_node_t *task_node = (task_node_t *)user_data;
+  ble_data_t *ble_data = task_node->ble_data;
+  pairing_connection_t *pairing_connection = 
+                              (pairing_connection_t *)ble_data->ble_connection;
+  save_message_data(data, data_length, user_data);
+  if (pairing_connection->step_max_size == pairing_connection->step_cur_size)
+  {
+    int ret;
+    serverLog(LL_NOTICE, "handle_step2_message RECV step2 data finished");
+    // pthread_mutex_lock(&pairing_connection->wait_mutex);
+    pairing_connection->pairing_step = BLE_PAIRING_STEP4;
+    // pthread_mutex_unlock(&pairing_connection->wait_mutex);
+    g_main_loop_quit(task_node->loop);
+  }
 }
 
 int handle_step2_message(const uint8_t* data, int data_length,void* user_data)
@@ -249,10 +215,219 @@ void message_handler(
   {
     case BLE_PAIRING_STEP1:
     {
+      serverLog(LL_NOTICE, 
+      "pairing_connection->pairing_step BLE_PAIRING_STEP1 handle_step2_message");
       handle_step2_message(data, data_length, user_data);
       break;
     }
+    case BLE_PAIRING_STEP3:
+    {
+      serverLog(LL_NOTICE, 
+      "pairing_connection->pairing_step BLE_PAIRING_STEP3 handle_step4_message");
+      handle_step4_message(data, data_length, user_data);
+      break;
+    }
+    default:
+    {
+      serverLog(LL_ERROR, "pairing_connection->pairing_step error");
+      break;
+    }
   }
+}
+
+int write_pairing_commit(void *arg)
+{
+  serverLog(LL_NOTICE, "write_pairing_commit start --------");
+  int ret;
+  task_node_t *task_node = (task_node_t *)arg;
+  ble_data_t *ble_data = task_node->ble_data;
+  pairing_connection_t *pairing_connection = 
+                              (pairing_connection_t *)ble_data->ble_connection;
+  void *step_data = pairing_connection->step_data;
+  size_t step_max_size = pairing_connection->step_max_size;
+  size_t n_size_byte = pairing_connection->n_size_byte;
+
+  size_t commitBytes_len = 0;
+	uint8_t *commitBytes = NULL;
+
+  uint8_t *step4Bytes = NULL;
+	size_t step4_size = 0;
+  IgPairingStep4 *step4;
+
+  size_t payload_len = 0;
+	uint8_t *payloadBytes = NULL;
+
+
+  ret = igloohome_ble_lock_crypto_PairingConnection_recPairingStep4Native(
+		(step_max_size-n_size_byte), (step_data+n_size_byte), &(step4Bytes)
+	);
+  if (!ret)
+	{
+    serverLog(LL_ERROR, "igloohome_ble_lock_crypto_PairingConnection_recPairingStep4Native error");
+    goto COMMIT_ERROR_EXIT;
+  }
+  serverLog(LL_NOTICE, "igloohome_ble_lock_crypto_PairingConnection_recPairingStep4Native success");
+  step4_size = ret;
+  step4 = (IgPairingStep4 *)step4Bytes;
+
+  serverLog(LL_NOTICE, "debug show step4 password: ");
+  if (step4->has_success && step4->success)
+	{
+			printf("-------------------------step4.has_success \n");
+			
+			if (step4->has_password)
+			{
+					printf("step4.has_password: ");
+					for (int j = 0; j < step4->password_size;j++)
+					{
+							printf("%02x ", (step4->password)[j]);
+					}
+					printf("\n");
+			}
+	}
+
+  time_t current_time = time(NULL);
+
+  commitBytes_len = igloohome_ble_lock_crypto_PairingConnection_genPairingCommitNative(
+    current_time, &commitBytes);
+  if (!commitBytes_len)
+	{
+    serverLog(LL_ERROR, "genPairingCommitNative failed!");
+		goto COMMIT_ERROR_EXIT;
+	}
+  serverLog(LL_NOTICE, "genPairingCommitNative success");
+
+  if (!build_msg_payload(
+		&payloadBytes, &payload_len, commitBytes, commitBytes_len))
+	{
+    serverLog(LL_ERROR, "build_msg_payload failed!");
+		goto COMMIT_ERROR_EXIT;
+	}
+  serverLog(LL_NOTICE, "build_msg_payload success!");
+
+  ret = write_char_by_uuid_multi_atts(
+		pairing_connection->gatt_connection, &pairing_connection->pairing_uuid, 
+    payloadBytes, payload_len);
+	if (ret != GATTLIB_SUCCESS) {
+    serverLog(LL_ERROR, "write_char_by_uuid_multi_atts failed!");
+		goto COMMIT_ERROR_EXIT;
+	}
+  serverLog(LL_NOTICE, "write_char_by_uuid_multi_atts success!");
+
+  pairing_connection->pairing_step = BLE_PAIRING_DONE;
+
+  serverLog(LL_NOTICE, "paired lock name %s addr %s", 
+                pairing_connection->lock.name,  pairing_connection->lock.addr);
+
+  uint8_t *admin_key;
+  int key_len = igloohome_ble_lock_crypto_PairingConnection_getAdminKeyNative(
+			time(NULL), &admin_key);
+  serverLog(LL_NOTICE, "paired lock admin key:");
+  for (int j = 0; j < key_len; j++)
+	{
+			printf("%02x ", admin_key[j]);
+	}
+	printf("\n");
+
+  if (admin_key)
+  {
+    free(admin_key);
+  }
+  free(commitBytes);
+	free(payloadBytes);
+
+
+  serverLog(LL_NOTICE, "write_pairing_commit end --------");
+  return 0;
+
+COMMIT_ERROR_EXIT:
+  if (commitBytes)
+  {
+    free(commitBytes);
+  }
+  if (payloadBytes)
+  {
+    free(payloadBytes);
+  }
+  return 1;
+}
+
+int write_pairing_step3(void *arg)
+{
+  serverLog(LL_NOTICE, "write_pairing_step3 start --------");
+  int ret;
+  task_node_t *task_node = (task_node_t *)arg;
+  ble_data_t *ble_data = task_node->ble_data;
+  pairing_connection_t *pairing_connection = 
+                              (pairing_connection_t *)ble_data->ble_connection;
+  void *step_data = pairing_connection->step_data;
+  size_t step_max_size = pairing_connection->step_max_size;
+  size_t n_size_byte = pairing_connection->n_size_byte;
+
+  size_t payload_len = 0;
+	uint8_t *payloadBytes = NULL;
+  uint8_t *step3Bytes;
+  size_t step3Bytes_len = 0;
+
+  step3Bytes_len = 
+      igloohome_ble_lock_crypto_PairingConnection_genPairingStep3Native(
+		        (step_max_size-n_size_byte), (step_data+n_size_byte), &step3Bytes);
+  if (!step3Bytes_len)
+  {
+    serverLog(LL_NOTICE, "genPairingStep3Native error");
+    goto STEP3_ERROR_EXIT;
+  }
+  serverLog(LL_NOTICE, "genPairingStep3Native Success");
+
+  if (!build_msg_payload(
+		&payloadBytes, &payload_len, step3Bytes, step3Bytes_len))
+	{
+    serverLog(LL_ERROR, "failed in build_msg_payload");
+		goto STEP3_ERROR_EXIT;
+	}
+  serverLog(LL_NOTICE, "build_msg_payload Success");
+
+  ret = write_char_by_uuid_multi_atts(
+		pairing_connection->gatt_connection, &pairing_connection->pairing_uuid,
+                                                     payloadBytes, payload_len);
+	if (ret != GATTLIB_SUCCESS) {
+    serverLog(LL_ERROR, 
+                "write_char_by_uuid_multi_atts failed in writing th packags");
+		goto STEP3_ERROR_EXIT;
+	}
+  serverLog(LL_NOTICE, "write_char_by_uuid_multi_atts Success");
+
+  // 重设step_data等数据, 为了下次作准备
+  if(pairing_connection->step_data)
+  {
+    free(pairing_connection->step_data);
+    pairing_connection->step_data = NULL;
+    pairing_connection->step_max_size = 0;
+    pairing_connection->step_cur_size = 0;
+    pairing_connection->n_size_byte = 0;
+    serverLog(LL_NOTICE, "write_pairing_step3  reset step data success");
+  }
+
+  // 重设步骤
+  pairing_connection->pairing_step = BLE_PAIRING_STEP3;
+
+  free(step3Bytes);
+  free(payloadBytes);
+  return 0;
+
+STEP3_ERROR_EXIT:
+  // 释放产生的数据内存哦
+  // 释放申请的内存
+  if (step3Bytes)
+  {
+    free(step3Bytes);
+  }
+
+  if (payloadBytes)
+  {
+    free(payloadBytes);
+  }
+  return 1;
 }
 
 int write_pairing_step1(void *arg)
