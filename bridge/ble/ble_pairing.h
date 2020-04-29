@@ -27,6 +27,7 @@ int bleReleaseParingParam(ble_pairing_param_t *pairing_param);
 int bleSetPairingParam(ble_pairing_param_t *pairing_param, igm_lock_t *lock);
 
 typedef struct BLEPairingResult {
+  char addr[MAX_DEVICE_ADDR];
   int pairing_successed;
   int has_admin_key;
   uint8_t *admin_key;
@@ -49,6 +50,8 @@ int bleGetPairingResultAdminKey(ble_pairing_result_t *result,
   uint8_t *admin_key, int *p_admin_key_len);
 int bleGetPairingResultPassword(ble_pairing_result_t *result, 
   uint8_t *password, int *p_password_size);
+int bleSetPairingResultAddr(ble_pairing_result_t *result, 
+  char *addr, size_t addr_len);
 
 fsm_table_t *getPairingFsmTable();
 int getPairingFsmTableLen();

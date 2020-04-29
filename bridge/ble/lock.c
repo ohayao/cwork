@@ -108,3 +108,18 @@ void printLock (igm_lock_t *lock)
   }
   serverLog(LL_NOTICE, "--------------print Lock end------------------");
 }
+
+int isLockPaired(igm_lock_t *lock)
+{
+  return lock->paired;
+}
+
+int isLockAdmin(igm_lock_t *lock)
+{
+  return lock->admin_connection;
+}
+
+int setLockPaired(igm_lock_t *lock)
+{
+  lock->paired = 1;
+}

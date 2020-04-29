@@ -329,14 +329,28 @@ void saveTaskData(task_node_t *ptn)
                 igm_lock_t *lock = bleGetNResult(ble_data, j, sizeof(igm_lock_t));
                 serverLog(LL_NOTICE, "name %s  addr: %s", lock->name, lock->addr);
                 insertLock(lock);
+                // test
+                if (!lock->paired)
+                {
+                    serverLog(LL_NOTICE, "try to pair name %s  addr: %s", lock->name, lock->addr);
+                    addPairingTask(lock);
+                }              
             }
             break;
         }
         case TASK_BLE_PAIRING:
         {
             serverLog(LL_NOTICE, "saving ble TASK_BLE_PAIRING data");
+            ble_pairing_result_t *pairing_result = (ble_pairing_result_t *)ble_data->ble_result;
+            igm_lock_t *lock = findLockByAddr(ble_data->ble_result);
+            if (lock)
+            {
+                serverLog(LL_NOTICE, "set name %s addr %s to paired", lock->name, lock->addr);
+                setLockPaired(lock);
+            }
             break;
-        }        
+        }
+        
         default:
             break;
         }

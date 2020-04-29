@@ -339,7 +339,7 @@ int write_pairing_commit(void *arg)
   serverLog(LL_NOTICE, "write_pairing_commit bleSetBleResult to ble data");
   bleSetBleResult(
     ble_data, pairing_connection->pairing_result, sizeof(ble_pairing_result_t));
-  
+  bleSetPairingSuccess(pairing_connection->pairing_result, 1);
 
   if (admin_key)
   {
@@ -515,7 +515,8 @@ int register_pairing_notfication(void *arg)
   pairing_connection->has_pairing_result = 1;
   pairing_connection->pairing_result = calloc(sizeof(ble_pairing_result_t), 1);
   bleInitPairingResult(pairing_connection->pairing_result);
-
+  bleSetPairingResultAddr(pairing_connection->pairing_result, 
+                                      param->lock->addr, param->lock->addr_len);
   // char *adapter_name = NULL;
   // void *adapter = NULL;
   ble_data->adapter_name = NULL;
@@ -696,6 +697,14 @@ int bleGetPairingResultPassword(ble_pairing_result_t *result,
     *p_password_size = result->password_size;
     memcpy(password, result->password, result->password_size);
   }
+  return 0;
+}
+
+int bleSetPairingResultAddr(ble_pairing_result_t *result, 
+  char *addr, size_t addr_len)
+{
+  memset(result->addr,0, MAX_DEVICE_ADDR);
+  memcpy(result->addr, addr, addr_len>MAX_DEVICE_ADDR?MAX_DEVICE_ADDR:addr_len);
   return 0;
 }
 
