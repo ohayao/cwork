@@ -157,6 +157,18 @@ bool copyIgPairingStep4(IgPairingStep4 *step4, uint8_t **ret)
 {
     (*ret) = (uint8_t *)calloc(sizeof(IgPairingStep4), 1);
     IgPairingStep4 *copy_step4 =  (IgPairingStep4 *)(*ret);
+
+    if (step4->has_success) {
+        copy_step4->has_success = step4->has_success;
+        copy_step4->success = step4->success;
+    }
+
+    if (step4->has_gmt_offset)
+    {
+        copy_step4->has_gmt_offset = step4->has_gmt_offset;
+        copy_step4->gmt_offset = step4->gmt_offset;
+    }
+
     if(step4->has_master_pin){
         copy_step4->has_master_pin = true;
         copy_step4->master_pin_size = step4->master_pin_size;
@@ -175,8 +187,7 @@ bool copyIgPairingStep4(IgPairingStep4 *step4, uint8_t **ret)
             goto COPY_FAILED;   
         memcpy(copy_step4->pin_key, step4->pin_key, copy_step4->pin_key_size);
     }
-  
-  
+
   
   if(step4->has_password){
         copy_step4->has_password = step4->has_password;

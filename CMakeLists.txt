@@ -7,7 +7,7 @@ pkg_search_module(GLIB REQUIRED glib-2.0)
 
 include_directories(.)
 include_directories(${GIO_UNIX_INCLUDE_DIRS})
-
+#include_directories(${GLIB_INCLUDE_DIRS})
 # 定义一个变量
 set(GATTLIB_ROOT_DIR ${CMAKE_SOURCE_DIR}/bridge/gattlib)
 

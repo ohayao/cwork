@@ -8,9 +8,16 @@
 #include <bridge/bridge_main/list.h>
 #include <glib.h>
 
+enum TASK_TYPE {
+    TASK_BLE_DISCOVER = 1,
+    TASK_BLE_PAIRING = 2,
+    TASK_BLE_ADMIN_CONNECTION = 3,
+};
+
 typedef struct TaskNode {
     struct list_head list;
     char lock_id[32];
+    int task_type; // 需要它进行数据的分类处理, 例如扫描的数据,和paired的数据, admin_connection的数据
     // void* lockinfo; // 外部数据?
 	//struct task_node *next;
 	unsigned int msg_id;

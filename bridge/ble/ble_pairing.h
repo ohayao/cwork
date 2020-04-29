@@ -28,11 +28,27 @@ int bleSetPairingParam(ble_pairing_param_t *pairing_param, igm_lock_t *lock);
 
 typedef struct BLEPairingResult {
   int pairing_successed;
+  int has_admin_key;
   uint8_t *admin_key;
   size_t admin_key_len;
+  int has_password;
   uint8_t *password;
   size_t password_size;
 }ble_pairing_result_t;
+
+int bleInitPairingResult(ble_pairing_result_t *result);
+int bleSetPairingSuccess(ble_pairing_result_t *pairing_result, int s);
+int bleReleaseResultAdminKey(ble_pairing_result_t *result);
+int bleReleaseResultPassword(ble_pairing_result_t *result);
+int bleReleasePairingResult(ble_pairing_result_t **pp_result);
+int bleSetPairingResultAdminKey(ble_pairing_result_t *result, 
+  uint8_t *admin_key, int admin_key_len);
+int bleSetPairingResultPassword(ble_pairing_result_t *result, 
+  uint8_t *password, int password_size);
+int bleGetPairingResultAdminKey(ble_pairing_result_t *result, 
+  uint8_t *admin_key, int *p_admin_key_len);
+int bleGetPairingResultPassword(ble_pairing_result_t *result, 
+  uint8_t *password, int *p_password_size);
 
 fsm_table_t *getPairingFsmTable();
 int getPairingFsmTableLen();

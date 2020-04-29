@@ -1,6 +1,4 @@
 #include <bridge/ble/ble_pairing.h>
-#include <string.h>
-#include <stdlib.h>
 #include <bridge/bridge_main/task.h>
 #include <bridge/bridge_main/log.h>
 #include <pthread.h>
@@ -12,12 +10,12 @@
 #include <bridge/lock/messages/PairingCommit.h>
 #include <bridge/lock/connection/pairing_connection.h>
 #include <bridge/ble/ble_operation.h>
+#include <string.h>
+#include <stdlib.h>
 
 char* adapter_name;
 void* adapter;
 char pairing_str[] = "5c3a659e-897e-45e1-b016-007107c96df6";
-
-
 
 //步骤分别为
 // 1. BLE_PAIRING_BEGIN 监听变化
@@ -62,7 +60,6 @@ int getPairingFsmTableLen()
 
 typedef struct ParingConnection {
 	gatt_connection_t* gatt_connection;
-  pthread_mutex_t wait_mutex;
   igm_lock_t lock;
 	enum BLE_PAIRING_STATE pairing_step;
 	size_t step_max_size;
@@ -70,6 +67,8 @@ typedef struct ParingConnection {
 	size_t n_size_byte;
 	uint8_t *step_data;
   uuid_t pairing_uuid;
+  int has_pairing_result;
+  ble_pairing_result_t *pairing_result;
 }pairing_connection_t;
 
 int save_message_data(const uint8_t* data, int data_length, void* user_data)
@@ -177,9 +176,7 @@ int handle_step4_message(const uint8_t* data, int data_length,void* user_data)
   {
     int ret;
     serverLog(LL_NOTICE, "handle_step2_message RECV step2 data finished");
-    // pthread_mutex_lock(&pairing_connection->wait_mutex);
     pairing_connection->pairing_step = BLE_PAIRING_STEP4;
-    // pthread_mutex_unlock(&pairing_connection->wait_mutex);
     g_main_loop_quit(task_node->loop);
   }
 }
@@ -196,9 +193,7 @@ int handle_step2_message(const uint8_t* data, int data_length,void* user_data)
   {
     int ret;
     serverLog(LL_NOTICE, "handle_step2_message RECV step2 data finished");
-    // pthread_mutex_lock(&pairing_connection->wait_mutex);
     pairing_connection->pairing_step = BLE_PAIRING_STEP2;
-    // pthread_mutex_unlock(&pairing_connection->wait_mutex);
     g_main_loop_quit(task_node->loop);
 
   }
@@ -246,6 +241,7 @@ int write_pairing_commit(void *arg)
   void *step_data = pairing_connection->step_data;
   size_t step_max_size = pairing_connection->step_max_size;
   size_t n_size_byte = pairing_connection->n_size_byte;
+  
 
   size_t commitBytes_len = 0;
 	uint8_t *commitBytes = NULL;
@@ -271,10 +267,14 @@ int write_pairing_commit(void *arg)
   step4 = (IgPairingStep4 *)step4Bytes;
 
   serverLog(LL_NOTICE, "debug show step4 password: ");
-  if (step4->has_success && step4->success)
+
+  if (step4->has_success && step4->success && 
+                                        pairing_connection->has_pairing_result)
 	{
-			printf("-------------------------step4.has_success \n");
-			
+    serverLog(LL_NOTICE, "set Pairing Result the Password");
+    bleSetPairingResultPassword(
+      pairing_connection->pairing_result, step4->password, step4->password_size);
+      serverLog(LL_NOTICE, "-------------------------step4.has_success ");
 			if (step4->has_password)
 			{
 					printf("step4.has_password: ");
@@ -322,12 +322,24 @@ int write_pairing_commit(void *arg)
   uint8_t *admin_key;
   int key_len = igloohome_ble_lock_crypto_PairingConnection_getAdminKeyNative(
 			time(NULL), &admin_key);
-  serverLog(LL_NOTICE, "paired lock admin key:");
-  for (int j = 0; j < key_len; j++)
-	{
-			printf("%02x ", admin_key[j]);
-	}
-	printf("\n");
+  if (key_len && admin_key && pairing_connection->has_pairing_result)
+  {
+    serverLog(LL_NOTICE, "set Pairing Result the  admin key:");
+    bleSetPairingResultAdminKey(
+      pairing_connection->pairing_result, admin_key, key_len);
+      serverLog(LL_NOTICE, "paired lock admin key:");
+      for (int j = 0; j < key_len; j++)
+      {
+          printf("%02x ", admin_key[j]);
+      }
+      printf("\n");
+  }
+
+  // 返回参数给调用进程
+  serverLog(LL_NOTICE, "write_pairing_commit bleSetBleResult to ble data");
+  bleSetBleResult(
+    ble_data, pairing_connection->pairing_result, sizeof(ble_pairing_result_t));
+  
 
   if (admin_key)
   {
@@ -474,10 +486,7 @@ int write_pairing_step1(void *arg)
 		goto STEP1_ERROR_EXIT;
 	}
   serverLog(LL_NOTICE, "write_char_by_uuid_multi_atts success in writing packages");
-	// std::lock_guard<std::mutex> lock(pairing_step_mutex);
-  // pthread_mutex_lock(&pairing_connection->wait_mutex);
 	pairing_connection->pairing_step = BLE_PAIRING_STEP1;
-  // pthread_mutex_unlock(&pairing_connection->wait_mutex);
   serverLog(LL_NOTICE, "write_pairing_step1 end --------");
   return 0;
 STEP1_ERROR_EXIT:
@@ -502,7 +511,11 @@ int register_pairing_notfication(void *arg)
   pairing_connection_t *pairing_connection = 
                             (pairing_connection_t *)ble_data->ble_connection;
   memset(pairing_connection, 0, sizeof(pairing_connection_t));
-  pthread_mutex_init(&pairing_connection->wait_mutex, PTHREAD_MUTEX_TIMED_NP);
+  // 返回的结果
+  pairing_connection->has_pairing_result = 1;
+  pairing_connection->pairing_result = calloc(sizeof(ble_pairing_result_t), 1);
+  bleInitPairingResult(pairing_connection->pairing_result);
+
   // char *adapter_name = NULL;
   // void *adapter = NULL;
   ble_data->adapter_name = NULL;
@@ -547,9 +560,7 @@ int register_pairing_notfication(void *arg)
 	{
     serverLog(LL_NOTICE, "success to start notification" );
 	}
-  // pthread_mutex_lock(&pairing_connection->wait_mutex);
   pairing_connection->pairing_step = BLE_PAIRING_STEP1;
-  // pthread_mutex_unlock(&pairing_connection->wait_mutex);
   serverLog(LL_NOTICE, "register_pairing_notfication end --------");
   return 0;
 
@@ -603,24 +614,33 @@ int bleInitPairingResult(ble_pairing_result_t *result)
   return 0;
 }
 
+int bleSetPairingSuccess(ble_pairing_result_t *pairing_result, int s)
+{
+  pairing_result->pairing_successed = s;
+  return 0;
+}
+
 int bleReleaseResultAdminKey(ble_pairing_result_t *result)
 {
-  if (result->admin_key)
+
+  if (result && result->has_admin_key && result->admin_key)
   {
+    result->has_admin_key = 0;
+    result->admin_key_len = 0;
     free(result->admin_key);
     result->admin_key = NULL;
-    result->admin_key_len = 0;
   }
   return 0;
 }
 
 int bleReleaseResultPassword(ble_pairing_result_t *result)
 {
-  if (result->password)
+  if (result && result->has_password && result->password)
   {
+    result->has_password = 0;
+    result->password_size = 0;
     free(result->password);
     result->password = NULL;
-    result->password_size = 0;
   }
   return 0;
 }
@@ -639,8 +659,9 @@ int bleSetPairingResultAdminKey(ble_pairing_result_t *result,
   uint8_t *admin_key, int admin_key_len)
 {
   bleReleaseResultAdminKey(result);
+  result->has_admin_key = 1;
   result->admin_key_len = admin_key_len;
-  result->admin_key = calloc(admin_key_len,1);
+  result->admin_key = calloc(admin_key_len, 1);
   memcpy(result->admin_key, admin_key, admin_key_len);
   return 0;
 }
@@ -649,25 +670,33 @@ int bleSetPairingResultPassword(ble_pairing_result_t *result,
   uint8_t *password, int password_size)
 {
   bleReleaseResultPassword(result);
+  result->has_password = 1;
   result->password_size = password_size;
-  result->password = calloc(password_size,1);
+  result->password = calloc(password_size, 1);
   memcpy(result->password, password, password_size);
   return 0;
 }
 
-void bleGetPairingResultAdminKey(ble_pairing_result_t *result, 
+int bleGetPairingResultAdminKey(ble_pairing_result_t *result, 
   uint8_t *admin_key, int *p_admin_key_len)
 {
-  *p_admin_key_len = result->admin_key_len;
-  memcpy(admin_key, result->admin_key, result->admin_key_len);
+  if (result->has_admin_key)
+  {
+    *p_admin_key_len = result->admin_key_len;
+    memcpy(admin_key, result->admin_key, result->admin_key_len);
+  }
+  return 0;
 }
 
-void bleGetPairingResultPassword(ble_pairing_result_t *result, 
+int bleGetPairingResultPassword(ble_pairing_result_t *result, 
   uint8_t *password, int *p_password_size)
 {
-  *p_password_size = result->password_size;
-  memcpy(password, result->password, result->password_size);
+  if (result->has_password)
+  {
+    *p_password_size = result->password_size;
+    memcpy(password, result->password, result->password_size);
+  }
+  return 0;
 }
 
 // --------------------------------------------------------------------
-

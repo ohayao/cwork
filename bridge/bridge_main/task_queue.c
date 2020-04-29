@@ -11,25 +11,13 @@ int doing_task_inited = 0;
 pthread_mutex_t doing_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t waiting_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-int _lockD()
-{
-  return pthread_mutex_lock(&doing_mutex);
-}
+#define _lockD() pthread_mutex_lock(&doing_mutex)
 
-int _unlockD()
-{
-  return pthread_mutex_unlock(&doing_mutex);
-}
+#define _unlockD() pthread_mutex_unlock(&doing_mutex)
 
-int _lockW()
-{
-  return pthread_mutex_lock(&waiting_mutex);
-}
+#define _lockW() pthread_mutex_lock(&waiting_mutex)
 
-int _unlockW()
-{
-  return pthread_mutex_unlock(&waiting_mutex);
-}
+#define _unlockW() pthread_mutex_unlock(&waiting_mutex)
 
 int _lockDW()
 {
@@ -97,12 +85,13 @@ task_node_t *InsertDTaskFront(
   unsigned int msg_id, unsigned char cs, 
   mqtt_data_t *mqtt_data, int mqtt_data_len,
   ble_data_t *ble_data, int ble_data_len, 
-  fsm_table_t *task_sm_table, int sm_table_len)
+  fsm_table_t *task_sm_table, int sm_table_len, int task_type)
 {
   task_node_t *new_task = (task_node_t *)malloc(sizeof(task_node_t));
   task_node_t *task_node = (task_node_t *)new_task;
   serverLog(LL_NOTICE, "1. InsertDTaskFront set pairing param lock memory %x", task_node);
   new_task->msg_id = msg_id;
+  new_task->task_type = task_type;
   // copy mqtt data
   if (mqtt_data_len && mqtt_data)
   {
@@ -140,10 +129,10 @@ task_node_t *InsertDTaskFront(
 task_node_t *InsertBle2DFront(
   unsigned int msg_id, unsigned char cs, 
   ble_data_t *ble_data, int ble_data_len, 
-  fsm_table_t *task_sm_table, int sm_table_len)
+  fsm_table_t *task_sm_table, int sm_table_len, int task_type)
 {
   return InsertDTaskFront(
-    msg_id, cs, NULL, 0, ble_data, ble_data_len, task_sm_table, sm_table_len
+    msg_id, cs, NULL, 0, ble_data, ble_data_len, task_sm_table, sm_table_len, task_type
   );
 }
 

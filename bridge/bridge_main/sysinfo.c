@@ -6,14 +6,8 @@
 
 pthread_mutex_t sysinfo_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-int _lock()
-{
-  return pthread_mutex_lock(&sysinfo_mutex);
-}
-int _unlock()
-{
-  return pthread_mutex_unlock(&sysinfo_mutex);
-}
+#define _lock()pthread_mutex_lock(&sysinfo_mutex)
+#define _unlock() pthread_mutex_unlock(&sysinfo_mutex)
 
 int tasksysinfoInit(sysinfo_t *sysinfo)
 {

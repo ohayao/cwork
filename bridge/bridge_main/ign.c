@@ -20,6 +20,7 @@
 #include <bridge/ble/ble_discover.h>
 #include <bridge/ble/lock.h>
 #include <bridge/ble/ble_pairing.h>
+#include <bridge/bridge_main/lock_list.h>
 
 sysinfo_t g_sysif;
 
@@ -95,6 +96,8 @@ int BLEParing(void* tn){
 	printf("BLEParing!\n");
     return 0;
 }
+
+
 
 
 // int Init(void* tn) {
@@ -255,7 +258,7 @@ void addDiscoverTask()
     serverLog(LL_NOTICE, "4. used InsertBle2DFront to insert the task to system.");
     InsertBle2DFront(msg_id, BLE_DISCOVER_BEGIN, 
         ble_data, sizeof(ble_data_t),
-        getDiscoverFsmTable(), getDiscoverFsmTableLen()
+        getDiscoverFsmTable(), getDiscoverFsmTableLen(), TASK_BLE_DISCOVER
     );
     serverLog(LL_NOTICE, "5. Add Discover task.");
     return;
@@ -300,10 +303,44 @@ void addPairingTask(igm_lock_t *lock)
     serverLog(LL_NOTICE, "4. used InsertBle2DFront to insert the task to system.");
     InsertBle2DFront(msg_id, BLE_PAIRING_BEGIN, 
         ble_data, sizeof(ble_data_t),
-        getPairingFsmTable(), getPairingFsmTableLen()
-    );
+        getPairingFsmTable(), getPairingFsmTableLen(), TASK_BLE_PAIRING);
     serverLog(LL_NOTICE, "5. Add Pairing task.");
     return;
+}
+
+
+void saveTaskData(task_node_t *ptn)
+{
+    if (!ptn) return;
+
+    if(ptn->ble_data && ptn->ble_data_len)
+    {
+        ble_data_t *ble_data = ptn->ble_data;
+        int task_type = ptn->task_type;
+        switch (task_type)
+        {
+        case TASK_BLE_DISCOVER:
+        {
+            serverLog(LL_NOTICE, "saving ble TASK_BLE_DISCOVER data");
+            int num_of_result = bleGetNumsOfResult(ble_data);
+            void *result = ble_data->ble_result;
+            for (int j=0; j < num_of_result; j++)
+            {
+                igm_lock_t *lock = bleGetNResult(ble_data, j, sizeof(igm_lock_t));
+                serverLog(LL_NOTICE, "name %s  addr: %s", lock->name, lock->addr);
+                insertLock(lock);
+            }
+            break;
+        }
+        case TASK_BLE_PAIRING:
+        {
+            serverLog(LL_NOTICE, "saving ble TASK_BLE_PAIRING data");
+            break;
+        }        
+        default:
+            break;
+        }
+    }
 }
 
 int main() {
@@ -331,8 +368,10 @@ int main() {
         //if empty, sleep(0.5);
         //do it , after set into waiting_list
         if (IsDEmpty()) {
-            serverLog(LL_NOTICE,"doing_task_head is empty, ready to sleep.");
+            serverLog(LL_NOTICE,"doing_task_head is empty, check Lock list.");
             // 应该去检查waiting list
+            printLockList();
+            serverLog(LL_NOTICE,"doing_task_head is empty, ready to sleep.");
             sleep(1);
         } 
         else {
@@ -350,7 +389,7 @@ int main() {
                 else
                 {
                     serverLog(LL_NOTICE, "one mission finished, delete this task");
-                    visitScanResult(ptn->ble_data);
+                    saveTaskData(ptn);
                     DeleteDTask(&ptn); // 自动置 ptn 为 NULL
                 }
                 

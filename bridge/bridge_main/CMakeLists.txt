@@ -1,4 +1,7 @@
 
+pkg_search_module(GLIB REQUIRED glib-2.0)
+include_directories(${GLIB_INCLUDE_DIRS})
+
 set(IGN_DEPENDENCIES
   pthread
   ble
@@ -14,6 +17,7 @@ set(IGN_SRCS
   ./task.c
   ./thread_helper.c
   ./wait_Ble.c
+  ./lock_list.c
 )
 
 add_executable(ign ${IGN_SRCS})
