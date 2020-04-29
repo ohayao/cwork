@@ -54,9 +54,10 @@ typedef struct _ign_BridgeProfile {
     uint32_t inited_time;
 } ign_BridgeProfile;
 
+typedef PB_BYTES_ARRAY_T(100) ign_LockEntry_ekey_t;
 typedef struct _ign_LockEntry {
     char bt_id[100];
-    pb_callback_t ekey;
+    ign_LockEntry_ekey_t ekey;
 } ign_LockEntry;
 
 typedef struct _ign_LockJob {
@@ -110,14 +111,14 @@ typedef struct _ign_MsgInfo {
 #define ign_LockLog_init_default                 {"", {0, {0}}}
 #define ign_BridgeEventData_init_default         {false, ign_BridgeProfile_init_default, {{NULL}, NULL}, {{NULL}, NULL}}
 #define ign_LockJob_init_default                 {"", {{NULL}, NULL}}
-#define ign_LockEntry_init_default               {"", {{NULL}, NULL}}
+#define ign_LockEntry_init_default               {"", {0, {0}}}
 #define ign_ServerEventData_init_default         {{{NULL}, NULL}, false, ign_LockJob_init_default}
 #define ign_MsgInfo_init_zero                    {0, 0, _ign_EventType_MIN, false, ign_BridgeEventData_init_zero, false, ign_ServerEventData_init_zero}
 #define ign_BridgeProfile_init_zero              {_ign_OSType_MIN, {0, {0}}, {0, {0}}, {0, {0}}, {0, {0}}, {0, {0}}, {0, {0}}, 0, {0, {0}}, 0}
 #define ign_LockLog_init_zero                    {"", {0, {0}}}
 #define ign_BridgeEventData_init_zero            {false, ign_BridgeProfile_init_zero, {{NULL}, NULL}, {{NULL}, NULL}}
 #define ign_LockJob_init_zero                    {"", {{NULL}, NULL}}
-#define ign_LockEntry_init_zero                  {"", {{NULL}, NULL}}
+#define ign_LockEntry_init_zero                  {"", {0, {0}}}
 #define ign_ServerEventData_init_zero            {{{NULL}, NULL}, false, ign_LockJob_init_zero}
 
 /* Field tags (for use in manual encoding/decoding) */
@@ -197,8 +198,8 @@ X(a, CALLBACK, SINGULAR, BYTES,    lock_cmd,          2)
 
 #define ign_LockEntry_FIELDLIST(X, a) \
 X(a, STATIC,   SINGULAR, STRING,   bt_id,             1) \
-X(a, CALLBACK, SINGULAR, BYTES,    ekey,              2)
-#define ign_LockEntry_CALLBACK pb_default_field_callback
+X(a, STATIC,   SINGULAR, BYTES,    ekey,              2)
+#define ign_LockEntry_CALLBACK NULL
 #define ign_LockEntry_DEFAULT NULL
 
 #define ign_ServerEventData_FIELDLIST(X, a) \
@@ -232,7 +233,7 @@ extern const pb_msgdesc_t ign_ServerEventData_msg;
 #define ign_LockLog_size                         1128
 /* ign_BridgeEventData_size depends on runtime parameters */
 /* ign_LockJob_size depends on runtime parameters */
-/* ign_LockEntry_size depends on runtime parameters */
+#define ign_LockEntry_size                       203
 /* ign_ServerEventData_size depends on runtime parameters */
 
 #ifdef __cplusplus
