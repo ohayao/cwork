@@ -55,10 +55,10 @@ message BridgeProfile {
   //   byte[2] mem_rate
   //   byte[3] disk_rate
   bytes  sys_statics = 6;
-  bytes  wifi_ssid   = 11;
-  int32  wifi_signal = 12;
-  uint32 inited_time = 14;
-  bytes  name        = 13;
+  bytes  wifi_ssid   = 7;
+  int32  wifi_signal = 8;
+  uint32 inited_time = 9;
+  bytes  name        = 10;
 }
 message LockLog {
   // Bt id of lock that this log belongs to

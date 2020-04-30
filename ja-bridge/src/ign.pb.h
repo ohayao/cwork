@@ -50,8 +50,8 @@ typedef struct _ign_BridgeProfile {
     ign_BridgeProfile_sys_statics_t sys_statics;
     ign_BridgeProfile_wifi_ssid_t wifi_ssid;
     int32_t wifi_signal;
-    ign_BridgeProfile_name_t name;
     uint32_t inited_time;
+    ign_BridgeProfile_name_t name;
 } ign_BridgeProfile;
 
 typedef PB_BYTES_ARRAY_T(100) ign_LockEntry_ekey_t;
@@ -107,14 +107,14 @@ typedef struct _ign_MsgInfo {
 
 /* Initializer values for message structs */
 #define ign_MsgInfo_init_default                 {0, 0, _ign_EventType_MIN, false, ign_BridgeEventData_init_default, false, ign_ServerEventData_init_default}
-#define ign_BridgeProfile_init_default           {_ign_OSType_MIN, {0, {0}}, {0, {0}}, {0, {0}}, {0, {0}}, {0, {0}}, {0, {0}}, 0, {0, {0}}, 0}
+#define ign_BridgeProfile_init_default           {_ign_OSType_MIN, {0, {0}}, {0, {0}}, {0, {0}}, {0, {0}}, {0, {0}}, {0, {0}}, 0, 0, {0, {0}}}
 #define ign_LockLog_init_default                 {"", {0, {0}}}
 #define ign_BridgeEventData_init_default         {false, ign_BridgeProfile_init_default, {{NULL}, NULL}, {{NULL}, NULL}}
 #define ign_LockJob_init_default                 {"", {{NULL}, NULL}}
 #define ign_LockEntry_init_default               {"", {0, {0}}}
 #define ign_ServerEventData_init_default         {{{NULL}, NULL}, false, ign_LockJob_init_default}
 #define ign_MsgInfo_init_zero                    {0, 0, _ign_EventType_MIN, false, ign_BridgeEventData_init_zero, false, ign_ServerEventData_init_zero}
-#define ign_BridgeProfile_init_zero              {_ign_OSType_MIN, {0, {0}}, {0, {0}}, {0, {0}}, {0, {0}}, {0, {0}}, {0, {0}}, 0, {0, {0}}, 0}
+#define ign_BridgeProfile_init_zero              {_ign_OSType_MIN, {0, {0}}, {0, {0}}, {0, {0}}, {0, {0}}, {0, {0}}, {0, {0}}, 0, 0, {0, {0}}}
 #define ign_LockLog_init_zero                    {"", {0, {0}}}
 #define ign_BridgeEventData_init_zero            {false, ign_BridgeProfile_init_zero, {{NULL}, NULL}, {{NULL}, NULL}}
 #define ign_LockJob_init_zero                    {"", {{NULL}, NULL}}
@@ -128,10 +128,10 @@ typedef struct _ign_MsgInfo {
 #define ign_BridgeProfile_local_ip_tag           4
 #define ign_BridgeProfile_public_ip_tag          5
 #define ign_BridgeProfile_sys_statics_tag        6
-#define ign_BridgeProfile_wifi_ssid_tag          11
-#define ign_BridgeProfile_wifi_signal_tag        12
-#define ign_BridgeProfile_inited_time_tag        14
-#define ign_BridgeProfile_name_tag               13
+#define ign_BridgeProfile_wifi_ssid_tag          7
+#define ign_BridgeProfile_wifi_signal_tag        8
+#define ign_BridgeProfile_inited_time_tag        9
+#define ign_BridgeProfile_name_tag               10
 #define ign_LockEntry_bt_id_tag                  1
 #define ign_LockEntry_ekey_tag                   2
 #define ign_LockJob_bt_id_tag                    1
@@ -168,10 +168,10 @@ X(a, STATIC,   SINGULAR, BYTES,    mac_addr,          3) \
 X(a, STATIC,   SINGULAR, BYTES,    local_ip,          4) \
 X(a, STATIC,   SINGULAR, BYTES,    public_ip,         5) \
 X(a, STATIC,   SINGULAR, BYTES,    sys_statics,       6) \
-X(a, STATIC,   SINGULAR, BYTES,    wifi_ssid,        11) \
-X(a, STATIC,   SINGULAR, INT32,    wifi_signal,      12) \
-X(a, STATIC,   SINGULAR, BYTES,    name,             13) \
-X(a, STATIC,   SINGULAR, UINT32,   inited_time,      14)
+X(a, STATIC,   SINGULAR, BYTES,    wifi_ssid,         7) \
+X(a, STATIC,   SINGULAR, INT32,    wifi_signal,       8) \
+X(a, STATIC,   SINGULAR, UINT32,   inited_time,       9) \
+X(a, STATIC,   SINGULAR, BYTES,    name,             10)
 #define ign_BridgeProfile_CALLBACK NULL
 #define ign_BridgeProfile_DEFAULT NULL
 

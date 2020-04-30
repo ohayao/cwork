@@ -228,7 +228,7 @@ int HeartBeat(){
     uint8_t buf[1024];
     memset(buf,0,sizeof(buf));
     pb_ostream_t out=pb_ostream_from_buffer(buf,sizeof(buf));
-    if(pb_encode_ex(&out,ign_MsgInfo_fields,&hb,PB_ENCODE_DELIMITED)){
+    if(pb_encode(&out,ign_MsgInfo_fields,&hb)){
         size_t len=out.bytes_written;
         if((publish_result=util_sendMessage(g_sysif.mqtt_c,PUB_TOPIC,1,buf,(int)len))!=MQTTCLIENT_SUCCESS){
             printf("SEND MQTT HB ERROR WITH CODE[%d]\n",publish_result);
@@ -241,16 +241,18 @@ int HeartBeat(){
     return 0;
 }
 
+static ign_LockEntry glocks[5];
+static int glock_index=0;
+
 bool get_server_event_data(pb_istream_t *stream,const pb_field_t *field,void **arg);
 bool get_server_event_data(pb_istream_t *stream,const pb_field_t *field,void **arg){
-    printf("*******************************************************%u\n",field->tag);
-    while(stream->bytes_left){
-        ign_LockEntry lock={};
-        if(pb_decode_ex(stream,ign_LockEntry_fields,&lock,PB_DECODE_DELIMITED)){
-            printf("YES=====%s\n",lock.bt_id);
-        }    
-    }
-    return true;
+    ign_LockEntry lock={};
+    if(pb_decode(stream,ign_LockEntry_fields,&lock)){
+        glocks[glock_index]=lock;
+        glock_index++;
+        return true;
+    }    
+    return false;
 }
 
 void WaitMQTT(sysinfo_t *si){
@@ -268,10 +270,12 @@ void WaitMQTT(sysinfo_t *si){
                 DoWebMsg(topic,msg->payload);
             }else{
                 //decode msg
-                printf("RECV MQTT MSG %s",(char *)msg->payload);
+                memset(glocks,0,sizeof(glocks));
+                glock_index=0;
                 ign_MsgInfo imsg={};
                 pb_istream_t in=pb_istream_from_buffer(msg->payload,(size_t)msg->payloadlen);
-                if(pb_decode_ex(&in,ign_MsgInfo_fields,&imsg,PB_DECODE_DELIMITED)){
+                imsg.server_data.lockEntries.funcs.decode=&get_server_event_data;
+                if(pb_decode(&in,ign_MsgInfo_fields,&imsg)){
                     switch(imsg.event_type){
                         case ign_EventType_HEARTBEAT:
                             printf("RECV MQTT HB msg\n");
@@ -284,14 +288,12 @@ void WaitMQTT(sysinfo_t *si){
                             goto gomqttfree;
                         break;
                         case ign_EventType_UPDATE_USER_INFO:
-                            printf("RECV MQTT REPLY[GET_USER_INFO] MSG [UPDATE_USER_INFO]\n");
-                            //imsg.server_data.lockEntries.
-//                            printf("LockEntries count=%d\n",(int)imsg.server_data.lockEntries_count); 
                             if(imsg.has_server_data){
-                                printf("YES HAS SERVER_DATA\n");
-                                imsg.server_data.lockEntries.funcs.decode=get_server_event_data;
-                                
+                                for(int i=0;i<glock_index;i++){
+                                    printf("%02d bt_id=%s\n",i,glocks[i].bt_id);
+                                }
                             }
+                            util_sendMessage(g_sysif.mqtt_c,"/WEB_USER_INFO",1,msg->payload,msg->payloadlen);
                             goto gomqttfree;
                         break;
                         default:
@@ -406,7 +408,7 @@ int DoWebMsg(char *topic,void *payload){
         uint8_t buf[1024];
         memset(buf,0,sizeof(buf));
         pb_ostream_t out=pb_ostream_from_buffer(buf,sizeof(buf));
-        if(pb_encode_ex(&out,ign_MsgInfo_fields,&msg,PB_ENCODE_DELIMITED)){
+        if(pb_encode(&out,ign_MsgInfo_fields,&msg)){
             size_t len=out.bytes_written;
             if((pubResult=util_sendMessage(g_sysif.mqtt_c,PUB_TOPIC,1,buf,(int)len))!=MQTTCLIENT_SUCCESS){
                 printf("SEND MQTT [GET_USER_INFO] ERROR WITH CODE[%d]\n",pubResult);

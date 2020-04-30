@@ -83,7 +83,7 @@ int util_sendMessage(MQTTClient client,char *topic,int qos,void * message,int me
     //    msg.payloadlen=messageLength;
     //    MQTTClient_publishMessage(client,topic,&msg,NULL);
     int rc=MQTTClient_publish(client,topic,messageLength,message,qos,0,NULL);
-    printf("send result %d\n",rc);
+    //printf("send result %d\n",rc);
     return rc;
 }
 
