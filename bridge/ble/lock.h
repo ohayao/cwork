@@ -34,5 +34,18 @@ void printLock (igm_lock_t *lock);
 int isLockPaired(igm_lock_t *lock);
 int isLockAdmin(igm_lock_t *lock);
 int setLockPaired(igm_lock_t *lock);
+int setLockConnectionID(igm_lock_t *lock, int ID);
+
+int releaseLockAminKey(igm_lock_t *lock);
+int releaseLockPassword(igm_lock_t *lock);
+int setLockAdminKey(igm_lock_t *lock, 
+  uint8_t *admin_key, int admin_key_len);
+int setLockPassword(igm_lock_t *lock, 
+  uint8_t *password, int password_size);
+int getLockAdminKey(igm_lock_t *lock, 
+  uint8_t *admin_key, int *p_admin_key_len);
+int getLockPassword(igm_lock_t *lock, 
+  uint8_t *password, int *p_password_size);
+
 // isLockGuest()
 #endif

@@ -5,6 +5,7 @@ void ig_UnpairResponse_init(IgUnpairResponse *obj)
 {
   memset(obj, 0, sizeof(IgUnpairResponse));
 }
+
 IgSerializerError ig_UnpairResponse_encode(IgUnpairResponse *obj,uint8_t *retval,uint32_t length,size_t *written_length)
 {
   

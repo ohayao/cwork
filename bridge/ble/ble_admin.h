@@ -1,0 +1,38 @@
+#ifndef _BLE_ADMIN_H_
+#define _BLE_ADMIN_H_
+#include <bridge/ble/lock.h>
+#include <bridge/bridge_main/fsm.h>
+
+enum BLE_ADMIN_STATE {
+  BLE_ADMIN_BEGIN = 0,          // 注册一个改变通知
+  BLE_ADMIN_STEP1 = 1,          // 收听锁的第一步信息
+  BLE_ADMIN_STEP2 = 2,          // 写给锁的第二步信息
+  BLE_ADMIN_ESTABLISHED = 3,     // 此时已经建立
+  BLE_ADMIN_DONE = 4,    // 完成admin connection标志
+};
+
+typedef struct BLEAdminParam {
+  // 需要addr, 需要key和password
+  igm_lock_t *lock;
+}ble_admin_param_t;
+
+int bleInitAdminParam(ble_admin_param_t *unpair_param);
+int bleReleaseAdminParam(ble_admin_param_t *unpair_param);
+int bleSetAdminParam(ble_admin_param_t *unpair_param, igm_lock_t *lock);
+
+typedef struct BLEAdminResult {
+  char addr[MAX_DEVICE_ADDR];
+  int admin_successed;
+  void *gatt_connection;
+}ble_admin_result_t;
+
+int bleInitAdminResult(ble_admin_result_t *result);
+int bleSetAdminResultAddr(ble_admin_result_t *result, 
+  char *addr, size_t addr_len);
+int bleIsAdminSuccess(ble_admin_result_t *result);
+int bleSetAdminResultGattConnection(ble_admin_result_t *result, void* gatt_connection);
+
+fsm_table_t *getAdminFsmTable();
+int getAdminFsmTableLen();
+
+#endif

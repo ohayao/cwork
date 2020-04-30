@@ -13,9 +13,7 @@
 #include <string.h>
 #include <stdlib.h>
 
-char* adapter_name;
-void* adapter;
-char pairing_str[] = "5c3a659e-897e-45e1-b016-007107c96df6";
+static char pairing_str[] = "5c3a659e-897e-45e1-b016-007107c96df6";
 
 //步骤分别为
 // 1. BLE_PAIRING_BEGIN 监听变化
@@ -24,17 +22,17 @@ char pairing_str[] = "5c3a659e-897e-45e1-b016-007107c96df6";
 // 4. BLE_PAIRING_STEP3 写第三步
 // 5. BLE_PAIRING_STEP4 等待第四步
 // 6. BLE_PAIRING_DONE 写commit, 也就done.
-int register_pairing_notfication(void *arg);
-int write_pairing_step1(void *arg);
-int waiting_pairing_step2(void *arg);
-int write_pairing_step3(void *arg);
-int waiting_pairing_step4(void *arg);
-int write_pairing_commit(void *arg);
-void message_handler(
+static int register_pairing_notfication(void *arg);
+static int write_pairing_step1(void *arg);
+static int waiting_pairing_step2(void *arg);
+static int write_pairing_step3(void *arg);
+static int waiting_pairing_step4(void *arg);
+static int write_pairing_commit(void *arg);
+static void message_handler(
 	const uuid_t* uuid, const uint8_t* data, size_t data_length, void* user_data);
-int handle_step2_message(const uint8_t* data, int data_length,void* user_data);
-int handle_step4_message(const uint8_t* data, int data_length,void* user_data);
-int save_message_data(const uint8_t* data, int data_length, void* user_data);
+static int handle_step2_message(const uint8_t* data, int data_length,void* user_data);
+static int handle_step4_message(const uint8_t* data, int data_length,void* user_data);
+static int save_message_data(const uint8_t* data, int data_length, void* user_data);
 
 enum {
   PAIRING_SM_TABLE_LEN =6
@@ -199,7 +197,7 @@ int handle_step2_message(const uint8_t* data, int data_length,void* user_data)
   }
 }
 
-void message_handler(
+static void message_handler(
 	const uuid_t* uuid, const uint8_t* data, size_t data_length, void* user_data) {
     serverLog(LL_NOTICE, "message_handler");
   task_node_t *task_node = (task_node_t *)user_data;
@@ -348,7 +346,10 @@ int write_pairing_commit(void *arg)
   free(commitBytes);
 	free(payloadBytes);
 
+  gattlib_notification_stop(
+        pairing_connection->gatt_connection, &pairing_connection->pairing_uuid);
 
+  gattlib_disconnect(pairing_connection->gatt_connection);
   serverLog(LL_NOTICE, "write_pairing_commit end --------");
   return 0;
 
@@ -511,6 +512,7 @@ int register_pairing_notfication(void *arg)
   pairing_connection_t *pairing_connection = 
                             (pairing_connection_t *)ble_data->ble_connection;
   memset(pairing_connection, 0, sizeof(pairing_connection_t));
+
   // 返回的结果
   pairing_connection->has_pairing_result = 1;
   pairing_connection->pairing_result = calloc(sizeof(ble_pairing_result_t), 1);
@@ -536,9 +538,8 @@ int register_pairing_notfication(void *arg)
 		serverLog(LL_ERROR, "Fail to connect to the bluetooth device." );
 		goto ERROR_EXIT;
 	} 
-  else {
-    serverLog(LL_NOTICE, "Succeeded to connect to the bluetooth device." );
-	}
+  serverLog(LL_NOTICE, "Succeeded to connect to the bluetooth device." );
+	
 
   if (
     gattlib_string_to_uuid(
@@ -557,10 +558,8 @@ int register_pairing_notfication(void *arg)
     serverLog(LL_ERROR, "Fail to start notification.");
 		goto ERROR_EXIT;
 	}
-	else
-	{
-    serverLog(LL_NOTICE, "success to start notification" );
-	}
+  serverLog(LL_NOTICE, "success to start notification" );
+
   pairing_connection->pairing_step = BLE_PAIRING_STEP1;
   serverLog(LL_NOTICE, "register_pairing_notfication end --------");
   return 0;
@@ -577,6 +576,7 @@ ERROR_EXIT:
   {
     free(ble_data->ble_connection);
   }
+  return 1;
 }
 
 // -------------------------------------

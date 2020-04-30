@@ -123,3 +123,83 @@ int setLockPaired(igm_lock_t *lock)
 {
   lock->paired = 1;
 }
+
+int setLockConnectionID(igm_lock_t *lock, int ID)
+{
+  lock->connectionID = ID;
+}
+
+int releaseLockAminKey(igm_lock_t *lock)
+{
+  if (lock && lock->has_admin_key && lock->admin_key && lock->admin_key_len)
+  {
+    lock->has_admin_key = 0;
+    lock->admin_key_len = 0;
+    free(lock->admin_key);
+    lock->admin_key = NULL;
+  }
+  return 0;
+}
+
+int releaseLockPassword(igm_lock_t *lock)
+{
+  if (lock && lock->has_password && lock->password_size && lock->password)
+  {
+    lock->has_password = 0;
+    lock->password_size = 0;
+    free(lock->password);
+    lock->password = NULL;
+  }
+  return 0;
+}
+
+int setLockAdminKey(igm_lock_t *lock, 
+  uint8_t *admin_key, int admin_key_len)
+{
+  releaseLockAminKey(lock);
+  lock->has_admin_key = 1;
+  lock->admin_key_len = admin_key_len;
+  lock->admin_key = calloc(admin_key_len, 1);
+  memcpy(lock->admin_key, admin_key, admin_key_len);
+  return 0;
+}
+
+int setLockPassword(igm_lock_t *lock, 
+  uint8_t *password, int password_size)
+{
+  releaseLockPassword(lock);
+  lock->has_password = 1;
+  lock->password_size = password_size;
+  lock->password = calloc(password_size, 1);
+  memcpy(lock->password, password, password_size);
+  return 0;
+}
+
+int getLockAdminKey(igm_lock_t *lock, 
+  uint8_t *admin_key, int *p_admin_key_len)
+{
+  if (lock->has_admin_key)
+  {
+    *p_admin_key_len = lock->admin_key_len;
+    memcpy(admin_key, lock->admin_key, lock->admin_key_len);
+  }
+  return 0;
+}
+
+int getLockPassword(igm_lock_t *lock, 
+  uint8_t *password, int *p_password_size)
+{
+  if (lock->has_password)
+  {
+    *p_password_size = lock->password_size;
+    memcpy(password, lock->password, lock->password_size);
+  }
+  return 0;
+}
+
+int setLockAdminConnection(igm_lock_t *lock, int admin_connection)
+{
+  lock->admin_connection = admin_connection;
+  return 0;
+}
+
