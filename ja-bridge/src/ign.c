@@ -60,10 +60,80 @@ int FSMHandle(task_node_t* tn) {
     return 0;
 }
 
+//create birdge profile
+ign_BridgeProfile Create_IgnBridgeProfile(char *bridgeID);
+ign_BridgeProfile Create_IgnBridgeProfile(char *bridgeID){
+    ign_BridgeProfile bp={};
+    bp.os_info=ign_OSType_LINUX;
+    char temp[100];
+    memset(temp,0,sizeof(temp));
+    strcpy(temp,bridgeID);
+    bp.bt_id.size=strlen(temp);
+    memcpy(bp.bt_id.bytes,temp,strlen(temp));
+
+    memset(temp,0,sizeof(temp));
+    strcpy(temp,"mac_addr");
+    bp.mac_addr.size=strlen(temp);
+    memcpy(bp.mac_addr.bytes,temp,strlen(temp));
+
+    memset(temp,0,sizeof(temp));
+    strcpy(temp,"local_ip");
+    bp.local_ip.size=strlen(temp);
+    memcpy(bp.local_ip.bytes,temp,strlen(temp));
+
+    memset(temp,0,sizeof(temp));
+    strcpy(temp,"public_ip");
+    bp.public_ip.size=strlen(temp);
+    memcpy(bp.public_ip.bytes,temp,strlen(temp));
+
+    memset(temp,0,sizeof(temp));
+    strcpy(temp,"sys_statics");
+    bp.sys_statics.size=strlen(temp);
+    memcpy(bp.sys_statics.bytes,temp,strlen(temp));
+
+    memset(temp,0,sizeof(temp));
+    strcpy(temp,"wifi_ssid");
+    bp.wifi_ssid.size=strlen(temp);
+    memcpy(bp.wifi_ssid.bytes,temp,strlen(temp));
+    bp.wifi_signal=2;
+    bp.inited_time=get_ustime();
+
+    memset(temp,0,sizeof(temp));
+    strcpy(temp,"bridge_name");
+    bp.name.size=strlen(temp);
+    memcpy(bp.name.bytes,temp,strlen(temp));
+    return bp;
+}
 
 int GetUserInfo(void* si) {
 	//send request to server to get userinfo
 	printf("send request to server to get userinfo!\n");
+    
+    ign_MsgInfo msg={};
+        msg.event_type=ign_EventType_GET_USER_INFO;
+        msg.time=get_ustime();
+        msg.msg_id=get_ustime();
+        ign_BridgeEventData bed={};
+        bed.has_profile=true;
+        bed.profile=Create_IgnBridgeProfile((char*)si);
+        msg.has_bridge_data=true;
+        msg.bridge_data=bed;
+
+        int pubResult;
+        uint8_t buf[1024];
+        memset(buf,0,sizeof(buf));
+        pb_ostream_t out=pb_ostream_from_buffer(buf,sizeof(buf));
+        if(pb_encode(&out,ign_MsgInfo_fields,&msg)){
+            size_t len=out.bytes_written;
+            if((pubResult=util_sendMessage(g_sysif.mqtt_c,PUB_TOPIC,1,buf,(int)len))!=MQTTCLIENT_SUCCESS){
+                printf("SEND MQTT [GET_USER_INFO] ERROR WITH CODE[%d]\n",pubResult);
+            }else{
+                printf("SEND MQTT [GET_USER_INFO] SUCCESS\n");
+            }
+        }else{
+            printf("ENCODE GETUSERINFO ERROR\n");
+        }
+
     return 0;
 }
 
@@ -87,7 +157,7 @@ int UpdateLockState(void* tn) {
 
 int UnLock(void* tn) {
 	//unlock
-	printf("unlock!\n");
+	printf("unlock %s!\n",(char*)tn);
     return 0;
 }
 
@@ -114,11 +184,11 @@ int Init(void* tn) {
     }else{
         printf("Subscribe [%s] success!!!\n",SUB_TOPIC);
     }
-    rc=MQTTClient_subscribe(g_sysif.mqtt_c,SUB_WEBDEMO,1);
+    rc=MQTTClient_subscribe(g_sysif.mqtt_c,PUB_WEBDEMO,1);
     if(rc!=MQTTCLIENT_SUCCESS){
-        printf("Subscribe [%s] error with code[%d]！！！\n",SUB_WEBDEMO,rc);
+        printf("Subscribe [%s] error with code[%d]！！！\n",PUB_WEBDEMO,rc);
     }else{
-        printf("Subscribe [%s] success!!!\n",SUB_WEBDEMO);
+        printf("Subscribe [%s] success!!!\n",PUB_WEBDEMO);
     }
     //InitBLE(si);
     //InitBtn(si);
@@ -179,47 +249,8 @@ int HeartBeat(){
     hb.time=get_ustime();
     hb.msg_id=get_ustime();
     ign_BridgeEventData bed={};
-    ign_BridgeProfile bp={};
-
-    char temp[100];
-    memset(temp,0,sizeof(temp));
-    strcpy(temp,"abcdef");
-    bp.bt_id.size=strlen(temp);
-    memcpy(bp.bt_id.bytes,temp,strlen(temp));
-
-    memset(temp,0,sizeof(temp));
-    strcpy(temp,"mac_addr");
-    bp.mac_addr.size=strlen(temp);
-    memcpy(bp.mac_addr.bytes,temp,strlen(temp));
-
-    memset(temp,0,sizeof(temp));
-    strcpy(temp,"local_ip");
-    bp.local_ip.size=strlen(temp);
-    memcpy(bp.local_ip.bytes,temp,strlen(temp));
-
-    memset(temp,0,sizeof(temp));
-    strcpy(temp,"public_ip");
-    bp.public_ip.size=strlen(temp);
-    memcpy(bp.public_ip.bytes,temp,strlen(temp));
-
-    memset(temp,0,sizeof(temp));
-    strcpy(temp,"sys_statics");
-    bp.sys_statics.size=strlen(temp);
-    memcpy(bp.sys_statics.bytes,temp,strlen(temp));
-
-    memset(temp,0,sizeof(temp));
-    strcpy(temp,"wifi_ssid");
-    bp.wifi_ssid.size=strlen(temp);
-    memcpy(bp.wifi_ssid.bytes,temp,strlen(temp));
-    bp.wifi_signal=2;
-    bp.inited_time=get_ustime();
-
-    memset(temp,0,sizeof(temp));
-    strcpy(temp,"bridge_name");
-    bp.name.size=strlen(temp);
-    memcpy(bp.name.bytes,temp,strlen(temp));
     bed.has_profile=true;
-    bed.profile=bp;
+    bed.profile=Create_IgnBridgeProfile("abcdef");
     hb.has_bridge_data=true;
     hb.bridge_data=bed;
 
@@ -266,7 +297,7 @@ void WaitMQTT(sysinfo_t *si){
             //err log
         }
         if(msg){
-            if(strcmp(topic,SUB_WEBDEMO)==0){
+            if(strcmp(topic,PUB_WEBDEMO)==0){
                 DoWebMsg(topic,msg->payload);
             }else{
                 //decode msg
@@ -293,7 +324,7 @@ void WaitMQTT(sysinfo_t *si){
                                     printf("%02d bt_id=%s\n",i,glocks[i].bt_id);
                                 }
                             }
-                            util_sendMessage(g_sysif.mqtt_c,"/WEB_USER_INFO",1,msg->payload,msg->payloadlen);
+                            util_sendMessage(g_sysif.mqtt_c,SUB_WEBDEMO,1,msg->payload,msg->payloadlen);
                             goto gomqttfree;
                         break;
                         default:
@@ -346,79 +377,17 @@ int DoWebMsg(char *topic,void *payload){
     root=cJSON_Parse((char *)payload);
     if(root==NULL){
         cJSON_Delete(root);
-        printf("反序列化失败\n");
         return 0;
     }
     cJSON *cmd= cJSON_GetObjectItem(root,"cmd");
-    cJSON *lockId=cJSON_GetObjectItem(root,"lockId");
+    cJSON *bridgeId=cJSON_GetObjectItem(root,"bridge_id");
     cJSON *value=cJSON_GetObjectItem(root,"value");
-    printf("recv CMD=%s,LOCKID=%s Value=%s\n",cmd->valuestring,lockId->valuestring,value->valuestring);
-    if(strcmp("list",cmd->valuestring)==0){
-        printf("RECV WEB REQUEST [list]\n");
-        ign_MsgInfo msg={};
-        msg.event_type=ign_EventType_GET_USER_INFO;
-        msg.time=get_ustime();
-        msg.msg_id=get_ustime();
-        ign_BridgeEventData bed={};
-        ign_BridgeProfile bp={};
-        bp.os_info=ign_OSType_LINUX;
-        char temp[100];
-        memset(temp,0,sizeof(temp));
-        strcpy(temp,"abcdef");
-        bp.bt_id.size=strlen(temp);
-        memcpy(bp.bt_id.bytes,temp,strlen(temp));
-
-        memset(temp,0,sizeof(temp));
-        strcpy(temp,"mac_addr");
-        bp.mac_addr.size=strlen(temp);
-        memcpy(bp.mac_addr.bytes,temp,strlen(temp));
-
-        memset(temp,0,sizeof(temp));
-        strcpy(temp,"local_ip");
-        bp.local_ip.size=strlen(temp);
-        memcpy(bp.local_ip.bytes,temp,strlen(temp));
-
-        memset(temp,0,sizeof(temp));
-        strcpy(temp,"public_ip");
-        bp.public_ip.size=strlen(temp);
-        memcpy(bp.public_ip.bytes,temp,strlen(temp));
-
-        memset(temp,0,sizeof(temp));
-        strcpy(temp,"sys_statics");
-        bp.sys_statics.size=strlen(temp);
-        memcpy(bp.sys_statics.bytes,temp,strlen(temp));
-
-        memset(temp,0,sizeof(temp));
-        strcpy(temp,"wifi_ssid");
-        bp.wifi_ssid.size=strlen(temp);
-        memcpy(bp.wifi_ssid.bytes,temp,strlen(temp));
-        bp.wifi_signal=2;
-        bp.inited_time=get_ustime();
-
-        memset(temp,0,sizeof(temp));
-        strcpy(temp,"bridge_name");
-        bp.name.size=strlen(temp);
-        memcpy(bp.name.bytes,temp,strlen(temp));
-        bed.has_profile=true;
-        bed.profile=bp;
-        msg.has_bridge_data=true;
-        msg.bridge_data=bed;
-
-        int pubResult;
-        uint8_t buf[1024];
-        memset(buf,0,sizeof(buf));
-        pb_ostream_t out=pb_ostream_from_buffer(buf,sizeof(buf));
-        if(pb_encode(&out,ign_MsgInfo_fields,&msg)){
-            size_t len=out.bytes_written;
-            if((pubResult=util_sendMessage(g_sysif.mqtt_c,PUB_TOPIC,1,buf,(int)len))!=MQTTCLIENT_SUCCESS){
-                printf("SEND MQTT [GET_USER_INFO] ERROR WITH CODE[%d]\n",pubResult);
-            }else{
-                printf("SEND MQTT [GET_USER_INFO] SUCCESS\n");
-            }
-        }else{
-            printf("ENCODE GETUSERINFO ERROR\n");
-        }
-        
+    printf("recv CMD=%s,BRIDGEID=%s Value=%s\n",cmd->valuestring,bridgeId->valuestring,value->valuestring);
+    if(strcmp("getUserInfo",cmd->valuestring)==0){
+        GetUserInfo(bridgeId->valuestring);
+    }else if(strcmp("unlock",cmd->valuestring)==0){
+        char* lockID=value->valuestring;
+        UnLock(lockID);
     }
     printf("=============================================================\n");
     cJSON_Delete(root);
