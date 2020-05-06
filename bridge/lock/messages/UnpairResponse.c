@@ -51,7 +51,8 @@ IgSerializerError ig_UnpairResponse_encode(IgUnpairResponse *obj,uint8_t *retval
   
   return IgSerializerNoError;
 }
-IgSerializerError ig_UnpairResponse_decode(uint8_t *buf,size_t buf_size,IgUnpairResponse *retval,size_t index)
+IgSerializerError ig_UnpairResponse_decode(
+  uint8_t *buf,size_t buf_size,IgUnpairResponse *retval,size_t index)
 {
   CborParser parser;
   CborValue it;

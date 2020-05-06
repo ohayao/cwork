@@ -13,6 +13,7 @@ enum TASK_TYPE {
     TASK_BLE_PAIRING = 2,
     TASK_BLE_ADMIN_CONNECTION = 3,
     TASK_BLE_ADMIN_UNPAIR = 4,
+    TASK_BLE_ADMIN_UNLOCK = 5,
 };
 
 typedef struct TaskNode {

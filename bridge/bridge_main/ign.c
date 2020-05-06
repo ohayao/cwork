@@ -23,7 +23,6 @@
 #include <bridge/bridge_main/lock_list.h>
 #include <bridge/ble/ble_admin.h>
 #include <bridge/ble/ble_pairing.h>
-#include <bridge/ble/ble_admin_unpair.h>
 
 sysinfo_t g_sysif;
 
@@ -343,9 +342,9 @@ void addAdminUnpairTask(igm_lock_t *lock)
     // 设置需要的参数
     serverLog(LL_NOTICE, "Add Admin Unpair task");
     serverLog(LL_NOTICE, "1. set ble admin unpair parameters");
-    ble_admin_unpair_param_t *admin_unpair_param = (ble_admin_unpair_param_t *)calloc(sizeof(ble_admin_unpair_param_t), 1);
+    ble_admin_param_t *admin_unpair_param = (ble_admin_param_t *)calloc(sizeof(ble_admin_param_t), 1);
     serverLog(LL_NOTICE, "1. set admin unpair param lock to name %s addr %s", lock->name, lock->addr);
-    bleSetAdminUnpairParam(admin_unpair_param, lock);
+    bleSetAdminParam(admin_unpair_param, lock);
     serverLog(LL_NOTICE, "2. set msg_id to 3(or anything you want)");
     int msg_id = 3;
     // 把参数写入data, 当前有个问题就是, 使用完, 得访问的人记的释放.
@@ -354,14 +353,41 @@ void addAdminUnpairTask(igm_lock_t *lock)
     serverLog(LL_NOTICE, "3. init ble_data");
     bleInitData(ble_data);
     serverLog(LL_NOTICE, "3. set ble parametes to ble data");
-    bleSetBleParam(ble_data, admin_unpair_param, sizeof(ble_admin_unpair_param_t));
+    bleSetBleParam(ble_data, admin_unpair_param, sizeof(ble_admin_param_t));
 
     // 插入系统的队列
     serverLog(LL_NOTICE, "4. used InsertBle2DFront to insert the task to system.");
-    InsertBle2DFront(msg_id, BLE_ADMIN_UNPAIR_BEGIN, 
+    InsertBle2DFront(msg_id, BLE_ADMIN_BEGIN, 
         ble_data, sizeof(ble_data_t),
         getAdminUnpairFsmTable(), getAdminUnpairFsmTableLen(), TASK_BLE_ADMIN_UNPAIR);
-    serverLog(LL_NOTICE, "5. Add admin task.");
+    serverLog(LL_NOTICE, "5. Add admin unpair task.");
+    return;
+}
+
+void addAdminUnlockTask(igm_lock_t *lock)
+{
+    // 设置需要的参数
+    serverLog(LL_NOTICE, "Add Admin Unlock task");
+    serverLog(LL_NOTICE, "1. set ble admin unpair parameters");
+    ble_admin_param_t *admin_param = (ble_admin_param_t *)calloc(sizeof(ble_admin_param_t), 1);
+    serverLog(LL_NOTICE, "1. set admin unpair param lock to name %s addr %s", lock->name, lock->addr);
+    bleSetAdminParam(admin_param, lock);
+    serverLog(LL_NOTICE, "2. set msg_id to 4(or anything you want)");
+    int msg_id = 4;
+    // 把参数写入data, 当前有个问题就是, 使用完, 得访问的人记的释放.
+    serverLog(LL_NOTICE, "3. alloc ble data datatype, ble_data is used to devliver parameters and get result data");
+    ble_data_t *ble_data = calloc(sizeof(ble_data_t), 1);
+    serverLog(LL_NOTICE, "3. init ble_data");
+    bleInitData(ble_data);
+    serverLog(LL_NOTICE, "3. set ble parametes to ble data");
+    bleSetBleParam(ble_data, admin_param, sizeof(ble_admin_param_t));
+
+    // 插入系统的队列
+    serverLog(LL_NOTICE, "4. used InsertBle2DFront to insert the task to system.");
+    InsertBle2DFront(msg_id, BLE_ADMIN_BEGIN, 
+        ble_data, sizeof(ble_data_t),
+        getAdminUnlockFsmTable(), getAdminUnlockFsmTableLen(), TASK_BLE_ADMIN_UNLOCK);
+    serverLog(LL_NOTICE, "5. Add admin unlock task.");
     return;
 }
 
@@ -406,7 +432,8 @@ void saveTaskData(task_node_t *ptn)
                 setLockAdminKey(lock, pairing_result->admin_key, pairing_result->admin_key_len);
                 setLockPassword(lock, pairing_result->password, pairing_result->password_size);
                 // addAdminTask(lock);
-                addAdminUnpairTask(lock);
+                // addAdminUnpairTask(lock);
+                addAdminUnlockTask(lock);
             }
             break;
         }
@@ -417,7 +444,13 @@ void saveTaskData(task_node_t *ptn)
         case TASK_BLE_ADMIN_UNPAIR:
         {
             serverLog(LL_NOTICE, "saving ble TASK_BLE_ADMIN_UNPAIR data");
-            ble_admin_unpair_result_t *admin_unpair_result = (ble_admin_unpair_result_t *)ble_data->ble_result;
+            ble_admin_result_t *admin_unpair_result = (ble_admin_result_t *)ble_data->ble_result;
+            break;
+        }
+        case TASK_BLE_ADMIN_UNLOCK:
+        {
+            serverLog(LL_NOTICE, "saving ble TASK_BLE_ADMIN_UNLOCK data");
+            ble_admin_result_t *admin_lock_result = (ble_admin_result_t *)ble_data->ble_result;
             break;
         }
         default:

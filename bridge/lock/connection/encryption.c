@@ -5,6 +5,7 @@
 
 #include <bridge/lock/cifra/modes.h>
 #include <bridge/lock/cifra/aes.h>
+#include <bridge/bridge_main/log.h>
 
 static const char *kTag = "JNI encryption";
 
@@ -77,13 +78,27 @@ int32_t decryptData(uint8_t *dataIn, uint32_t dataInLen, uint8_t *dataOut,
                      uint32_t dataOutLen, const uint8_t *key, uint32_t keyLen,
                      uint8_t *nonce, uint32_t nonceLen) {
     if (dataInLen > 4096)
+    {
+        serverLog(LL_ERROR, "decryptData dataInLen > 4096");
         return -1;
+    }
+        
     if (dataOutLen < decryptDataSize(dataInLen))
+    {
+        serverLog(LL_ERROR, "decryptData dataOutLen < decryptDataSize(dataInLen)");
         return -1;
+    }
     if (keyLen != 16 && keyLen != 24 && keyLen != 32)
+    {
+        serverLog(LL_ERROR, "decryptData keyLen != 16 && keyLen != 24 && keyLen != 32");
         return -1;
+    }
     if (nonceLen != kNonceLength)
+    {
+        serverLog(LL_ERROR, "decryptData nonceLen != kNonceLength");
         return -1;
+    }
+        
 
     cf_aes_context aes_ctx;
     cf_aes_init(&aes_ctx, key, keyLen);
@@ -92,8 +107,9 @@ int32_t decryptData(uint8_t *dataIn, uint32_t dataInLen, uint8_t *dataOut,
     size_t ciphertextLen = decryptDataSize(dataInLen);
     uint8_t *tag = dataIn + ciphertextLen;
     size_t tagLen = kCcmTagLength;
-
+    serverLog(LL_NOTICE, "decryptData result %x", ciphertext);
     int result = cf_ccm_decrypt(&cf_aes, &aes_ctx, ciphertext, ciphertextLen, kCcmInternalCounterLength, NULL, 0, nonce, kNonceLength, tag, tagLen, dataOut);
+    serverLog(LL_NOTICE, "decryptData result %d", result);
 //    Log_d(kTag, "decrypt result = %i", result);
     uint32_t bytesWritten = decryptDataSize(dataInLen);
     cf_aes_finish(&aes_ctx);

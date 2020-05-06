@@ -4,10 +4,22 @@
 #include <time.h> 
 #include <bridge/lock/connection/admin_connection.h>
 #include <bridge/ble/ble_operation.h>
+#include <bridge/lock/messages/AdminLockRequest.h>
+#include <bridge/lock/messages/AdminLockResponse.h>
+#include <bridge/lock/messages/UnpairRequest.h>
+#include <bridge/lock/messages/UnpairResponse.h>
 
 static char admin_str[] = "5c3a659f-897e-45e1-b016-007107c96df6";
 enum {
   ADMIN_SM_TABLE_LEN = 4
+};
+
+enum {
+  ADMIN_UNPAIR_SM_TABLE_LEN = 5
+};
+
+enum {
+  ADMIN_UNLOCK_SM_TABLE_LEN = 5
 };
 
 typedef struct AdminConnection {
@@ -23,6 +35,7 @@ typedef struct AdminConnection {
   ble_admin_result_t *admin_result;
 }admin_connection_t;
 
+// admin
 static int register_admin_notfication(void *arg);
 static void message_handler(
 	const uuid_t* uuid, const uint8_t* data, size_t data_length, void* user_data);
@@ -33,6 +46,11 @@ static int write_admin_step2(void *arg);
 static int waiting_admin_step3(void *arg);
 static int handle_step3_message(const uint8_t* data, int data_length,void* user_data);
 
+
+
+
+
+
 fsm_table_t admin_fsm_table[ADMIN_SM_TABLE_LEN] = {
   {BLE_ADMIN_BEGIN,       register_admin_notfication,  BLE_ADMIN_STEP1},
   {BLE_ADMIN_STEP1,       waiting_admin_step1,         BLE_ADMIN_STEP2},
@@ -40,7 +58,31 @@ fsm_table_t admin_fsm_table[ADMIN_SM_TABLE_LEN] = {
   {BLE_ADMIN_ESTABLISHED, waiting_admin_step3,     BLE_ADMIN_DONE},
 };
 
+// unpair
+static int write_unpair_request(void *arg);
+static int handle_unpair_responce(const uint8_t* data, int data_length,void* user_data);
+static int waiting_unpair_result(void *arg);
 
+fsm_table_t admin_unpair_fsm_table[ADMIN_UNPAIR_SM_TABLE_LEN] = {
+  {BLE_ADMIN_BEGIN,         register_admin_notfication,   BLE_ADMIN_STEP1},
+  {BLE_ADMIN_STEP1,         waiting_admin_step1,          BLE_ADMIN_STEP2},
+  {BLE_ADMIN_STEP2,         write_admin_step2,            BLE_ADMIN_ESTABLISHED},
+  {BLE_ADMIN_ESTABLISHED,   write_unpair_request,         BLE_ADMIN_UNPAIR_RESULT},
+  {BLE_ADMIN_UNPAIR_RESULT, waiting_unpair_result,        BLE_ADMIN_UNPAIR_DONE},
+};
+
+// unlock
+static int write_unlock_request(void *arg);
+static int handle_unlock_responce(const uint8_t* data, int data_length,void* user_data);
+static int waiting_unlock_result(void *arg);
+
+fsm_table_t admin_unlock_fsm_table[ADMIN_UNLOCK_SM_TABLE_LEN] = {
+  {BLE_ADMIN_BEGIN,         register_admin_notfication,   BLE_ADMIN_STEP1},
+  {BLE_ADMIN_STEP1,         waiting_admin_step1,          BLE_ADMIN_STEP2},
+  {BLE_ADMIN_STEP2,         write_admin_step2,            BLE_ADMIN_ESTABLISHED},
+  {BLE_ADMIN_ESTABLISHED,   write_unlock_request,         BLE_ADMIN_UNLOCK_RESULT},
+  {BLE_ADMIN_UNLOCK_RESULT, waiting_unlock_result,        BLE_ADMIN_UNLOCK_DONE},
+};
 
 int write_admin_step2(void *arg)
 {
@@ -129,6 +171,172 @@ ADMIN_STEP2_ERROR_EXIT:
   return 1;
 }
 
+
+static int write_unlock_request(void *arg)
+{
+  serverLog(LL_NOTICE, "write_unlock_request start --------");
+  int ret = 0;
+  task_node_t *task_node = (task_node_t *)arg;
+  ble_data_t *ble_data = task_node->ble_data;
+  ble_admin_param_t *param = ble_data->ble_param;
+  admin_connection_t *admin_unpair_connection = 
+                              (admin_connection_t *)ble_data->ble_connection;
+  srand(time(0));
+  int requestID = rand() % 2147483647;
+  size_t buf_size = 32;
+  size_t encode_size = 0;
+  uint8_t buf[buf_size];
+  uint8_t *encryptPayloadBytes;
+	size_t encryptPayloadBytes_len;
+
+  IgAdminLockRequest unlock_request;
+  ig_AdminLockRequest_init(&unlock_request);
+  ig_AdminLockRequest_set_operation_id(&unlock_request, requestID);
+  ig_AdminLockRequest_set_password(
+    &unlock_request, param->lock->password, param->lock->password_size);
+  IgSerializerError IgErr = ig_AdminLockRequest_encode(
+		&unlock_request, buf, buf_size, &encode_size);
+  if (IgErr)
+	{
+    serverLog(LL_ERROR, "ig_UnpairRequest_encode err");
+    goto UNPAIR_REQUEST_ERROR;
+	}
+  serverLog(LL_NOTICE, "ig_UnpairRequest_encode success size:" );
+
+  Connection *encry_connection = getConnection(param->lock->connectionID);
+	if (!encry_connection)
+	{
+    serverLog(LL_ERROR, "ble_unpair_write_unpairreques can't get encry_connection");
+		goto UNPAIR_REQUEST_ERROR;
+	}
+  serverLog(LL_NOTICE, "ble_unpair_write_unpairreques success getting encry_connection" );
+
+  uint32_t retvalMaxLen = encryptDataSize(encode_size);
+  serverLog(LL_NOTICE, "ble_unpair_write_unpairreques PayloadBytes_len: %d", retvalMaxLen);
+  uint8_t *retvalBytes = (uint8_t *)calloc(retvalMaxLen,1);
+  int32_t retvalLen = encryptData(
+    buf, encode_size,
+    retvalBytes, retvalMaxLen,
+    encry_connection->key, kConnectionKeyLength,
+    encry_connection->txNonce, kNonceLength
+  );
+  incrementNonce(encry_connection->txNonce);
+  serverLog(LL_NOTICE, "ble_unpair_write_unpairreques retvalLen: %d", retvalLen);
+
+  if (!build_msg_payload(
+		&encryptPayloadBytes, &encryptPayloadBytes_len, retvalBytes, retvalLen))
+	{
+    serverLog(LL_ERROR, "failed in build_msg_payload");
+		goto UNPAIR_REQUEST_ERROR;
+	}
+  serverLog(LL_NOTICE, "build_msg_payload success");
+
+
+  ret = write_char_by_uuid_multi_atts(
+		admin_unpair_connection->gatt_connection, &admin_unpair_connection->admin_uuid, 
+    encryptPayloadBytes, encryptPayloadBytes_len);
+	if (ret != GATTLIB_SUCCESS) {
+    serverLog(LL_ERROR, "write_char_by_uuid_multi_atts failed in writing th packags");
+		goto UNPAIR_REQUEST_ERROR;
+	}
+  serverLog(LL_NOTICE, "write_char_by_uuid_multi_atts success");
+
+  free(encryptPayloadBytes);
+  admin_unpair_connection->admin_step = BLE_ADMIN_UNLOCK_REQUEST;
+  return 0;
+
+
+UNPAIR_REQUEST_ERROR:
+  if (encryptPayloadBytes)
+  {
+    free(encryptPayloadBytes);
+  }
+  return 1;
+}
+
+
+static int write_unpair_request(void *arg)
+{
+  serverLog(LL_NOTICE, "write_unpair_request start --------");
+  int ret = 0;
+  task_node_t *task_node = (task_node_t *)arg;
+  ble_data_t *ble_data = task_node->ble_data;
+  ble_admin_param_t *param = ble_data->ble_param;
+  admin_connection_t *admin_unpair_connection = 
+                              (admin_connection_t *)ble_data->ble_connection;
+  srand(time(0));
+  int requestID = rand() % 2147483647;
+  size_t buf_size = 32;
+  size_t encode_size = 0;
+  uint8_t buf[buf_size];
+  uint8_t *encryptPayloadBytes;
+	size_t encryptPayloadBytes_len;
+
+  IgUnpairRequest unpair_request;
+  ig_UnpairRequest_init(&unpair_request);
+  ig_UnpairRequest_set_operation_id(&unpair_request, requestID);
+  ig_UnpairRequest_set_password(
+    &unpair_request, param->lock->password, param->lock->password_size);
+  IgSerializerError IgErr = ig_UnpairRequest_encode(
+		&unpair_request, buf, buf_size, &encode_size);
+  if (IgErr)
+	{
+    serverLog(LL_ERROR, "ig_UnpairRequest_encode err");
+    goto UNPAIR_REQUEST_ERROR;
+	}
+  serverLog(LL_NOTICE, "ig_UnpairRequest_encode success size:" );
+
+  Connection *encry_connection = getConnection(param->lock->connectionID);
+	if (!encry_connection)
+	{
+    serverLog(LL_ERROR, "ble_unpair_write_unpairreques can't get encry_connection");
+		goto UNPAIR_REQUEST_ERROR;
+	}
+  serverLog(LL_NOTICE, "ble_unpair_write_unpairreques success getting encry_connection" );
+
+  uint32_t retvalMaxLen = encryptDataSize(encode_size);
+  serverLog(LL_NOTICE, "ble_unpair_write_unpairreques PayloadBytes_len: %d", retvalMaxLen);
+  uint8_t *retvalBytes = (uint8_t *)calloc(retvalMaxLen,1);
+  int32_t retvalLen = encryptData(
+    buf, encode_size,
+    retvalBytes, retvalMaxLen,
+    encry_connection->key, kConnectionKeyLength,
+    encry_connection->txNonce, kNonceLength
+  );
+  incrementNonce(encry_connection->txNonce);
+  serverLog(LL_NOTICE, "ble_unpair_write_unpairreques retvalLen: %d", retvalLen);
+
+  if (!build_msg_payload(
+		&encryptPayloadBytes, &encryptPayloadBytes_len, retvalBytes, retvalLen))
+	{
+    serverLog(LL_ERROR, "failed in build_msg_payload");
+		goto UNPAIR_REQUEST_ERROR;
+	}
+  serverLog(LL_NOTICE, "build_msg_payload success");
+
+
+  ret = write_char_by_uuid_multi_atts(
+		admin_unpair_connection->gatt_connection, &admin_unpair_connection->admin_uuid, 
+    encryptPayloadBytes, encryptPayloadBytes_len);
+	if (ret != GATTLIB_SUCCESS) {
+    serverLog(LL_ERROR, "write_char_by_uuid_multi_atts failed in writing th packags");
+		goto UNPAIR_REQUEST_ERROR;
+	}
+  serverLog(LL_NOTICE, "write_char_by_uuid_multi_atts success");
+
+  free(encryptPayloadBytes);
+  admin_unpair_connection->admin_step = BLE_ADMIN_UNPAIR_REQUEST;
+  return 0;
+
+
+UNPAIR_REQUEST_ERROR:
+  if (encryptPayloadBytes)
+  {
+    free(encryptPayloadBytes);
+  }
+  return 1;
+}
+
 int handle_step3_message(const uint8_t* data, int data_length,void* user_data)
 {
   serverLog(LL_NOTICE, "handle_step3_message");
@@ -186,6 +394,71 @@ int handle_step3_message(const uint8_t* data, int data_length,void* user_data)
   }
 }
 
+static int handle_unpair_responce(const uint8_t* data, int data_length,void* user_data)
+{
+  serverLog(LL_NOTICE, "handle_unpair_responce");
+  task_node_t *task_node = (task_node_t *)user_data;
+  ble_data_t *ble_data = task_node->ble_data;
+  ble_admin_param_t *param = ble_data->ble_param;
+  admin_connection_t *admin_unpair_connection = 
+                              (admin_connection_t *)ble_data->ble_connection;
+  save_message_data(data, data_length, user_data);
+  if (admin_unpair_connection->step_max_size == admin_unpair_connection->step_cur_size)
+  {
+    int ret;
+    serverLog(LL_NOTICE, "handle_unpair_responce RECV step2 data finished");
+    admin_unpair_connection->admin_step = BLE_ADMIN_UNPAIR_RESULT;
+
+    // size_t messageLen = 
+    //   admin_unpair_connection->step_max_size - admin_unpair_connection->n_size_byte;
+    // uint8_t *data_start = admin_unpair_connection->step_data + admin_unpair_connection->n_size_byte;
+    // uint8_t messageBytes[messageLen];
+    // memcpy(messageBytes, data_start, messageLen);
+
+    // uint32_t responceMaxLen = decryptDataSize(messageLen);
+    // uint8_t *responceBytes = calloc(responceMaxLen, 1);
+    // serverLog(LL_NOTICE, "responceMaxLen %d", responceMaxLen);
+    // ret =  decryptNative(param->lock->connectionID, messageBytes, responceMaxLen, &responceBytes);
+    // serverLog(LL_NOTICE, "ret %d", ret);
+    // Connection *encry_connection = getConnection(param->lock->connectionID);
+    // if (!encry_connection)
+    // {
+    //   serverLog(LL_ERROR, "ble_unpair_write_unpairreques can't get encry_connection");
+    //   goto UNPAIR_RESULT_EXIT;
+    // }
+    // serverLog(LL_NOTICE, "ble_unpair_write_unpairreques success getting encry_connection" );
+    
+    // int32_t responceLen = decryptData(
+    //         messageBytes, messageLen,
+    //         responceBytes, responceMaxLen,
+    //         encry_connection->key, kConnectionKeyLength,
+    //         encry_connection->txNonce, kNonceLength
+    // );
+    // serverLog(LL_NOTICE, "ble_unpair_write_unpairreques responceLen %d", responceLen);
+
+    // IgUnpairResponse unpair_resppnce;
+    // ig_UnpairResponse_init(&unpair_resppnce);
+    // IgSerializerError err = ig_UnpairResponse_decode(
+    //   data_start, 
+    //   messageLen, 
+    //   &unpair_resppnce, 0 );
+
+    // if (err)
+    // {
+    //   serverLog(LL_NOTICE, "ig_UnpairResponse_decode err %d", err);
+    // }
+    // else
+    // {
+    //   serverLog(LL_NOTICE, "has unpair response %d %d",unpair_resppnce.has_result, unpair_resppnce.result);
+    // }
+    
+    
+UNPAIR_RESULT_EXIT:
+    g_main_loop_quit(task_node->loop);
+
+  }
+}
+
 int handle_step1_message(const uint8_t* data, int data_length,void* user_data)
 {
   serverLog(LL_NOTICE, "handle_step1_message");
@@ -225,6 +498,13 @@ void message_handler(
       serverLog(LL_NOTICE, 
       "admin_connection->admin_step BLE_PAIRING_STEP3 handle_step3_message");
       handle_step3_message(data, data_length, user_data);
+      break;
+    }
+    case BLE_ADMIN_UNPAIR_REQUEST:
+    {
+      serverLog(LL_NOTICE, 
+      "BLE_ADMIN_UNPAIR_REQUEST handle_unpair_responce");
+      handle_unpair_responce(data, data_length,user_data);
       break;
     }
     default:
@@ -318,14 +598,56 @@ static int waiting_admin_step3(void *arg)
 {
   serverLog(LL_NOTICE, "waiting_pairing_step3");
   task_node_t *task_node = (task_node_t *)arg;
-
+  ble_data_t *ble_data = (ble_data_t *)(task_node->ble_data);
+  admin_connection_t *admin_connection = 
+                            (admin_connection_t *)ble_data->ble_connection;
   // 在这儿用g_main_loop_run等待, 用线程锁和睡眠的方法不行, 就像是bluez不会调用
   // 我的回调函数, 在 rtos 应该会有相应的方法实现这样的等待事件到来的方法.
   // 当前 Linux 下, 这样用, works 
   serverLog(LL_NOTICE, "waiting_admin_step3 new loop waiting");
   // task_node->loop = g_main_loop_new(NULL, 0);
   g_main_loop_run(task_node->loop);
+
+  admin_connection->admin_step = BLE_ADMIN_DONE;
   serverLog(LL_NOTICE, "waiting_admin_step3 exit task_node->loop");
+  return 0;
+}
+
+static int waiting_unpair_result(void *arg)
+{
+  serverLog(LL_NOTICE, "waiting_unpair_result");
+  task_node_t *task_node = (task_node_t *)arg;
+
+  // 在这儿用g_main_loop_run等待, 用线程锁和睡眠的方法不行, 就像是bluez不会调用
+  // 我的回调函数, 在 rtos 应该会有相应的方法实现这样的等待事件到来的方法.
+  // 当前 Linux 下, 这样用, works 
+  serverLog(LL_NOTICE, "waiting_unpair_result new loop waiting");
+  task_node->loop = g_main_loop_new(NULL, 0);
+  if (!task_node->loop)
+  {
+    serverLog(LL_ERROR, "task_node->loop error");
+  }
+  g_main_loop_run(task_node->loop);
+  serverLog(LL_NOTICE, "waiting_unpair_result exit task_node->loop");
+  return 0;
+}
+
+static int waiting_unlock_result(void *arg)
+{
+  serverLog(LL_NOTICE, "waiting_unlock_result");
+  task_node_t *task_node = (task_node_t *)arg;
+
+  // 在这儿用g_main_loop_run等待, 用线程锁和睡眠的方法不行, 就像是bluez不会调用
+  // 我的回调函数, 在 rtos 应该会有相应的方法实现这样的等待事件到来的方法.
+  // 当前 Linux 下, 这样用, works 
+  serverLog(LL_NOTICE, "waiting_unlock_result new loop waiting");
+  task_node->loop = g_main_loop_new(NULL, 0);
+  if (!task_node->loop)
+  {
+    serverLog(LL_ERROR, "task_node->loop error");
+  }
+  g_main_loop_run(task_node->loop);
+  serverLog(LL_NOTICE, "waiting_unlock_result exit task_node->loop");
   return 0;
 }
 
@@ -474,4 +796,28 @@ fsm_table_t *getAdminFsmTable()
 int getAdminFsmTableLen()
 {
   return ADMIN_SM_TABLE_LEN;
+}
+
+// unpair
+
+fsm_table_t *getAdminUnpairFsmTable()
+{
+  return admin_unpair_fsm_table;
+}
+
+int getAdminUnpairFsmTableLen()
+{
+  return ADMIN_UNPAIR_SM_TABLE_LEN;
+}
+
+// unlock
+
+fsm_table_t *getAdminUnlockFsmTable()
+{
+  return admin_unlock_fsm_table;
+}
+
+int getAdminUnlockFsmTableLen()
+{
+  return ADMIN_UNLOCK_SM_TABLE_LEN;
 }

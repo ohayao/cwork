@@ -11,6 +11,18 @@ enum BLE_ADMIN_STATE {
   BLE_ADMIN_DONE = 4,    // 完成admin connection标志
 };
 
+enum BLE_ADMIN_UNPAIR_STATE {
+  BLE_ADMIN_UNPAIR_REQUEST = 5, // 发送请求
+  BLE_ADMIN_UNPAIR_RESULT = 6,  // 等待结果
+  BLE_ADMIN_UNPAIR_DONE = 7     // 完成
+};
+
+enum BLE_ADMIN_UNLOCK_STATE {
+  BLE_ADMIN_UNLOCK_REQUEST = 5, // 发送请求
+  BLE_ADMIN_UNLOCK_RESULT = 6,  // 等待结果
+  BLE_ADMIN_UNLOCK_DONE = 7     // 完成
+};
+
 typedef struct BLEAdminParam {
   // 需要addr, 需要key和password
   igm_lock_t *lock;
@@ -32,7 +44,16 @@ int bleSetAdminResultAddr(ble_admin_result_t *result,
 int bleIsAdminSuccess(ble_admin_result_t *result);
 int bleSetAdminResultGattConnection(ble_admin_result_t *result, void* gatt_connection);
 
+// admin
 fsm_table_t *getAdminFsmTable();
 int getAdminFsmTableLen();
+
+// admin unpair
+fsm_table_t *getAdminUnpairFsmTable();
+int getAdminUnpairFsmTableLen();
+
+// admin lock
+fsm_table_t *getAdminUnlockFsmTable();
+int getAdminUnlockFsmTableLen();
 
 #endif
