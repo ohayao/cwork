@@ -107,8 +107,10 @@ int32_t decryptData(uint8_t *dataIn, uint32_t dataInLen, uint8_t *dataOut,
     size_t ciphertextLen = decryptDataSize(dataInLen);
     uint8_t *tag = dataIn + ciphertextLen;
     size_t tagLen = kCcmTagLength;
-    serverLog(LL_NOTICE, "decryptData result %x", ciphertext);
-    int result = cf_ccm_decrypt(&cf_aes, &aes_ctx, ciphertext, ciphertextLen, kCcmInternalCounterLength, NULL, 0, nonce, kNonceLength, tag, tagLen, dataOut);
+    serverLog(LL_NOTICE, "decryptData result %02x", ciphertext[0]);
+    int result = cf_ccm_decrypt(
+        &cf_aes, &aes_ctx, ciphertext, ciphertextLen, kCcmInternalCounterLength, 
+        NULL, 0, nonce, kNonceLength, tag, tagLen, dataOut);
     serverLog(LL_NOTICE, "decryptData result %d", result);
 //    Log_d(kTag, "decrypt result = %i", result);
     uint32_t bytesWritten = decryptDataSize(dataInLen);
@@ -124,76 +126,6 @@ int32_t decryptData(uint8_t *dataIn, uint32_t dataInLen, uint8_t *dataOut,
 
     return bytesWritten;
 }
-
-// JNIEXPORT jbyteArray JNICALL
-// Java_co_igloohome_ble_lock_crypto_Encryption_encrypt(JNIEnv *env, jobject pThis, jbyteArray jPlaintext, jbyteArray jKey, jbyteArray jNonce) {
-//     jsize plaintextLen = env->GetArrayLength(jPlaintext);
-//     uint8_t *plaintext = (uint8_t*)(env->GetByteArrayElements(jPlaintext, NULL));
-//     jsize keyLen = env->GetArrayLength(jKey);
-//     uint8_t *key = (uint8_t*)(env->GetByteArrayElements(jKey, NULL));
-//     jsize nonceLen = env->GetArrayLength(jNonce);
-//     uint8_t *nonce = (uint8_t*)(env->GetByteArrayElements(jNonce, NULL));
-//     auto freeJArrays = [&]() {
-//         env->ReleaseByteArrayElements(jPlaintext, (jbyte*)plaintext, 0);
-//         env->ReleaseByteArrayElements(jKey, (jbyte*)key, 0);
-//         env->ReleaseByteArrayElements(jNonce, (jbyte*)nonce, 0);
-//     };
-
-//     jsize ciphertextLen = encryptDataSize(plaintextLen);
-//     uint8_t ciphertext[ciphertextLen];
-//     uint32_t retvalLen = encryptData(plaintext, plaintextLen,
-//                                      ciphertext, ciphertextLen,
-//                                      key, keyLen, nonce, nonceLen);
-//     incrementNonce(nonce);
-//     if (retvalLen == 0) {
-//         freeJArrays();
-//         return NULL;
-//     }
-//     if (retvalLen != ciphertextLen) {
-//         freeJArrays();
-//         return NULL;
-//     }
-//     jbyteArray retval = env->NewByteArray(retvalLen);
-//     env->SetByteArrayRegion(retval, 0, retvalLen, (jbyte*)ciphertext);
-
-//     freeJArrays();
-//     return retval;
-// }
-
-// JNIEXPORT jbyteArray JNICALL
-// Java_co_igloohome_ble_lock_crypto_Encryption_decrypt(JNIEnv *env, jobject pThis, jbyteArray jMessage, jbyteArray jKey, jbyteArray jNonce) {
-//     jsize messageLen = env->GetArrayLength(jMessage);
-//     uint8_t *messageBytes = (uint8_t*)(env->GetByteArrayElements(jMessage, NULL));
-//     jsize keyLen = env->GetArrayLength(jKey);
-//     uint8_t *key = (uint8_t*)(env->GetByteArrayElements(jKey, NULL));
-//     jsize nonceLen = env->GetArrayLength(jNonce);
-//     uint8_t *nonce = (uint8_t*)(env->GetByteArrayElements(jNonce, NULL));
-//     auto freeJArrays = [&]() {
-//         env->ReleaseByteArrayElements(jMessage, (jbyte*)messageBytes, 0);
-//         env->ReleaseByteArrayElements(jKey, (jbyte*)key, 0);
-//         env->ReleaseByteArrayElements(jNonce, (jbyte*)nonce, 0);
-//     };
-
-//     jsize plaintextLen = decryptDataSize(messageLen);
-//     uint8_t plaintext[plaintextLen];
-//     uint32_t retvalLen = decryptData(messageBytes, messageLen,
-//                                      plaintext, plaintextLen,
-//                                      key, keyLen, nonce, nonceLen);
-//     incrementNonce(nonce);
-//     if (retvalLen == 0) {
-//         freeJArrays();
-//         return NULL;
-//     }
-//     if (retvalLen != plaintextLen) {
-//         freeJArrays();
-//         return NULL;
-//     }
-//     jbyteArray retval = env->NewByteArray(retvalLen);
-//     env->SetByteArrayRegion(retval, 0, retvalLen, (jbyte*)plaintext);
-
-//     freeJArrays();
-//     return retval;
-// }
 
 #ifdef __cplusplus
 }

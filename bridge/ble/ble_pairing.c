@@ -71,6 +71,7 @@ typedef struct ParingConnection {
 
 int save_message_data(const uint8_t* data, int data_length, void* user_data)
 {
+  
   task_node_t *task_node = (task_node_t *)user_data;
   ble_data_t *ble_data = task_node->ble_data;
   pairing_connection_t *pairing_connection = 
@@ -95,8 +96,6 @@ int save_message_data(const uint8_t* data, int data_length, void* user_data)
       {
         pairing_connection->n_size_byte = 1;
         pairing_connection->step_max_size = data[0] + 1;
-        serverLog(LL_NOTICE, 
-                      "1 bytes lenth %d", pairing_connection->step_max_size);
       }
       pairing_connection->step_cur_size = 0;
       pairing_connection->step_data = (uint8_t *)malloc(
@@ -108,13 +107,11 @@ int save_message_data(const uint8_t* data, int data_length, void* user_data)
       }
     }
   }
-
   int size_left = 
         pairing_connection->step_max_size - pairing_connection->step_cur_size;
 
   if (size_left < data_length)
 	{
-    serverLog(LL_NOTICE, "size_left < data_length");
     pairing_connection->step_max_size += 85;
 		uint8_t *old_data = pairing_connection->step_data;
 		pairing_connection->step_data = (uint8_t *)malloc(
@@ -128,7 +125,6 @@ int save_message_data(const uint8_t* data, int data_length, void* user_data)
       pairing_connection->step_data, old_data, pairing_connection->step_cur_size);
 		free(old_data);
 	}
-
   // 空间足够, 直接放下空间里面
 	for (int j = 0; j < data_length; ) {
 		// printf("%02x ", data[i]);
@@ -140,10 +136,15 @@ int waiting_pairing_step4(void *arg)
 {
   serverLog(LL_NOTICE, "waiting_pairing_step4");
   task_node_t *task_node = (task_node_t *)arg;
+  ble_data_t *ble_data = (ble_data_t *)(task_node->ble_data);
+  pairing_connection_t *pairing_connection = 
+                            (pairing_connection_t *)ble_data->ble_connection;
+  
   serverLog(LL_NOTICE, "waiting_pairing_step4 new loop waiting");
   task_node->loop = g_main_loop_new(NULL, 0);
-  g_main_loop_run(task_node->loop);
   serverLog(LL_NOTICE, "waiting_pairing_step4 exit task_node->loop");
+  g_main_loop_run(task_node->loop);  
+
   return 0;
 }
 
@@ -173,20 +174,23 @@ int handle_step4_message(const uint8_t* data, int data_length,void* user_data)
   if (pairing_connection->step_max_size == pairing_connection->step_cur_size)
   {
     int ret;
-    serverLog(LL_NOTICE, "handle_step2_message RECV step2 data finished");
+    serverLog(LL_NOTICE, "handle_step4_message RECV step2 data finished");
     pairing_connection->pairing_step = BLE_PAIRING_STEP4;
+
     g_main_loop_quit(task_node->loop);
   }
 }
 
 int handle_step2_message(const uint8_t* data, int data_length,void* user_data)
 {
-  serverLog(LL_NOTICE, "handle_step2_message");
+  serverLog(LL_NOTICE, "handle_step2_message -------------------");
   task_node_t *task_node = (task_node_t *)user_data;
   ble_data_t *ble_data = task_node->ble_data;
   pairing_connection_t *pairing_connection = 
                               (pairing_connection_t *)ble_data->ble_connection;
+  serverLog(LL_NOTICE, "step_max_size %d, step_cur_size %d", pairing_connection->step_max_size, pairing_connection->step_cur_size);
   save_message_data(data, data_length, user_data);
+  serverLog(LL_NOTICE, "step_max_size %d, step_cur_size %d", pairing_connection->step_max_size, pairing_connection->step_cur_size);
   if (pairing_connection->step_max_size == pairing_connection->step_cur_size)
   {
     int ret;
@@ -345,12 +349,13 @@ int write_pairing_commit(void *arg)
   }
   free(commitBytes);
 	free(payloadBytes);
-
+  serverLog(LL_NOTICE, "release gatt_connection and notification");
   gattlib_notification_stop(
         pairing_connection->gatt_connection, &pairing_connection->pairing_uuid);
 
   gattlib_disconnect(pairing_connection->gatt_connection);
   serverLog(LL_NOTICE, "write_pairing_commit end --------");
+  
   return 0;
 
 COMMIT_ERROR_EXIT:

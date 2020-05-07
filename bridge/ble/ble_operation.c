@@ -7,6 +7,19 @@ size_t resolve_payload_len(const size_t step_len)
 	return step_len>254 ? (step_len+3) : (step_len+1);
 }
 
+int x2d(int x)
+{
+  int ret = 0;
+  ret += (x %10);
+  x /= 10;
+  for (;x;){
+    ret += (x % 10) * 15;
+    x = x / 10;
+  }
+  printf("ret: %d", ret);
+  return ret;
+}
+
 bool build_msg_payload(uint8_t **p_payloadBytes, 
                       size_t *payload_len, uint8_t *stepBytes, size_t step_len)
 {

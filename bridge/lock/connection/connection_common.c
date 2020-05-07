@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <bridge/bridge_main/log.h>
 
 static const char *kTag = "JNI_connection_common";
 
@@ -39,17 +40,17 @@ int beginConnection(ConnectionType type, uint8_t *jKey, int keyLen) {
     return ERROR_CONNECTION_ID;
 }
 
-// void endConnection(JNIEnv *env, jobject pThis, jint connectionId) {
-//     if (connectionId > kMaxConnections || connectionId < 0) {
-//         return;
-//     }
+void endConnection(int connectionId) {
+    if (connectionId > kMaxConnections || connectionId < 0) {
+        return;
+    }
 
-//     connections_[connectionId].active = false;
-//     connections_[connectionId].connnectionId = 0;
-//     connections_[connectionId].type = kConnectionTypeNone;
+    connections_[connectionId].active = false;
+    connections_[connectionId].connnectionId = 0;
+    connections_[connectionId].type = kConnectionTypeNone;
 
-//     memset(connections_->rxNonce, 0, sizeof(connections_->rxNonce));
-// }
+    memset(connections_->rxNonce, 0, sizeof(connections_->rxNonce));
+}
 
 
 int encryptNative(int connectionId, uint8_t *jPlaintext, int plaintextLen,
@@ -91,6 +92,11 @@ int decryptNative(
                                     plaintext, plaintextLen,
                                     connection->key, kConnectionKeyLength,
                                     connection->rxNonce, kNonceLength);
+    if (retvalLen < 0)
+    {
+        serverLog(LL_ERROR, "decryptNative decryptData error");
+        return 0;
+    }
 
     incrementNonce(connection->rxNonce);
     if (retvalLen <= 0 || retvalLen != plaintextLen) {

@@ -117,14 +117,14 @@ bool igloohome_ble_lock_crypto_AdminConnection_recConnStep3Native(
   return true;
 }
 
-int igloohome_ble_lock_crypto_AdminConnection_encryptNative(
+int AdminConnection_encryptNative(
   int connectionId, uint8_t *jPlaintext, int plaintextLen, uint8_t **retBytes) {
     return encryptNative(connectionId, jPlaintext, plaintextLen, retBytes);
 }
 
-int igloohome_ble_lock_crypto_AdminConnection_decryptNative(
+int AdminConnection_decryptNative(
   int connectionId, uint8_t *jMessage, int messageLen, uint8_t **retBytes) {
-   decryptNative(
+   return decryptNative(
      connectionId, jMessage, messageLen, retBytes);
 }
 

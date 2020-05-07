@@ -18,9 +18,15 @@ enum BLE_ADMIN_UNPAIR_STATE {
 };
 
 enum BLE_ADMIN_UNLOCK_STATE {
-  BLE_ADMIN_UNLOCK_REQUEST = 5, // 发送请求
-  BLE_ADMIN_UNLOCK_RESULT = 6,  // 等待结果
-  BLE_ADMIN_UNLOCK_DONE = 7     // 完成
+  BLE_ADMIN_UNLOCK_REQUEST = 8, // 发送请求
+  BLE_ADMIN_UNLOCK_RESULT = 9,  // 等待结果
+  BLE_ADMIN_UNLOCK_DONE = 10     // 完成
+};
+
+enum BLE_ADMIN_LOCK_STATE {
+  BLE_ADMIN_LOCK_REQUEST = 11, // 发送请求
+  BLE_ADMIN_LOCK_RESULT = 12,  // 等待结果
+  BLE_ADMIN_LOCK_DONE = 13     // 完成
 };
 
 typedef struct BLEAdminParam {

@@ -368,9 +368,9 @@ void addAdminUnlockTask(igm_lock_t *lock)
 {
     // 设置需要的参数
     serverLog(LL_NOTICE, "Add Admin Unlock task");
-    serverLog(LL_NOTICE, "1. set ble admin unpair parameters");
+    serverLog(LL_NOTICE, "1. set ble admin Unlock parameters");
     ble_admin_param_t *admin_param = (ble_admin_param_t *)calloc(sizeof(ble_admin_param_t), 1);
-    serverLog(LL_NOTICE, "1. set admin unpair param lock to name %s addr %s", lock->name, lock->addr);
+    serverLog(LL_NOTICE, "1. set admin Unlock param lock to name %s addr %s", lock->name, lock->addr);
     bleSetAdminParam(admin_param, lock);
     serverLog(LL_NOTICE, "2. set msg_id to 4(or anything you want)");
     int msg_id = 4;
