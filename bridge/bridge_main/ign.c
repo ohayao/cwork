@@ -46,17 +46,27 @@ int FSMHandle(task_node_t* tn) {
         serverLog(LL_NOTICE, "FSMHandle i %d ", i);
 		if (tn->cur_state == tn->task_sm_table[i].cur_state) {
             serverLog(LL_NOTICE, "eventActFun begin---------------");
-			tn->task_sm_table[i].eventActFun(tn);
+            // 增加一个判断当前函数, 是否当前函数出错. 0 表示没问题
+			int event_result = tn->task_sm_table[i].eventActFun(tn);
+            if (event_result)
+            {
+                flag = 0;
+                break;
+            }
+            else
+            {
+                tn->cur_state = tn->task_sm_table[i].next_state;
+                flag = 1;
+            }
             serverLog(LL_NOTICE, "eventActFun end-----------------");
-			tn->cur_state = tn->task_sm_table[i].next_state;
-            flag = 1;
+            
 		}
 	}
     serverLog(LL_NOTICE, "FSMHandle out for end-----------------");
     if (0 == flag) {
 		// do nothing
         // sm or cur_state err
-        serverLog(LL_ERROR, "NO state(%d).", tn->cur_state);
+        serverLog(LL_ERROR, "something wrogin int fsm, one of the event function error, state(%d) error.", tn->cur_state);
         return -1;
 	}
     serverLog(LL_NOTICE, "FSMHandle end");
@@ -411,7 +421,7 @@ void saveTaskData(task_node_t *ptn)
                 igm_lock_t *lock = bleGetNResult(ble_data, j, sizeof(igm_lock_t));
                 serverLog(LL_NOTICE, "name %s  addr: %s", lock->name, lock->addr);
                 insertLock(lock);
-                // test
+                // test 需要, 
                 if (!lock->paired)
                 {
                     serverLog(LL_NOTICE, "try to pair name %s  addr: %s", lock->name, lock->addr);
@@ -425,7 +435,9 @@ void saveTaskData(task_node_t *ptn)
             serverLog(LL_NOTICE, "saving ble TASK_BLE_PAIRING data");
             ble_pairing_result_t *pairing_result = (ble_pairing_result_t *)ble_data->ble_result;
             igm_lock_t *lock = findLockByAddr(pairing_result->addr);
-            if (lock)
+            // 只有找到这把锁, 并且匹配成功, 成保存称为Paired
+            // 添加任务, 纯属测试需要
+            if (lock && pairing_result->pairing_successed)
             {
                 serverLog(LL_NOTICE, "set name %s addr %s to paired", lock->name, lock->addr);
                 setLockPaired(lock);
@@ -505,9 +517,9 @@ int main() {
                 else
                 {
                     serverLog(LL_NOTICE, "one mission finished, delete this task");
-                    saveTaskData(ptn);
-                    DeleteDTask(&ptn); // 自动置 ptn 为 NULL
                 }
+                saveTaskData(ptn);
+                DeleteDTask(&ptn); // 自动置 ptn 为 NULL
                 
                 task_node_t *tmp = NextDTask(ptn);
                 if (tmp)

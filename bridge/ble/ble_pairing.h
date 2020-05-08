@@ -27,6 +27,7 @@ int bleInitPairingParam(ble_pairing_param_t *pairing_param);
 int bleReleaseParingParam(ble_pairing_param_t *pairing_param);
 int bleSetPairingParam(ble_pairing_param_t *pairing_param, igm_lock_t *lock);
 
+
 typedef struct BLEPairingResult {
   char addr[MAX_DEVICE_ADDR];
   int pairing_successed;

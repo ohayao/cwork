@@ -437,6 +437,15 @@ COMMIT_ERROR_EXIT:
   {
     free(payloadBytes);
   }
+  ret = end_pairing_gatt(arg);
+  if (ret != GATTLIB_SUCCESS)
+  {
+    serverLog(LL_ERROR, "end_pairing_gatt error");
+  }
+  else
+  {
+    serverLog(LL_NOTICE, "end_pairing_gatt success ✓✓✓");
+  }
   return 1;
 }
 
@@ -522,6 +531,15 @@ STEP3_ERROR_EXIT:
   {
     free(payloadBytes);
   }
+  ret = end_pairing_gatt(arg);
+  if (ret != GATTLIB_SUCCESS)
+  {
+    serverLog(LL_ERROR, "end_pairing_gatt error");
+  }
+  else
+  {
+    serverLog(LL_NOTICE, "end_pairing_gatt success ✓✓✓");
+  }
   return 1;
 }
 
@@ -587,6 +605,15 @@ STEP1_ERROR_EXIT:
   if (payloadBytes)
   {
     free(payloadBytes);
+  }
+  ret = end_pairing_gatt(arg);
+  if (ret != GATTLIB_SUCCESS)
+  {
+    serverLog(LL_ERROR, "end_pairing_gatt error");
+  }
+  else
+  {
+    serverLog(LL_NOTICE, "end_pairing_gatt success ✓✓✓");
   }
 }
 
@@ -667,7 +694,15 @@ ERROR_EXIT:
     // gattlib_notification_stop(
     //   pairing_connection->gatt_connection, &(pairing_connection->pairing_uuid));
     // gattlib_disconnect(pairing_connection->gatt_connection);
-    end_pairing_gatt(arg);
+    ret = end_pairing_gatt(arg);
+    if (ret != GATTLIB_SUCCESS)
+    {
+      serverLog(LL_ERROR, "end_pairing_gatt error");
+    }
+    else
+    {
+      serverLog(LL_NOTICE, "end_pairing_gatt success ✓✓✓");
+    }
   }
   // 
   // if (ble_data->ble_connection)
