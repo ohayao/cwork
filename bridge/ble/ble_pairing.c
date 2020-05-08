@@ -14,6 +14,8 @@
 #include <stdlib.h>
 
 static char pairing_str[] = "5c3a659e-897e-45e1-b016-007107c96df6";
+// 产生一个错误的返回.
+int blePairingResultErr(ble_pairing_result_t *result);
 
 //步骤分别为
 // 1. BLE_PAIRING_BEGIN 监听变化
@@ -45,6 +47,8 @@ fsm_table_t pairing_fsm_table[PAIRING_SM_TABLE_LEN] = {
   {BLE_PAIRING_STEP4,   waiting_pairing_step4,         BLE_PAIRING_COMMIT},
   {BLE_PAIRING_COMMIT,  write_pairing_commit,          BLE_PAIRING_DONE},
 };
+static int end_pairing_gatt(void *arg);
+
 
 fsm_table_t *getPairingFsmTable()
 {
@@ -56,6 +60,13 @@ int getPairingFsmTableLen()
   return PAIRING_SM_TABLE_LEN;
 }
 
+// 为什么这儿也有一个result, 原因是
+// 我不想在Ble_data里面有各种操作,把不同部分的操作都归纳到ble_data里面
+// 所以, 在不同部分的connection_t里面, 设置了一个result
+// ble data 只复制二进制结果.这样可以让不同写和读的人自己知道协议
+// 递信的人, 只要复制二进制结果就ok了.即使那个结果是一个指针, 只拿指针内存的地址就ok
+// 你们两个写信和读信的人配合好释放内存.
+// 写信的人,自己申请一块, 读信的人, 自己负责使用写信人提供的释放借口释放.
 typedef struct ParingConnection {
 	gatt_connection_t* gatt_connection;
   igm_lock_t lock;
@@ -68,6 +79,56 @@ typedef struct ParingConnection {
   int has_pairing_result;
   ble_pairing_result_t *pairing_result;
 }pairing_connection_t;
+
+static int end_pairing_gatt(void *arg)
+{
+  int ret;
+  task_node_t *task_node = (task_node_t *)arg;
+  ble_data_t *ble_data = task_node->ble_data;
+  pairing_connection_t *pairing_connection = 
+                              (pairing_connection_t *)ble_data->ble_connection;
+  ret = gattlib_notification_stop(
+        pairing_connection->gatt_connection, &pairing_connection->pairing_uuid);
+  if (ret != GATTLIB_SUCCESS)
+  {
+    serverLog(LL_ERROR, "end_admin_gatt gattlib_notification_stop error");
+    return ret;
+  }
+  ret = gattlib_disconnect(pairing_connection->gatt_connection);
+  if (ret != GATTLIB_SUCCESS)
+  {
+    serverLog(LL_ERROR, "end_admin_gatt gattlib_disconnect error");
+    return ret;
+  }
+  return ret;
+}
+
+int pairing_err_result_return(void *arg)
+{
+  task_node_t *task_node = (task_node_t *)arg;
+  ble_data_t *ble_data = task_node->ble_data;
+   pairing_connection_t *pairing_connection = 
+                              (pairing_connection_t *)ble_data->ble_connection;
+  // 返回参数给调用进程
+  serverLog(LL_NOTICE, 
+    "write_pairing_commit bleSetBleResult to ble data");
+  
+  bleSetBleResult(
+    ble_data, pairing_connection->pairing_result, sizeof(ble_pairing_result_t));
+}
+
+int pairing_success_result_return(void *arg)
+{
+  task_node_t *task_node = (task_node_t *)arg;
+  ble_data_t *ble_data = task_node->ble_data;
+   pairing_connection_t *pairing_connection = 
+                              (pairing_connection_t *)ble_data->ble_connection;
+  // 返回参数给调用进程
+  serverLog(LL_NOTICE, 
+    "write_pairing_commit bleSetBleResult to ble data");
+  bleSetBleResult(
+    ble_data, pairing_connection->pairing_result, sizeof(ble_pairing_result_t));
+}
 
 int save_message_data(const uint8_t* data, int data_length, void* user_data)
 {
@@ -275,7 +336,7 @@ int write_pairing_commit(void *arg)
 	{
     serverLog(LL_NOTICE, "set Pairing Result the Password");
     bleSetPairingResultPassword(
-      pairing_connection->pairing_result, step4->password, step4->password_size);
+      pairing_connection->pairing_result, 1, step4->password, step4->password_size);
       serverLog(LL_NOTICE, "-------------------------step4.has_success ");
 			if (step4->has_password)
 			{
@@ -328,7 +389,7 @@ int write_pairing_commit(void *arg)
   {
     serverLog(LL_NOTICE, "set Pairing Result the  admin key:");
     bleSetPairingResultAdminKey(
-      pairing_connection->pairing_result, admin_key, key_len);
+      pairing_connection->pairing_result, 1, admin_key, key_len);
       serverLog(LL_NOTICE, "paired lock admin key:");
       for (int j = 0; j < key_len; j++)
       {
@@ -338,11 +399,8 @@ int write_pairing_commit(void *arg)
   }
 
   // 返回参数给调用进程
-  serverLog(LL_NOTICE, "write_pairing_commit bleSetBleResult to ble data");
-  bleSetBleResult(
-    ble_data, pairing_connection->pairing_result, sizeof(ble_pairing_result_t));
   bleSetPairingSuccess(pairing_connection->pairing_result, 1);
-
+  pairing_err_result_return(arg);
   if (admin_key)
   {
     free(admin_key);
@@ -350,15 +408,27 @@ int write_pairing_commit(void *arg)
   free(commitBytes);
 	free(payloadBytes);
   serverLog(LL_NOTICE, "release gatt_connection and notification");
-  gattlib_notification_stop(
-        pairing_connection->gatt_connection, &pairing_connection->pairing_uuid);
-
-  gattlib_disconnect(pairing_connection->gatt_connection);
+  ret = end_pairing_gatt(arg);
+  if (ret != GATTLIB_SUCCESS)
+  {
+    serverLog(LL_ERROR, "end_pairing_gatt error");
+  }
+  else
+  {
+    serverLog(LL_NOTICE, "end_pairing_gatt success ✓✓✓");
+  }
   serverLog(LL_NOTICE, "write_pairing_commit end --------");
   
   return 0;
 
 COMMIT_ERROR_EXIT:
+  serverLog(LL_ERROR, "write_pairing_commit ERROR EXIT.");
+  if (pairing_connection->has_pairing_result)
+  {
+    serverLog(LL_NOTICE, "blePairingResultErr.");
+    blePairingResultErr(pairing_connection->pairing_result);
+    pairing_err_result_return(arg);
+  }
   if (commitBytes)
   {
     free(commitBytes);
@@ -436,6 +506,13 @@ int write_pairing_step3(void *arg)
 STEP3_ERROR_EXIT:
   // 释放产生的数据内存哦
   // 释放申请的内存
+  serverLog(LL_ERROR, "write_pairing_step3 ERROR EXIT.");
+  if (pairing_connection->has_pairing_result)
+  {
+    serverLog(LL_NOTICE, "blePairingResultErr.");
+    blePairingResultErr(pairing_connection->pairing_result);
+    pairing_err_result_return(arg);
+  }
   if (step3Bytes)
   {
     free(step3Bytes);
@@ -496,6 +573,13 @@ int write_pairing_step1(void *arg)
   serverLog(LL_NOTICE, "write_pairing_step1 end --------");
   return 0;
 STEP1_ERROR_EXIT:
+  serverLog(LL_ERROR, "write_pairing_step1 ERROR EXIT.");
+  if (pairing_connection->has_pairing_result)
+  {
+    serverLog(LL_NOTICE, "blePairingResultErr.");
+    blePairingResultErr(pairing_connection->pairing_result);
+    pairing_err_result_return(arg);
+  }
   if (step1Bytes)
   {
     free(step1Bytes);
@@ -505,6 +589,7 @@ STEP1_ERROR_EXIT:
     free(payloadBytes);
   }
 }
+
 
 int register_pairing_notfication(void *arg)
 {
@@ -571,16 +656,24 @@ int register_pairing_notfication(void *arg)
 
 ERROR_EXIT:
   serverLog(LL_ERROR, "register_pairing_notfication ERROR EXIT.");
+  if (pairing_connection->has_pairing_result)
+  {
+    serverLog(LL_NOTICE, "blePairingResultErr.");
+    blePairingResultErr(pairing_connection->pairing_result);
+    pairing_err_result_return(arg);
+  }
   if (pairing_connection->gatt_connection)
   {
-    gattlib_notification_stop(
-      pairing_connection->gatt_connection, &(pairing_connection->pairing_uuid));
-    gattlib_disconnect(pairing_connection->gatt_connection);
+    // gattlib_notification_stop(
+    //   pairing_connection->gatt_connection, &(pairing_connection->pairing_uuid));
+    // gattlib_disconnect(pairing_connection->gatt_connection);
+    end_pairing_gatt(arg);
   }
-  if (ble_data->ble_connection)
-  {
-    free(ble_data->ble_connection);
-  }
+  // 
+  // if (ble_data->ble_connection)
+  // {
+  //   free(ble_data->ble_connection);
+  // }
   return 1;
 }
 
@@ -661,25 +754,41 @@ int bleReleasePairingResult(ble_pairing_result_t **pp_result)
   return 0;
 }
 
-int bleSetPairingResultAdminKey(ble_pairing_result_t *result, 
+int bleSetPairingResultAdminKey(ble_pairing_result_t *result, int has_admin_key,
   uint8_t *admin_key, int admin_key_len)
 {
   bleReleaseResultAdminKey(result);
-  result->has_admin_key = 1;
-  result->admin_key_len = admin_key_len;
-  result->admin_key = calloc(admin_key_len, 1);
-  memcpy(result->admin_key, admin_key, admin_key_len);
+  result->has_admin_key = has_admin_key;
+  if (result->has_admin_key)
+  {
+    result->admin_key_len = admin_key_len;
+    result->admin_key = calloc(admin_key_len, 1);
+    memcpy(result->admin_key, admin_key, admin_key_len);
+  }
+  else
+  {
+    result->admin_key_len = 0;
+    result->admin_key = NULL;
+  }
   return 0;
 }
 
-int bleSetPairingResultPassword(ble_pairing_result_t *result, 
+int bleSetPairingResultPassword(ble_pairing_result_t *result, int has_password,
   uint8_t *password, int password_size)
 {
   bleReleaseResultPassword(result);
-  result->has_password = 1;
-  result->password_size = password_size;
-  result->password = calloc(password_size, 1);
-  memcpy(result->password, password, password_size);
+  result->has_password = has_password;
+  if (result->has_password)
+  {
+    result->password_size = password_size;
+    result->password = calloc(password_size, 1);
+    memcpy(result->password, password, password_size);
+  }
+  else
+  {
+    result->password_size = 0;
+    result->password = NULL;
+  }
   return 0;
 }
 
@@ -710,6 +819,16 @@ int bleSetPairingResultAddr(ble_pairing_result_t *result,
 {
   memset(result->addr,0, MAX_DEVICE_ADDR);
   memcpy(result->addr, addr, addr_len>MAX_DEVICE_ADDR?MAX_DEVICE_ADDR:addr_len);
+  return 0;
+}
+
+// 设置返回出错结果
+int blePairingResultErr(ble_pairing_result_t *result)
+{
+  result->pairing_successed = 0;
+  bleSetPairingSuccess(result, 1);
+  bleSetPairingResultPassword(result, 0, NULL, 0);
+  bleSetPairingResultAdminKey(result, 0, NULL, 0);
   return 0;
 }
 

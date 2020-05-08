@@ -432,8 +432,8 @@ void saveTaskData(task_node_t *ptn)
                 setLockAdminKey(lock, pairing_result->admin_key, pairing_result->admin_key_len);
                 setLockPassword(lock, pairing_result->password, pairing_result->password_size);
                 // addAdminTask(lock);
-                // addAdminUnpairTask(lock);
-                addAdminUnlockTask(lock);
+                addAdminUnpairTask(lock);
+                // addAdminUnlockTask(lock);
             }
             break;
         }

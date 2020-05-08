@@ -43,9 +43,9 @@ int bleSetPairingSuccess(ble_pairing_result_t *pairing_result, int s);
 int bleReleaseResultAdminKey(ble_pairing_result_t *result);
 int bleReleaseResultPassword(ble_pairing_result_t *result);
 int bleReleasePairingResult(ble_pairing_result_t **pp_result);
-int bleSetPairingResultAdminKey(ble_pairing_result_t *result, 
+int bleSetPairingResultAdminKey(ble_pairing_result_t *result, int has_admin_key,
   uint8_t *admin_key, int admin_key_len);
-int bleSetPairingResultPassword(ble_pairing_result_t *result, 
+int bleSetPairingResultPassword(ble_pairing_result_t *result, int has_password,
   uint8_t *password, int password_size);
 int bleGetPairingResultAdminKey(ble_pairing_result_t *result, 
   uint8_t *admin_key, int *p_admin_key_len);
@@ -53,6 +53,7 @@ int bleGetPairingResultPassword(ble_pairing_result_t *result,
   uint8_t *password, int *p_password_size);
 int bleSetPairingResultAddr(ble_pairing_result_t *result, 
   char *addr, size_t addr_len);
+
 
 fsm_table_t *getPairingFsmTable();
 int getPairingFsmTableLen();

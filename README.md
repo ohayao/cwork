@@ -66,10 +66,12 @@ bridge
 
 
 
-### 命名:
+### 命名规则:
   结构体命名: IGMLock形式, igm_lock_t
   结构体成语变量,局部变量:addr_len 形式
   函数: updateCachedTime 形式
   枚举类型: FSM_STATE 形式
   
-
+### TODO List
+1. 当锁已经被paired, 当前会出错.
+2. 发送完成一个命令, 把锁有连接和监听都关闭, unpaired 命令

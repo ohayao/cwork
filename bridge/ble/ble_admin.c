@@ -53,9 +53,6 @@ static int write_admin_step2(void *arg);
 static int waiting_admin_step3(void *arg);
 static int handle_step3_message(const uint8_t* data, int data_length,void* user_data);
 
-
-static int dummy_ptr(void *arg){}
-
 fsm_table_t admin_fsm_table[ADMIN_SM_TABLE_LEN] = {
   {BLE_ADMIN_BEGIN,       register_admin_notfication,  BLE_ADMIN_STEP1},
   {BLE_ADMIN_STEP1,       waiting_admin_step1,         BLE_ADMIN_STEP2},
@@ -103,7 +100,30 @@ fsm_table_t admin_lock_fsm_table[ADMIN_LOCK_SM_TABLE_LEN] = {
   {BLE_ADMIN_ESTABLISHED,   write_unlock_request,         BLE_ADMIN_UNLOCK_RESULT},
   {BLE_ADMIN_UNLOCK_RESULT, waiting_unlock_result,        BLE_ADMIN_UNLOCK_DONE},
 };
+static int end_admin_gatt(void *arg);
 
+static int end_admin_gatt(void *arg)
+{
+  int ret;
+  task_node_t *task_node = (task_node_t *)arg;
+  ble_data_t *ble_data = task_node->ble_data;
+  admin_connection_t *admin_connection = 
+                              (admin_connection_t *)ble_data->ble_connection;
+  ret = gattlib_notification_stop(
+        admin_connection->gatt_connection, &admin_connection->admin_uuid);
+  if (ret != GATTLIB_SUCCESS)
+  {
+    serverLog(LL_ERROR, "end_admin_gatt gattlib_notification_stop error");
+    return ret;
+  }
+  ret = gattlib_disconnect(admin_connection->gatt_connection);
+  if (ret != GATTLIB_SUCCESS)
+  {
+    serverLog(LL_ERROR, "end_admin_gatt gattlib_disconnect error");
+    return ret;
+  }
+  return ret;
+}
 
 int write_admin_step2(void *arg)
 {
@@ -662,9 +682,17 @@ static int handle_unpair_responce(const uint8_t* data, int data_length,void* use
     {
       serverLog(LL_NOTICE, "ig_UnpairResponse_decode err %d", err);
     }
+    serverLog(LL_NOTICE, "has unpair response %d %d",unpair_resppnce.has_result, unpair_resppnce.result);
+    
+    
+    ret = end_admin_gatt(user_data);
+    if (ret != GATTLIB_SUCCESS)
+    {
+      serverLog(LL_ERROR, "end_admin_gatt error");
+    }
     else
     {
-      serverLog(LL_NOTICE, "has unpair response %d %d",unpair_resppnce.has_result, unpair_resppnce.result);
+      serverLog(LL_NOTICE, "end_admin_gatt success ✓✓✓");
     }
     
     
