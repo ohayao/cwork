@@ -27,7 +27,7 @@ paho.mqtt.c github 编译安装
 libssl-dev 安装这个库, mqtt 需要
 cjson
 mosquitto 用于测试
-
+protobuf
 
 ### BLE 编译依赖
 * build-essential  

@@ -1,0 +1,16 @@
+
+
+set(ALL_PROTO_HDRS)
+set(ALL_PROTO_SRCS)
+
+set(MQTT_DEPENDENCIES
+)
+
+file(GLOB_RECURSE ALL_PROTO_HDRS "*.h")
+file(GLOB_RECURSE ALL_PROTO_SRCS "*.c")
+
+add_library(ign_proto
+  ${ALL_PROTO_HDRS} ${ALL_PROTO_SRCS}
+)
+
+

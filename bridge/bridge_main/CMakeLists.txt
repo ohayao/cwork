@@ -6,6 +6,7 @@ set(IGN_DEPENDENCIES
   pthread
   ble
   mqtt
+  ign_proto
 )
 set(IGN_SRCS
   ./ign.c

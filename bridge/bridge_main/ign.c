@@ -26,10 +26,14 @@
 #include <bridge/mqtt/mqtt_constant.h>
 #include <bridge/mqtt/mqtt_util.h>
 #include <bridge/mqtt/cJSON.h>
-
+#include <bridge/proto/ign.pb.h>
+#include <bridge/proto/pb_encode.h>
+#include <bridge/proto/pb_decode.h>
 sysinfo_t g_sysif;
 
 extern int WaitBtn(void *arg);
+ign_BridgeProfile Create_IgnBridgeProfile(char *bridgeID);
+void addPairingTask(igm_lock_t *lock);
 
 int FSMHandle(task_node_t* tn) {
     if(NULL == tn->task_sm_table) {
@@ -73,6 +77,83 @@ int FSMHandle(task_node_t* tn) {
         return -1;
 	}
     serverLog(LL_NOTICE, "FSMHandle end");
+    return 0;
+}
+
+ign_BridgeProfile Create_IgnBridgeProfile(char *bridgeID){
+    ign_BridgeProfile bp={};
+    bp.os_info=ign_OSType_LINUX;
+    char temp[100];
+    memset(temp,0,sizeof(temp));
+    strcpy(temp,bridgeID);
+    bp.bt_id.size=strlen(temp);
+    memcpy(bp.bt_id.bytes,temp,strlen(temp));
+
+    memset(temp,0,sizeof(temp));
+    strcpy(temp,"mac_addr");
+    bp.mac_addr.size=strlen(temp);
+    memcpy(bp.mac_addr.bytes,temp,strlen(temp));
+
+    memset(temp,0,sizeof(temp));
+    strcpy(temp,"local_ip");
+    bp.local_ip.size=strlen(temp);
+    memcpy(bp.local_ip.bytes,temp,strlen(temp));
+
+    memset(temp,0,sizeof(temp));
+    strcpy(temp,"public_ip");
+    bp.public_ip.size=strlen(temp);
+    memcpy(bp.public_ip.bytes,temp,strlen(temp));
+
+    memset(temp,0,sizeof(temp));
+    strcpy(temp,"sys_statics");
+    bp.sys_statics.size=strlen(temp);
+    memcpy(bp.sys_statics.bytes,temp,strlen(temp));
+
+    memset(temp,0,sizeof(temp));
+    strcpy(temp,"wifi_ssid");
+    bp.wifi_ssid.size=strlen(temp);
+    memcpy(bp.wifi_ssid.bytes,temp,strlen(temp));
+    bp.wifi_signal=2;
+    bp.inited_time=get_ustime();
+
+    memset(temp,0,sizeof(temp));
+    strcpy(temp,"bridge_name");
+    bp.name.size=strlen(temp);
+    memcpy(bp.name.bytes,temp,strlen(temp));
+    return bp;
+}
+
+static int hbInterval=0;
+int HeartBeat(){
+    //send MQTT HB to Server
+    hbInterval++;
+    hbInterval=hbInterval%10;
+    if(hbInterval>0) return 0;
+    ign_MsgInfo hb={};
+    hb.event_type=ign_EventType_HEARTBEAT;
+    hb.time=get_ustime();
+    hb.msg_id=get_ustime();
+    ign_BridgeEventData bed={};
+    bed.has_profile=true;
+    bed.profile=Create_IgnBridgeProfile("abcdef");
+    hb.has_bridge_data=true;
+    hb.bridge_data=bed;
+
+
+    int publish_result;
+    uint8_t buf[1024];
+    memset(buf,0,sizeof(buf));
+    pb_ostream_t out=pb_ostream_from_buffer(buf,sizeof(buf));
+    if(pb_encode(&out,ign_MsgInfo_fields,&hb)){
+        size_t len=out.bytes_written;
+        if((publish_result=sendMessage(g_sysif.mqtt_c,PUB_TOPIC,1,buf,(int)len))!=MQTTCLIENT_SUCCESS){
+            serverLog(LL_ERROR, "SEND MQTT HB ERROR WITH CODE[%d]", publish_result);
+        }else{
+            serverLog(LL_NOTICE, "SEND MQTT HB SUCCESS");
+        }
+    }else{
+        serverLog(LL_ERROR, "ENCODE MQTT HB ERROR");
+    }
     return 0;
 }
 
@@ -230,18 +311,17 @@ void WaitMQTT(void *arg){
             serverLog(LL_ERROR, "MQTTClient_receive msg error");
             continue;
         }
-        serverLog(LL_NOTICE, "MQTTClient_receive msg success");
+        // serverLog(LL_NOTICE, "MQTTClient_receive msg success");
         if (!msg)
         {
-            serverLog(LL_NOTICE, "MQTTClient_receive msg NULL, error");
+            HeartBeat();
             continue;
         }
 
         if (strcmp(topic,PUB_WEBDEMO) == 0)
         {
-            // DoWebMsg(topic,msg->payload);;
+            DoWebMsg(topic,msg->payload);;
         }
-
     }
 }
 
@@ -258,7 +338,7 @@ int WaitBtn(void *arg){
     return 0;
 }
 
-void addPairingTask(igm_lock_t *lock);
+
 
 
 
