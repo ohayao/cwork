@@ -33,7 +33,8 @@ sysinfo_t g_sysif;
 
 extern int WaitBtn(void *arg);
 ign_BridgeProfile Create_IgnBridgeProfile(char *bridgeID);
-void addPairingTask(igm_lock_t *lock);
+void addPairingTask(igm_lock_t *lock, int msg_id);
+void addDiscoverTask(int msg_id);
 
 int FSMHandle(task_node_t* tn) {
     if(NULL == tn->task_sm_table) {
@@ -296,6 +297,9 @@ int DoWebMsg(char *topic,void *payload){
     }
     printf("=============================================================\n");
     cJSON_Delete(root);
+    int msg_id = rand() % 25532;
+    serverLog(LL_NOTICE, "addDiscoverTask msg_id %d", msg_id);
+    addDiscoverTask(msg_id);
     return 0;
 }
 
@@ -322,6 +326,7 @@ void WaitMQTT(void *arg){
         {
             DoWebMsg(topic,msg->payload);;
         }
+        serverLog(LL_NOTICE, "topic %s", topic);
     }
 }
 
@@ -353,7 +358,7 @@ void visitScanResult(ble_data_t *ble_data)
         serverLog(LL_NOTICE, "8. get the j:% lock.", j);
         igm_lock_t *lock = bleGetNResult(ble_data, j, sizeof(igm_lock_t));
         serverLog(LL_NOTICE, "name %s  addr: %s", lock->name, lock->addr);
-        addPairingTask(lock);
+        // addPairingTask(lock);
     }
     serverLog(LL_NOTICE, "9. Release the ble data");
     bleReleaseData(&ble_data);
@@ -361,7 +366,7 @@ void visitScanResult(ble_data_t *ble_data)
 
 // 添加扫描方式样例
 // ble_data 里面全市
-void addDiscoverTask()
+void addDiscoverTask(int msg_id)
 {
     // 设置需要的参数
     serverLog(LL_NOTICE, "Add Discover task");
@@ -370,7 +375,6 @@ void addDiscoverTask()
     serverLog(LL_NOTICE, "1. set scan_timeout to 3");
     discover_param.scan_timeout = 2;
     serverLog(LL_NOTICE, "2. set msg_id to 0(or anything you want)");
-    int msg_id = 0;
     // 把参数写入data, 当前有个问题就是, 使用完, 得访问的人记的释放.
     serverLog(LL_NOTICE, "3. alloc ble data datatype, ble_data is used to devliver parameters and get result data");
     ble_data_t *ble_data = calloc(sizeof(ble_data_t), 1);
@@ -392,8 +396,15 @@ void addDiscoverTask()
     return;
 }
 
-void addPairingTask(igm_lock_t *lock)
+void addPairingTask(igm_lock_t *lock, int msg_id)
 {
+    igm_lock_t *lock_nearby = findLockByName(lock->name);
+    if (!lock_nearby)
+    {
+        serverLog(LL_NOTICE, "Pairing lock, not discover by the bridge, bridge scan first");
+        addDiscoverTask(msg_id)
+        return;
+    }
     // 设置需要的参数
     serverLog(LL_NOTICE, "Add Pairing task");
     serverLog(LL_NOTICE, "1. set ble pairing parameters");
@@ -401,7 +412,7 @@ void addPairingTask(igm_lock_t *lock)
     serverLog(LL_NOTICE, "1. set pairing param lock to name %s addr %s", lock->name, lock->addr);
     bleSetPairingParam(pairing_param, lock);
     serverLog(LL_NOTICE, "2. set msg_id to 1(or anything you want)");
-    int msg_id = 1;
+    // int msg_id = 1;
     // 把参数写入data, 当前有个问题就是, 使用完, 得访问的人记的释放.
     serverLog(LL_NOTICE, "3. alloc ble data datatype, ble_data is used to devliver parameters and get result data");
     ble_data_t *ble_data = calloc(sizeof(ble_data_t), 1);
@@ -419,7 +430,7 @@ void addPairingTask(igm_lock_t *lock)
     return;
 }
 
-void addAdminTask(igm_lock_t *lock)
+void addAdminTask(igm_lock_t *lock, int msg_id)
 {
     // 设置需要的参数
     serverLog(LL_NOTICE, "Add Admin task");
@@ -427,8 +438,6 @@ void addAdminTask(igm_lock_t *lock)
     ble_admin_param_t *admin_param = (ble_admin_param_t *)calloc(sizeof(ble_admin_param_t), 1);
     serverLog(LL_NOTICE, "1. set pairing param lock to name %s addr %s", lock->name, lock->addr);
     bleSetAdminParam(admin_param, lock);
-    serverLog(LL_NOTICE, "2. set msg_id to 2(or anything you want)");
-    int msg_id = 2;
     // 把参数写入data, 当前有个问题就是, 使用完, 得访问的人记的释放.
     serverLog(LL_NOTICE, "3. alloc ble data datatype, ble_data is used to devliver parameters and get result data");
     ble_data_t *ble_data = calloc(sizeof(ble_data_t), 1);
@@ -548,11 +557,11 @@ void saveTaskData(task_node_t *ptn)
                 serverLog(LL_NOTICE, "name %s  addr: %s", lock->name, lock->addr);
                 insertLock(lock);
                 // test 需要, 
-                if (!lock->paired)
-                {
-                    serverLog(LL_NOTICE, "try to pair name %s  addr: %s", lock->name, lock->addr);
-                    addPairingTask(lock);
-                }              
+                // if (!lock->paired)
+                // {
+                //     serverLog(LL_NOTICE, "try to pair name %s  addr: %s", lock->name, lock->addr);
+                //     addPairingTask(lock);
+                // }              
             }
             break;
         }
@@ -569,7 +578,7 @@ void saveTaskData(task_node_t *ptn)
                 setLockPaired(lock);
                 setLockAdminKey(lock, pairing_result->admin_key, pairing_result->admin_key_len);
                 setLockPassword(lock, pairing_result->password, pairing_result->password_size);
-                // addAdminTask(lock);
+                // addAdminTask(lock, 2);
                 // addAdminUnpairTask(lock);
                 // addAdminUnlockTask(lock);
                 // addAdminLockTask(lock);
