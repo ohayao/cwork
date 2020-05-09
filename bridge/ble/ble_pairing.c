@@ -861,7 +861,7 @@ int bleSetPairingResultAddr(ble_pairing_result_t *result,
 int blePairingResultErr(ble_pairing_result_t *result)
 {
   result->pairing_successed = 0;
-  bleSetPairingSuccess(result, 1);
+  bleSetPairingSuccess(result, 0);
   bleSetPairingResultPassword(result, 0, NULL, 0);
   bleSetPairingResultAdminKey(result, 0, NULL, 0);
   return 0;

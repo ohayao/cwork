@@ -122,12 +122,63 @@ task_node_t *InsertDTaskFront(
   return new_task;
 }
 
+task_node_t *InsertDTaskTail(
+  unsigned int msg_id, unsigned char cs, 
+  mqtt_data_t *mqtt_data, int mqtt_data_len,
+  ble_data_t *ble_data, int ble_data_len, 
+  fsm_table_t *task_sm_table, int sm_table_len, int task_type)
+{
+  task_node_t *new_task = (task_node_t *)malloc(sizeof(task_node_t));
+  task_node_t *task_node = (task_node_t *)new_task;
+  new_task->msg_id = msg_id;
+  new_task->task_type = task_type;
+  // copy mqtt data
+  if (mqtt_data_len && mqtt_data)
+  {
+    new_task->mqtt_data_len = mqtt_data_len;
+    new_task->mqtt_data = calloc(new_task->mqtt_data_len, 1);
+    // TODO, 内存分配不了?
+    memcpy(new_task->mqtt_data, mqtt_data, new_task->mqtt_data_len);
+  }
+  
+  if (ble_data_len && ble_data)
+  {
+    // 只是将指针值复制过去.
+    new_task->ble_data_len = ble_data_len;
+    new_task->ble_data = calloc(new_task->ble_data_len, 1);
+    // TODO, 内存分配不了?
+    memcpy(new_task->ble_data, ble_data, new_task->ble_data_len);
+  }
+  if (task_sm_table && sm_table_len)
+  {
+    new_task->sm_table_len = sm_table_len;
+    new_task->task_sm_table = calloc(new_task->sm_table_len, sizeof(fsm_table_t));
+    // TODO, 内存分配不了?
+    memcpy(new_task->task_sm_table, task_sm_table, new_task->sm_table_len*sizeof(fsm_table_t));
+  }
+  new_task->cur_state = cs;
+  _lockD();
+  list_add_tail(&(new_task->list), &doing_task_head);
+  _unlockD();
+  return new_task;
+}
+
 task_node_t *InsertBle2DFront(
   unsigned int msg_id, unsigned char cs, 
   ble_data_t *ble_data, int ble_data_len, 
   fsm_table_t *task_sm_table, int sm_table_len, int task_type)
 {
   return InsertDTaskFront(
+    msg_id, cs, NULL, 0, ble_data, ble_data_len, task_sm_table, sm_table_len, task_type
+  );
+}
+
+task_node_t *InsertBle2DTail(
+  unsigned int msg_id, unsigned char cs, 
+  ble_data_t *ble_data, int ble_data_len, 
+  fsm_table_t *task_sm_table, int sm_table_len, int task_type)
+{
+  return InsertDTaskTail(
     msg_id, cs, NULL, 0, ble_data, ble_data_len, task_sm_table, sm_table_len, task_type
   );
 }

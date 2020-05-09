@@ -35,6 +35,7 @@ extern int WaitBtn(void *arg);
 ign_BridgeProfile Create_IgnBridgeProfile(char *bridgeID);
 void addPairingTask(igm_lock_t *lock, int msg_id);
 void addDiscoverTask(int msg_id);
+void addAdminTask(igm_lock_t *lock, int msg_id);
 
 int FSMHandle(task_node_t* tn) {
     if(NULL == tn->task_sm_table) {
@@ -299,7 +300,11 @@ int DoWebMsg(char *topic,void *payload){
     cJSON_Delete(root);
     int msg_id = rand() % 25532;
     serverLog(LL_NOTICE, "addDiscoverTask msg_id %d", msg_id);
-    addDiscoverTask(msg_id);
+    igm_lock_t lock;
+    lockSetName(&lock, "IGM303e31a5c", strlen("IGM303e31a5c"));
+    // addPairingTask(&lock, msg_id);
+    addAdminTask(&lock, msg_id);
+    // addPairingTask(&lock, msg_id);
     return 0;
 }
 
@@ -388,7 +393,7 @@ void addDiscoverTask(int msg_id)
 
     // 插入系统的队列
     serverLog(LL_NOTICE, "4. used InsertBle2DFront to insert the task to system.");
-    InsertBle2DFront(msg_id, BLE_DISCOVER_BEGIN, 
+    InsertBle2DTail(msg_id, BLE_DISCOVER_BEGIN, 
         ble_data, sizeof(ble_data_t),
         getDiscoverFsmTable(), getDiscoverFsmTableLen(), TASK_BLE_DISCOVER
     );
@@ -396,21 +401,60 @@ void addDiscoverTask(int msg_id)
     return;
 }
 
-void addPairingTask(igm_lock_t *lock, int msg_id)
+igm_lock_t *checkLockIsDiscovered(igm_lock_t *lock)
 {
-    igm_lock_t *lock_nearby = findLockByName(lock->name);
+    int n_try_scan = 3;
+    igm_lock_t *lock_nearby;
+    while (n_try_scan--)
+    {
+        lock_nearby = findLockByName(lock->name);
+        if (!lock_nearby)
+        {
+            serverLog(LL_NOTICE, "Pairing lock, not discover by the bridge, bridge scan first");
+            contnueDiscoverLock();
+        }
+    }
     if (!lock_nearby)
     {
-        serverLog(LL_NOTICE, "Pairing lock, not discover by the bridge, bridge scan first");
-        addDiscoverTask(msg_id)
+        serverLog(LL_NOTICE, "Pairing lock, not discover by the bridge");
+        return NULL;
+    }
+    return lock_nearby;
+}
+
+igm_lock_t *checkLockIsPaired(igm_lock_t *lock)
+{
+    igm_lock_t *paired_lock;
+    int n_try_paired = 3;
+    int msg_id = 233;
+    while (n_try_paired--)
+    {
+        if (lock && lock->paired)
+        {
+            return lock;
+        }
+        addPairingTask(lock, msg_id);
+        sleep(1);
+    }
+    return NULL;
+}
+
+void addPairingTask(igm_lock_t *lock, int msg_id)
+{
+
+    igm_lock_t *lock_nearby = checkLockIsDiscovered(lock);
+    if (!lock_nearby)
+    {
+        serverLog(LL_ERROR, "can't not find lock nearby");
         return;
     }
+
     // 设置需要的参数
     serverLog(LL_NOTICE, "Add Pairing task");
     serverLog(LL_NOTICE, "1. set ble pairing parameters");
     ble_pairing_param_t *pairing_param = (ble_pairing_param_t *)calloc(sizeof(ble_pairing_param_t), 1);
-    serverLog(LL_NOTICE, "1. set pairing param lock to name %s addr %s", lock->name, lock->addr);
-    bleSetPairingParam(pairing_param, lock);
+    serverLog(LL_NOTICE, "1. set pairing param lock to name %s addr %s", lock_nearby->name, lock_nearby->addr);
+    bleSetPairingParam(pairing_param, lock_nearby);
     serverLog(LL_NOTICE, "2. set msg_id to 1(or anything you want)");
     // int msg_id = 1;
     // 把参数写入data, 当前有个问题就是, 使用完, 得访问的人记的释放.
@@ -423,7 +467,7 @@ void addPairingTask(igm_lock_t *lock, int msg_id)
 
     // 插入系统的队列
     serverLog(LL_NOTICE, "4. used InsertBle2DFront to insert the task to system.");
-    InsertBle2DFront(msg_id, BLE_PAIRING_BEGIN, 
+    InsertBle2DTail(msg_id, BLE_PAIRING_BEGIN, 
         ble_data, sizeof(ble_data_t),
         getPairingFsmTable(), getPairingFsmTableLen(), TASK_BLE_PAIRING);
     serverLog(LL_NOTICE, "5. Add Pairing task.");
@@ -432,6 +476,18 @@ void addPairingTask(igm_lock_t *lock, int msg_id)
 
 void addAdminTask(igm_lock_t *lock, int msg_id)
 {
+    igm_lock_t *lock_nearby  = checkLockIsDiscovered(lock);
+    if (!lock_nearby)
+    {
+        return;
+    }
+    
+    lock_nearby = checkLockIsPaired(lock_nearby);
+    if (!lock_nearby)
+    {
+        serverLog(LL_ERROR, "can't not paired lock nearby");
+        return;
+    }
     // 设置需要的参数
     serverLog(LL_NOTICE, "Add Admin task");
     serverLog(LL_NOTICE, "1. set ble admin parameters");

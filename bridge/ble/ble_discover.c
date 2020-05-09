@@ -4,6 +4,7 @@
 #include <bridge/bridge_main/task.h>
 #include <regex.h>
 #include <bridge/ble/lock.h>
+#include <bridge/bridge_main/lock_list.h>
 
 int discoverLock(void *arg);
 
@@ -42,6 +43,7 @@ EXIT:
   gattlib_adapter_close(adapter);
   return 0;
 }
+
 
 fsm_table_t *getDiscoverFsmTable()
 {
@@ -84,6 +86,83 @@ void ble_discovered_device(
     lockSetName(&nearby_lock, name, strlen(name));
     lockSetAddr(&nearby_lock, addr, strlen(addr));
     blePutResults(ble_data, &nearby_lock, sizeof(igm_lock_t));
+  }
+  else
+  {
+    return;
+  }
+  // 测试多个数据的返回
+  // serverLog(LL_NOTICE, "match name %s add %s", name, addr);
+  //   igm_lock_t nearby_lock;
+  //   lockInit(&nearby_lock);
+  //   lockSetName(&nearby_lock, name, strlen(name));
+  //   lockSetAddr(&nearby_lock, addr, strlen(addr));
+  //   blePutResults(ble_data, &nearby_lock, sizeof(igm_lock_t));
+  // printf("Discovered %s, don't have name, return\n", addr);
+	return;
+}
+
+void continueDiscoveredDevice(
+  void *adapter, const char* addr, const char* name, void *user_data);
+
+int contnueDiscoverLock()
+{
+  char *addr_name = NULL;
+  void *adapter = NULL;
+  int ret;
+  ret = gattlib_adapter_open(addr_name, &adapter);
+  if (ret) {
+		serverLog(LL_ERROR, "discoverLock ERROR: Failed to open adapter.\n");
+    // TODO: our own error;
+		return ret;
+	}
+
+  ret = gattlib_adapter_scan_enable(
+		adapter, continueDiscoveredDevice, 2, NULL /* task node*/);
+	if (ret) {
+		fprintf(stderr, "ERROR: Failed to scan.\n");
+		goto CONTINUE_DISCOVER_EXIT;
+	}
+CONTINUE_DISCOVER_EXIT:
+  gattlib_adapter_close(adapter);
+  return 0;
+}
+
+void continueDiscoveredDevice(
+  void *adapter, const char* addr, const char* name, void *user_data) {
+  // 通过 user_data, 传入一个数据结构, 然后返回结果
+	int ret;
+	int addr_size;
+	char *up_addr;
+	int name_size;
+  serverLog(LL_NOTICE, "123 continueDiscoveredDevice");
+
+	if (!name) {
+    return ;
+	} 
+  // IGM303e31a5c
+  regex_t regex;
+  int reti;
+  reti = regcomp(&regex, "^IGM", 0);
+  // reti = regcomp(&regex, "^IGR", 0);
+  if (reti) {
+    fprintf(stderr, "Could not compile regex\n");
+    return;
+  }
+  reti = regexec(&regex, name, 0, NULL, 0);
+  if (!reti) {
+    // match
+    igm_lock_t *lock = findLockByName(name);
+    if (!lock)
+    {
+      serverLog(LL_NOTICE, "finde new lock name %s addr %s and insert", name, addr);
+      igm_lock_t nearby_lock;
+      lockInit(&nearby_lock);
+      lockSetName(&nearby_lock, name, strlen(name));
+      lockSetAddr(&nearby_lock, addr, strlen(addr));
+      insertLock(&nearby_lock);
+    }
+    
   }
   else
   {

@@ -21,7 +21,7 @@ fsm_table_t *getDiscoverFsmTable();
 int getDiscoverFsmTableLen();
 void ble_discovered_device(
   void *adapter, const char* addr, const char* name, void *user_data);
-
+int contnueDiscoverLock();
 
 
 #endif

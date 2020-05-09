@@ -11,7 +11,16 @@ task_node_t *InsertDTaskFront(
   mqtt_data_t *mqtt_data, int mqtt_data_len,
   ble_data_t *ble_data, int ble_data_len, 
   fsm_table_t *task_sm_table, int sm_table_len, int task_type);
+task_node_t *InsertDTaskTail(
+  unsigned int msg_id, unsigned char cs, 
+  mqtt_data_t *mqtt_data, int mqtt_data_len,
+  ble_data_t *ble_data, int ble_data_len, 
+  fsm_table_t *task_sm_table, int sm_table_len, int task_type);
 task_node_t *InsertBle2DFront(
+  unsigned int msg_id, unsigned char cs, 
+  ble_data_t *ble_data, int ble_data_len, 
+  fsm_table_t *task_sm_table, int sm_table_len, int task_type);
+task_node_t *InsertBle2DTail(
   unsigned int msg_id, unsigned char cs, 
   ble_data_t *ble_data, int ble_data_len, 
   fsm_table_t *task_sm_table, int sm_table_len, int task_type);

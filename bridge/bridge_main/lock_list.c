@@ -38,7 +38,7 @@ int insertLock(igm_lock_t *lock)
 }
 
 // findLockByAddr()
-igm_lock_t *findLockByAddr(char addr[MAX_DEVICE_ADDR])
+igm_lock_t *findLockByAddr(const char addr[MAX_DEVICE_ADDR])
 {
   list_head_t *pos = NULL;
   igm_lock_t *pnode = NULL;
@@ -55,7 +55,7 @@ igm_lock_t *findLockByAddr(char addr[MAX_DEVICE_ADDR])
   return NULL;
 }
 
-igm_lock_t *findLockByName(char name[MAX_DEVICE_NAME])
+igm_lock_t *findLockByName(const char name[MAX_DEVICE_NAME])
 {
   list_head_t *pos = NULL;
   igm_lock_t *pnode = NULL;
