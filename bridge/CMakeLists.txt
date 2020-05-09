@@ -1,4 +1,5 @@
 add_subdirectory("gattlib")
 add_subdirectory("lock")
 add_subdirectory("ble")
+add_subdirectory("mqtt")
 add_subdirectory("bridge_main")

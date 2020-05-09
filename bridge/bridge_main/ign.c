@@ -23,6 +23,9 @@
 #include <bridge/bridge_main/lock_list.h>
 #include <bridge/ble/ble_admin.h>
 #include <bridge/ble/ble_pairing.h>
+#include <bridge/mqtt/mqtt_constant.h>
+#include <bridge/mqtt/mqtt_util.h>
+#include <bridge/mqtt/cJSON.h>
 
 sysinfo_t g_sysif;
 
@@ -73,11 +76,11 @@ int FSMHandle(task_node_t* tn) {
     return 0;
 }
 
-// int GetUserInfo(void* si) {
-// 	//send request to server to get userinfo
-// 	printf("send request to server to get userinfo!\n");
-//     return 0;
-// }
+int GetUserInfo(void* si) {
+	//send request to server to get userinfo
+	printf("send request to server to get userinfo!\n");
+    return 0;
+}
 
 // int DealUserInfo(void* si) {
 // 	//Recv UserInfo from server 
@@ -110,28 +113,36 @@ int BLEParing(void* tn){
 }
 
 
+int Init(void* tn) {
+    serverLog(LL_NOTICE, "Init mqtt Clients");
+    g_sysif.mqtt_c = initClients(HOST,SUBSCRIBE_CLIENT_ID,60,1,CA_PATH,TRUST_STORE,PRIVATE_KEY,KEY_STORE);
+    if(NULL == g_sysif.mqtt_c) {
+        //goto GoExit;
+        serverLog(LL_ERROR, "util_initClients err, mqtt_c is NULL.");
+        return 1;
+    }
+    serverLog(LL_NOTICE, "init mqtt Clients success");
+    
+    int rc = MQTTClient_subscribe(g_sysif.mqtt_c, SUB_TOPIC, 1);
+    if(MQTTCLIENT_SUCCESS != rc){
+        serverLog(LL_ERROR, "Subscribe [%s] error with code [%d].", SUB_TOPIC, rc);
+        return 1;
+    }
+    serverLog(LL_NOTICE, "Subscribe [%s] success!!!", SUB_TOPIC);
+    
+
+    rc = MQTTClient_subscribe(g_sysif.mqtt_c,PUB_WEBDEMO,1);
+    if(rc!=MQTTCLIENT_SUCCESS){
+        serverLog(LL_ERROR, "Subscribe [%s] error with code [%d].", PUB_WEBDEMO, rc);
+        return 1;
+    }
+    serverLog(LL_NOTICE, "Subscribe [%s] success!!!", PUB_WEBDEMO);
 
 
-// int Init(void* tn) {
-
-//     // get WiFi & user info from Mobile App
-//     // get AWS pem by http
-
-//     //task_node_t *ptn = (task_node_t*) tn; 
-//     g_sysif.mqtt_c = util_initClients(HOST,SUBSCRIBE_CLIENT_ID,60,1,CA_PATH,TRUST_STORE,PRIVATE_KEY,KEY_STORE);
-//     if(NULL == g_sysif.mqtt_c) {
-//         //goto GoExit;
-//         printf("util_initClients err, mqtt_c is NULL.\n");
-//     }
-//     int rc = MQTTClient_subscribe(g_sysif.mqtt_c, "test", 1);
-//     if(MQTTCLIENT_SUCCESS != rc){
-//         printf("Subscribe [abc] error with code [%d].\n", rc);
-//     }
-
-//     //InitBLE(si);
-//     //InitBtn(si);
-//     return 0;
-// }
+    //InitBLE(si);
+    //InitBtn(si);
+    return 0;
+}
 
 
 fsm_table_t g_fsm_table[] = {
@@ -183,48 +194,54 @@ static int FSM(MQTTClient_message *msg){
 //     return 0;
 // }
 
+//处理web端消息
+int DoWebMsg(char *topic,void *payload){
+    printf("=============================================================\n");
+    cJSON *root=NULL;
+    root=cJSON_Parse((char *)payload);
+    if(root==NULL){
+        cJSON_Delete(root);
+        return 0;
+    }
+    cJSON *cmd= cJSON_GetObjectItem(root,"cmd");
+    cJSON *bridgeId=cJSON_GetObjectItem(root,"bridge_id");
+    cJSON *value=cJSON_GetObjectItem(root,"value");
+    printf("recv CMD=%s,BRIDGEID=%s Value=%s\n",cmd->valuestring,bridgeId->valuestring,value->valuestring);
+    if(strcmp("getUserInfo",cmd->valuestring)==0){
+        GetUserInfo(bridgeId->valuestring);
+    }else if(strcmp("unlock",cmd->valuestring)==0){
+        char* lockID=value->valuestring;
+        UnLock(lockID);
+    }
+    printf("=============================================================\n");
+    cJSON_Delete(root);
+    return 0;
+}
+
 void WaitMQTT(void *arg){
+    sysinfo_t *si = (sysinfo_t *)arg;
     while(1){
         sleep(1);
-//         //if (NULL == si->mqtt_c)
-//         char *topic = NULL;
-//         int topicLen;
-//         MQTTClient_message *msg = NULL;
-//         int rc = MQTTClient_receive(si->mqtt_c, &topic, &topicLen, &msg, 1e3);
-//         if (0 != rc) {
-//             //err log
-//         }
-//         if(msg){
-//             //search task queue by msg_id
-//             unsigned int msg_id = 1;
-//             unsigned int current_state = 1;
-//             task_node_t *ptn = NULL;
-//             ptn = FindTaskByMsgID(msg_id, &waiting_task_head);
-            
-//             if (NULL!=ptn) {//move task_node into doing_list task queue
-//                 printf("find task_node.msg_id[%u], current_state[%d].\n", ptn->msg_id, ptn->cur_state);
-//                 //MoveTask();
+        char *topic = NULL;
+        int topicLen;
+        MQTTClient_message *msg = NULL;
+        int rc = MQTTClient_receive(si->mqtt_c, &topic, &topicLen, &msg, 1e3);
+        if (0 != rc) {
+            serverLog(LL_ERROR, "MQTTClient_receive msg error");
+            continue;
+        }
+        serverLog(LL_NOTICE, "MQTTClient_receive msg success");
+        if (!msg)
+        {
+            serverLog(LL_NOTICE, "MQTTClient_receive msg NULL, error");
+            continue;
+        }
 
-//                 pthread_mutex_lock(g_sysif.mutex);
-//                 MoveTask(&ptn->list, &doing_task_head);
-//                 pthread_mutex_unlock(g_sysif.mutex);
-//             }
-//             else {//if not exist, add into task queue
-//                 printf("find ptn==NULL.\n");
-//                 pthread_mutex_lock(g_sysif.mutex);
-//                 InsertTask(&doing_task_head, msg_id, current_state, NULL, NULL);
-//                 pthread_mutex_unlock(g_sysif.mutex);
-//             }
+        if (strcmp(topic,PUB_WEBDEMO) == 0)
+        {
+            // DoWebMsg(topic,msg->payload);;
+        }
 
-//             //decode get msg_id 
-//             //task_node_t* tn = FindTaskByMsgID(msg_id, waiting_list)
-            
-//             MQTTClient_freeMessage(&msg);
-//             MQTTClient_free(topic);
-//         } else {
-//             //err log
-//             HeartBeat();
-//         }
     }
 }
 
@@ -242,6 +259,25 @@ int WaitBtn(void *arg){
 }
 
 void addPairingTask(igm_lock_t *lock);
+
+
+
+void visitScanResult(ble_data_t *ble_data)
+{
+    serverLog(LL_NOTICE, "6. after the task is finished, we can get the data like this.");
+    serverLog(LL_NOTICE, "7. get the result point.");
+    int num_of_result = bleGetNumsOfResult(ble_data);
+    void *result = ble_data->ble_result;
+    for (int j=0; j < num_of_result; j++)
+    {
+        serverLog(LL_NOTICE, "8. get the j:% lock.", j);
+        igm_lock_t *lock = bleGetNResult(ble_data, j, sizeof(igm_lock_t));
+        serverLog(LL_NOTICE, "name %s  addr: %s", lock->name, lock->addr);
+        addPairingTask(lock);
+    }
+    serverLog(LL_NOTICE, "9. Release the ble data");
+    bleReleaseData(&ble_data);
+}
 
 // 添加扫描方式样例
 // ble_data 里面全市
@@ -274,23 +310,6 @@ void addDiscoverTask()
     );
     serverLog(LL_NOTICE, "5. Add Discover task.");
     return;
-}
-
-void visitScanResult(ble_data_t *ble_data)
-{
-    serverLog(LL_NOTICE, "6. after the task is finished, we can get the data like this.");
-    serverLog(LL_NOTICE, "7. get the result point.");
-    int num_of_result = bleGetNumsOfResult(ble_data);
-    void *result = ble_data->ble_result;
-    for (int j=0; j < num_of_result; j++)
-    {
-        serverLog(LL_NOTICE, "8. get the j:% lock.", j);
-        igm_lock_t *lock = bleGetNResult(ble_data, j, sizeof(igm_lock_t));
-        serverLog(LL_NOTICE, "name %s  addr: %s", lock->name, lock->addr);
-        addPairingTask(lock);
-    }
-    serverLog(LL_NOTICE, "9. Release the ble data");
-    bleReleaseData(&ble_data);
 }
 
 void addPairingTask(igm_lock_t *lock)
@@ -401,6 +420,33 @@ void addAdminUnlockTask(igm_lock_t *lock)
     return;
 }
 
+void addAdminLockTask(igm_lock_t *lock)
+{
+    // 设置需要的参数
+    serverLog(LL_NOTICE, "Add Admin lock task");
+    serverLog(LL_NOTICE, "1. set ble admin lock parameters");
+    ble_admin_param_t *admin_param = (ble_admin_param_t *)calloc(sizeof(ble_admin_param_t), 1);
+    serverLog(LL_NOTICE, "1. set admin lock param lock to name %s addr %s", lock->name, lock->addr);
+    bleSetAdminParam(admin_param, lock);
+    serverLog(LL_NOTICE, "2. set msg_id to 5(or anything you want)");
+    int msg_id = 5;
+    // 把参数写入data, 当前有个问题就是, 使用完, 得访问的人记的释放.
+    serverLog(LL_NOTICE, "3. alloc ble data datatype, ble_data is used to devliver parameters and get result data");
+    ble_data_t *ble_data = calloc(sizeof(ble_data_t), 1);
+    serverLog(LL_NOTICE, "3. init ble_data");
+    bleInitData(ble_data);
+    serverLog(LL_NOTICE, "3. set ble parametes to ble data");
+    bleSetBleParam(ble_data, admin_param, sizeof(ble_admin_param_t));
+
+    // 插入系统的队列
+    serverLog(LL_NOTICE, "4. used InsertBle2DFront to insert the task to system.");
+    InsertBle2DFront(msg_id, BLE_ADMIN_BEGIN, 
+        ble_data, sizeof(ble_data_t),
+        getAdminLockFsmTable(), getAdminLockFsmTableLen(), TASK_BLE_ADMIN_LOCK);
+    serverLog(LL_NOTICE, "5. Add admin unlock task.");
+    return;
+}
+
 void saveTaskData(task_node_t *ptn)
 {
     if (!ptn) return;
@@ -444,8 +490,9 @@ void saveTaskData(task_node_t *ptn)
                 setLockAdminKey(lock, pairing_result->admin_key, pairing_result->admin_key_len);
                 setLockPassword(lock, pairing_result->password, pairing_result->password_size);
                 // addAdminTask(lock);
-                addAdminUnpairTask(lock);
+                // addAdminUnpairTask(lock);
                 // addAdminUnlockTask(lock);
+                // addAdminLockTask(lock);
             }
             break;
         }
@@ -465,6 +512,12 @@ void saveTaskData(task_node_t *ptn)
             ble_admin_result_t *admin_lock_result = (ble_admin_result_t *)ble_data->ble_result;
             break;
         }
+        case TASK_BLE_ADMIN_LOCK:
+        {
+            serverLog(LL_NOTICE, "saving ble TASK_BLE_ADMIN_LOCK data");
+            ble_admin_result_t *admin_lock_result = (ble_admin_result_t *)ble_data->ble_result;
+            break;
+        }
         default:
             break;
         }
@@ -472,6 +525,7 @@ void saveTaskData(task_node_t *ptn)
 }
 
 int main() {
+    Init(NULL);
     serverLog(LL_NOTICE,"Ready to start.");
 
     //daemon(1, 0);
@@ -485,13 +539,13 @@ int main() {
         return -1;
     }*/
 
-    // pthread_t mqtt_thread = Thread_start(WaitMQTT, &g_sysif);
-    // serverLog(LL_NOTICE,"new thread to WaitMQTT[%u].", mqtt_thread);
+    pthread_t mqtt_thread = Thread_start(WaitMQTT, &g_sysif);
+    serverLog(LL_NOTICE,"new thread to WaitMQTT[%u].", mqtt_thread);
     // pthread_t ble_thread = Thread_start(WaitBLE, &g_sysif);
     // serverLog(LL_NOTICE,"new thread to WaitMQTT[%u].", ble_thread);
     // pthread_t bt_thread = Thread_start(WaitBtn, &g_sysif);
     // serverLog(LL_NOTICE,"new thread to WaitMQTT[%u].", bt_thread);
-    addDiscoverTask();
+    // addDiscoverTask();
     while(1) {
         //if empty, sleep(0.5);
         //do it , after set into waiting_list

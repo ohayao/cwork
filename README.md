@@ -21,6 +21,14 @@
 - TODO
 
 
+### mqtt 编译依赖
+pthread
+paho.mqtt.c github 编译安装
+libssl-dev 安装这个库, mqtt 需要
+cjson
+mosquitto 用于测试
+
+
 ### BLE 编译依赖
 * build-essential  
 * cmake  
@@ -75,3 +83,5 @@ bridge
 ### TODO List
 1. 当锁已经被paired, 当前会出错.
 2. 发送完成一个命令, 把锁有连接和监听都关闭, unpaired 命令
+
+

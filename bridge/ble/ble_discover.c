@@ -68,11 +68,10 @@ void ble_discovered_device(
     return ;
 	} 
   // IGM303e31a5c
-  // regex IGM_regex("^IGM.*?",  std::regex_constants::icase);
-  // regex IGM_regex("IGM303e31a5c",  std::regex_constants::icase);
   regex_t regex;
   int reti;
   reti = regcomp(&regex, "^IGM", 0);
+  // reti = regcomp(&regex, "^IGR", 0);
   if (reti) {
     fprintf(stderr, "Could not compile regex\n");
     return;

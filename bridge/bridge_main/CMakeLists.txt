@@ -5,6 +5,7 @@ include_directories(${GLIB_INCLUDE_DIRS})
 set(IGN_DEPENDENCIES
   pthread
   ble
+  mqtt
 )
 set(IGN_SRCS
   ./ign.c

@@ -42,6 +42,41 @@ typedef struct AdminConnection {
   ble_admin_result_t *admin_result;
 }admin_connection_t;
 
+static int clearAdminConnection(admin_connection_t **pp_admin_connection);
+static int clearAdminConnectionStepData(admin_connection_t *admin_connection);
+static int clearAdminConnectionGattConenction(admin_connection_t *admin_connection);
+
+static int clearAdminConnectionStepData(admin_connection_t *admin_connection)
+{
+  if (admin_connection->step_data && admin_connection->step_max_size)
+  {
+    admin_connection->step_max_size = 0;
+    admin_connection->step_cur_size = 0;
+    free(admin_connection->step_data);
+    admin_connection->step_data = NULL;
+  }
+  return 0;
+}
+
+static int clearAdminConnectionGattConenction(admin_connection_t *admin_connection)
+{
+  int ret;
+  ret = gattlib_notification_stop(
+        admin_connection->gatt_connection, &admin_connection->admin_uuid);
+  if (ret != GATTLIB_SUCCESS)
+  {
+    serverLog(LL_ERROR, "clearAdminConnectionGattConenction gattlib_notification_stop error");
+    return ret;
+  }
+  ret = gattlib_disconnect(admin_connection->gatt_connection);
+  if (ret != GATTLIB_SUCCESS)
+  {
+    serverLog(LL_ERROR, "clearAdminConnectionGattConenction gattlib_disconnect error");
+    return ret;
+  }
+  return ret;
+}
+
 // admin
 static int register_admin_notfication(void *arg);
 static void message_handler(
@@ -97,33 +132,10 @@ fsm_table_t admin_lock_fsm_table[ADMIN_LOCK_SM_TABLE_LEN] = {
   {BLE_ADMIN_BEGIN,         register_admin_notfication,   BLE_ADMIN_STEP1},
   {BLE_ADMIN_STEP1,         waiting_admin_step1,          BLE_ADMIN_STEP2},
   {BLE_ADMIN_STEP2,         write_admin_step2,            BLE_ADMIN_ESTABLISHED},
-  {BLE_ADMIN_ESTABLISHED,   write_unlock_request,         BLE_ADMIN_UNLOCK_RESULT},
-  {BLE_ADMIN_UNLOCK_RESULT, waiting_unlock_result,        BLE_ADMIN_UNLOCK_DONE},
+  {BLE_ADMIN_ESTABLISHED,   waiting_admin_step3,         BLE_ADMIN_LOCK_REQUEST},
+  {BLE_ADMIN_LOCK_REQUEST,   write_lock_request,         BLE_ADMIN_LOCK_RESULT},
+  {BLE_ADMIN_LOCK_RESULT,   waiting_lock_result,        BLE_ADMIN_LOCK_DONE},
 };
-static int end_admin_gatt(void *arg);
-
-static int end_admin_gatt(void *arg)
-{
-  int ret;
-  task_node_t *task_node = (task_node_t *)arg;
-  ble_data_t *ble_data = task_node->ble_data;
-  admin_connection_t *admin_connection = 
-                              (admin_connection_t *)ble_data->ble_connection;
-  ret = gattlib_notification_stop(
-        admin_connection->gatt_connection, &admin_connection->admin_uuid);
-  if (ret != GATTLIB_SUCCESS)
-  {
-    serverLog(LL_ERROR, "end_admin_gatt gattlib_notification_stop error");
-    return ret;
-  }
-  ret = gattlib_disconnect(admin_connection->gatt_connection);
-  if (ret != GATTLIB_SUCCESS)
-  {
-    serverLog(LL_ERROR, "end_admin_gatt gattlib_disconnect error");
-    return ret;
-  }
-  return ret;
-}
 
 int write_admin_step2(void *arg)
 {
@@ -201,6 +213,21 @@ int write_admin_step2(void *arg)
 
   return 0;
 ADMIN_STEP2_ERROR_EXIT:
+  if (admin_connection->gatt_connection)
+  {
+    // gattlib_notification_stop(
+    //   admin_connection->gatt_connection, &(admin_connection->admin_uuid));
+    // gattlib_disconnect(admin_connection->gatt_connection);
+    ret = clearAdminConnectionGattConenction(admin_connection);
+    if (ret != GATTLIB_SUCCESS)
+    {
+      serverLog(LL_ERROR, "clearAdminConnectionGattConenction error");
+    }
+    else
+    {
+      serverLog(LL_NOTICE, "clearAdminConnectionGattConenction success ✓✓✓");
+    }
+  }
   if (payloadBytes)
   {
     free(payloadBytes);
@@ -243,24 +270,17 @@ static int write_lock_request(void *arg)
 	}
   serverLog(LL_NOTICE, "ig_UnpairRequest_encode success size:" );
 
-  Connection *encry_connection = getConnection(param->lock->connectionID);
-	if (!encry_connection)
-	{
-    serverLog(LL_ERROR, "ble_unpair_write_unpairreques can't get encry_connection");
-		goto UNPAIR_REQUEST_ERROR;
-	}
-  serverLog(LL_NOTICE, "ble_unpair_write_unpairreques success getting encry_connection" );
-
   uint32_t retvalMaxLen = encryptDataSize(encode_size);
-  serverLog(LL_NOTICE, "ble_unpair_write_unpairreques PayloadBytes_len: %d", retvalMaxLen);
   uint8_t *retvalBytes = (uint8_t *)calloc(retvalMaxLen,1);
-  int32_t retvalLen = encryptData(
-    buf, encode_size,
-    retvalBytes, retvalMaxLen,
-    encry_connection->key, kConnectionKeyLength,
-    encry_connection->txNonce, kNonceLength
-  );
-  incrementNonce(encry_connection->txNonce);
+
+
+  int32_t retvalLen = AdminConnection_encryptNative(param->lock->connectionID, buf, encode_size, &retvalBytes);
+  if (!retvalLen) 
+  {
+    serverLog(LL_ERROR, "failed in AdminConnection_encryptNative");
+    goto UNPAIR_REQUEST_ERROR;
+  }
+
   serverLog(LL_NOTICE, "ble_unpair_write_unpairreques retvalLen: %d", retvalLen);
 
   if (!build_msg_payload(
@@ -285,8 +305,23 @@ static int write_lock_request(void *arg)
   admin_lock_connection->admin_step = BLE_ADMIN_LOCK_REQUEST;
   return 0;
 
-
 UNPAIR_REQUEST_ERROR:
+  if (admin_lock_connection->gatt_connection)
+  {
+    // gattlib_notification_stop(
+    //   admin_connection->gatt_connection, &(admin_connection->admin_uuid));
+    // gattlib_disconnect(admin_connection->gatt_connection);
+    ret = clearAdminConnectionGattConenction(admin_lock_connection);
+    if (ret != GATTLIB_SUCCESS)
+    {
+      serverLog(LL_ERROR, "clearAdminConnectionGattConenction error");
+    }
+    else
+    {
+      serverLog(LL_NOTICE, "clearAdminConnectionGattConenction success ✓✓✓");
+    }
+  }
+
   if (encryptPayloadBytes)
   {
     free(encryptPayloadBytes);
@@ -301,7 +336,7 @@ static int write_unlock_request(void *arg)
   task_node_t *task_node = (task_node_t *)arg;
   ble_data_t *ble_data = task_node->ble_data;
   ble_admin_param_t *param = ble_data->ble_param;
-  admin_connection_t *admin_unpair_connection = 
+  admin_connection_t *admin_unlock_connection = 
                               (admin_connection_t *)ble_data->ble_connection;
   srand(time(0));
   int requestID = rand() % 2147483647;
@@ -369,7 +404,7 @@ static int write_unlock_request(void *arg)
 
 
   ret = write_char_by_uuid_multi_atts(
-		admin_unpair_connection->gatt_connection, &admin_unpair_connection->admin_uuid, 
+		admin_unlock_connection->gatt_connection, &admin_unlock_connection->admin_uuid, 
     encryptPayloadBytes, encryptPayloadBytes_len);
 	if (ret != GATTLIB_SUCCESS) {
     serverLog(LL_ERROR, "write_char_by_uuid_multi_atts failed in writing th packags");
@@ -378,11 +413,27 @@ static int write_unlock_request(void *arg)
   serverLog(LL_NOTICE, "write_char_by_uuid_multi_atts success");
 
   free(encryptPayloadBytes);
-  admin_unpair_connection->admin_step = BLE_ADMIN_UNLOCK_REQUEST;
+  admin_unlock_connection->admin_step = BLE_ADMIN_UNLOCK_REQUEST;
+
   return 0;
 
 
 UNPAIR_REQUEST_ERROR:
+  if (admin_unlock_connection->gatt_connection)
+  {
+    // gattlib_notification_stop(
+    //   admin_connection->gatt_connection, &(admin_connection->admin_uuid));
+    // gattlib_disconnect(admin_connection->gatt_connection);
+    ret = clearAdminConnectionGattConenction(admin_unlock_connection);
+    if (ret != GATTLIB_SUCCESS)
+    {
+      serverLog(LL_ERROR, "clearAdminConnectionGattConenction error");
+    }
+    else
+    {
+      serverLog(LL_NOTICE, "clearAdminConnectionGattConenction success ✓✓✓");
+    }
+  }
   if (encryptPayloadBytes)
   {
     free(encryptPayloadBytes);
@@ -474,6 +525,21 @@ static int write_unpair_request(void *arg)
 
 
 UNPAIR_REQUEST_ERROR:
+  if (admin_unpair_connection->gatt_connection)
+  {
+    // gattlib_notification_stop(
+    //   admin_connection->gatt_connection, &(admin_connection->admin_uuid));
+    // gattlib_disconnect(admin_connection->gatt_connection);
+    ret = clearAdminConnectionGattConenction(admin_unpair_connection);
+    if (ret != GATTLIB_SUCCESS)
+    {
+      serverLog(LL_ERROR, "clearAdminConnectionGattConenction error");
+    }
+    else
+    {
+      serverLog(LL_NOTICE, "clearAdminConnectionGattConenction success ✓✓✓");
+    }
+  }
   if (encryptPayloadBytes)
   {
     free(encryptPayloadBytes);
@@ -511,7 +577,6 @@ int handle_step3_message(const uint8_t* data, int data_length,void* user_data)
     {
       serverLog(LL_NOTICE, "set admin result to success");
       admin_connection->admin_result->admin_successed = 1;
-      bleSetAdminResultGattConnection(admin_connection->admin_result, admin_connection->gatt_connection);
     }
      // 返回参数给调用进程
     serverLog(LL_NOTICE, "handle_step3_message bleSetBleResult to ble data");
@@ -550,8 +615,6 @@ static int handle_lock_responce(const uint8_t* data, int data_length,void* user_
     serverLog(LL_NOTICE, "handle_lock_responce RECV step2 data finished");
     admin_lock_connection->admin_step = BLE_ADMIN_UNPAIR_RESULT;
    
-    
-UNPAIR_RESULT_EXIT:
     g_main_loop_quit(task_node->loop);
 
   }
@@ -615,6 +678,22 @@ static int handle_unlock_responce(const uint8_t* data, int data_length,void* use
     else
     {
       serverLog(LL_NOTICE, "has unpair response %d %d",admin_unlock_resppnce.has_result, admin_unlock_resppnce.result);
+    }
+
+    if (admin_unlock_connection->gatt_connection)
+    {
+      // gattlib_notification_stop(
+      //   admin_connection->gatt_connection, &(admin_connection->admin_uuid));
+      // gattlib_disconnect(admin_connection->gatt_connection);
+      ret = clearAdminConnectionGattConenction(admin_unlock_connection);
+      if (ret != GATTLIB_SUCCESS)
+      {
+        serverLog(LL_ERROR, "clearAdminConnectionGattConenction error");
+      }
+      else
+      {
+        serverLog(LL_NOTICE, "clearAdminConnectionGattConenction success ✓✓✓");
+      }
     }
 
 UNLOCK_RESULT_EXIT:
@@ -685,14 +764,14 @@ static int handle_unpair_responce(const uint8_t* data, int data_length,void* use
     serverLog(LL_NOTICE, "has unpair response %d %d",unpair_resppnce.has_result, unpair_resppnce.result);
     
     
-    ret = end_admin_gatt(user_data);
+    ret = clearAdminConnectionGattConenction(admin_unpair_connection);
     if (ret != GATTLIB_SUCCESS)
     {
-      serverLog(LL_ERROR, "end_admin_gatt error");
+      serverLog(LL_ERROR, "clearAdminConnectionGattConenction error");
     }
     else
     {
-      serverLog(LL_NOTICE, "end_admin_gatt success ✓✓✓");
+      serverLog(LL_NOTICE, "clearAdminConnectionGattConenction success ✓✓✓");
     }
     
     
@@ -759,10 +838,18 @@ void message_handler(
       }
       printf("\n");
       serverLog(LL_NOTICE, 
-      "BLE_ADMIN_UNPAIR_REQUEST handle_unpair_responce");
+      "BLE_ADMIN_UNLOCK_REQUEST handle_unlock_responce");
       handle_unlock_responce(data, data_length,user_data);
       break;
     }
+    case BLE_ADMIN_LOCK_REQUEST:
+    {
+      serverLog(LL_NOTICE, 
+      "BLE_ADMIN_LOCK_REQUEST handle_lock_responce");
+      handle_lock_responce(data, data_length,user_data);
+      break;
+    }
+    
     default:
     {
       serverLog(LL_ERROR, "admin_connection->admin_step error");
@@ -837,11 +924,21 @@ int register_admin_notfication(void *arg)
 
 ADMIN_ERROR_EXIT:
   serverLog(LL_ERROR, "register_admin_notfication ERROR EXIT.");
+  
   if (admin_connection->gatt_connection)
   {
-    gattlib_notification_stop(
-      admin_connection->gatt_connection, &(admin_connection->admin_uuid));
-    gattlib_disconnect(admin_connection->gatt_connection);
+    // gattlib_notification_stop(
+    //   admin_connection->gatt_connection, &(admin_connection->admin_uuid));
+    // gattlib_disconnect(admin_connection->gatt_connection);
+    ret = clearAdminConnectionGattConenction(admin_connection);
+    if (ret != GATTLIB_SUCCESS)
+    {
+      serverLog(LL_ERROR, "clearAdminConnectionGattConenction error");
+    }
+    else
+    {
+      serverLog(LL_NOTICE, "clearAdminConnectionGattConenction success ✓✓✓");
+    }
   }
   if (ble_data->ble_connection)
   {
@@ -1057,11 +1154,6 @@ int bleIsAdminSuccess(ble_admin_result_t *result)
 {
   return result->admin_successed;
 }
-int bleSetAdminResultGattConnection(ble_admin_result_t *result, void* gatt_connection)
-{
-  result->gatt_connection =  gatt_connection;
-  return 0;
-}
 // -----------------------------------------------
 
 fsm_table_t *getAdminFsmTable()
@@ -1096,4 +1188,15 @@ fsm_table_t *getAdminUnlockFsmTable()
 int getAdminUnlockFsmTableLen()
 {
   return ADMIN_UNLOCK_SM_TABLE_LEN;
+}
+
+// lock
+fsm_table_t *getAdminLockFsmTable()
+{
+  return admin_lock_fsm_table;
+}
+
+int getAdminLockFsmTableLen()
+{
+  return ADMIN_LOCK_SM_TABLE_LEN;
 }

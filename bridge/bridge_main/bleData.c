@@ -11,8 +11,13 @@ int bleInitData(ble_data_t *data)
 
 int bleReleaseData(ble_data_t **pp_data)
 {
+  ble_data_t *ble_data = *pp_data;
   bleReleaseBleResult(*pp_data);
   bleReleaseBleParam(*pp_data);
+  if(ble_data->ble_connection)
+  {
+    
+  }
   *pp_data = NULL;
 }
 
