@@ -1,98 +1,49 @@
-#ifndef __IGN__
-#define __IGN__
+#include <bridge/bridge_main/log.h>
 
-
-#include <pthread.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <stdarg.h>
-#include <stdatomic.h>
-#include <time.h>
 #include <sys/time.h>
 #include <syslog.h>
-#include "list.h"
-#include "MQTTClient.h"
+#include <stdlib.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <linux/fs.h>
 
-atomic_int g_msg_id = 0;
+#include <fcntl.h>
+#include <unistd.h>
 
-#define HOST "ssl://aa85fsnk5qn58-ats.iot.ap-southeast-1.amazonaws.com:8883"
-#define SUBSCRIBE_CLIENT_ID "JasonSubscribeID"
-#define CA_PATH "/tmp/igkey/"
-#define TRUST_STORE "/tmp/igkey/ca.pem"
-#define PRIVATE_KEY "/tmp/igkey/key.pem"
-#define KEY_STORE "/tmp/igkey/cert.pem"
-static char LOG_FILE[] = "./log_ign";
+unsigned long getTimeZone(void) {
+    struct timeval tv;
+    struct timezone tz;
 
-#define thread_type pthread_t
-#define mutex_type pthread_mutex_t*
+    gettimeofday(&tv, &tz);
 
-#define LOG_MAX_LEN    1024 /* Default maximum length of syslog messages.*/
-#define LL_DEBUG 0
-#define LL_VERBOSE 1
-#define LL_NOTICE 2
-#define LL_WARNING 3
-#define LL_ERROR 4
-#define LL_RAW (1<<10) /* Modifier to log without timestamp */
+    return tz.tz_minuteswest * 60UL;
+}
 
+long long get_ustime(void) {
+    struct timeval tv;
+    long long ust;
 
-typedef struct st_sysinfo {
-    int inited;
-    MQTTClient mqtt_c;
-    mutex_type mutex;
-    char wifi_ssid[128];
-    char wifi_pswd[32];
-    char user_id[64];
-    char user_pswd[32];
-    void* userinfo;
-    char lock1_id[32];
-    char lock2_id[32];
-    char lock3_id[32];
-    char lock4_id[32];
-    char lock5_id[32];
-    void* lock1info;
-    void* lock2info;
-    void* lock3info;
-    void* lock4info;
-    void* lock5info;
-}sysinfo_t;
+    gettimeofday(&tv, NULL);
+    ust = ((long long)tv.tv_sec)*1000000;
+    ust += tv.tv_usec;
+    return ust;
+}
 
-typedef struct st_fsm_table {
-	unsigned char cur_state;
-	int (*eventActFun)(void*);
-	unsigned char next_state;
-}fsm_table_t;
+int updateCachedTime() {
+    long long ustime = get_ustime();
+    long long mstime = ustime / 1000;
+    _Atomic time_t  unixtime = (mstime / 1000);    /* Unix time sampled every cron cycle. */
 
-typedef struct task_node {
-    struct list_head list;
-    sysinfo_t *sysif;
-    char lock_id[32];
-    void* lockinfo;
-	//struct task_node *next;
-	unsigned int msg_id;
-    void * dataBLE;
-    void * dataMQTT;
-    //void * dataBtn;
-    unsigned int start_time;
-    fsm_table_t* p_sm_table;
-    unsigned char cur_state;
-}task_node_t;
-
-//LIST_HEAD(task_head);
-//INIT_LIST_HEAD(task_head);
-
-enum
-{
-    BEGIN,
-    DONE,
-	CMD_INIT,
-    INITED,
-    GET_WIFI_USER,
-	CMD_REQ_USERINFO,
-    CMD_UPDATE_USERINFO,
-    CMD_CONNECT_LOCK,
-    CMD_UPDATE_LOCKSTATUS,
-    CMD_UNLOCK,
-};
+    /* To get information about daylight saving time, we need to call
+     * localtime_r and cache the result. However calling localtime_r in this
+     * context is safe since we will never fork() while here, in the main
+     * thread. The logging function will call a thread safe version of
+     * localtime that has no locks. */
+    struct tm tm;
+    time_t ut = unixtime;
+    localtime_r(&ut,&tm);
+    return tm.tm_isdst;
+}
 
 /* We use a private localtime implementation which is fork-safe. The logging
  * function of Redis may be called from other threads. */
@@ -150,42 +101,6 @@ void nolocks_localtime(struct tm *tmp, time_t t, time_t tz, int dst) {
     tmp->tm_year -= 1900;   /* Surprisingly tm_year is year-1900. */
 }
 
-
-unsigned long getTimeZone(void) {
-    struct timeval tv;
-    struct timezone tz;
-
-    gettimeofday(&tv, &tz);
-
-    return tz.tz_minuteswest * 60UL;
-}
-
-long long get_ustime(void) {
-    struct timeval tv;
-    long long ust;
-
-    gettimeofday(&tv, NULL);
-    ust = ((long long)tv.tv_sec)*1000000;
-    ust += tv.tv_usec;
-    return ust;
-}
-
-int updateCachedTime() {
-    long long ustime = get_ustime();
-    long long mstime = ustime / 1000;
-    _Atomic time_t unixtime = mstime / 1000;    /* Unix time sampled every cron cycle. */
-
-    /* To get information about daylight saving time, we need to call
-     * localtime_r and cache the result. However calling localtime_r in this
-     * context is safe since we will never fork() while here, in the main
-     * thread. The logging function will call a thread safe version of
-     * localtime that has no locks. */
-    struct tm tm;
-    time_t ut = unixtime;
-    localtime_r(&ut,&tm);
-    return tm.tm_isdst;
-}
-
 /* Low level logging. To use only for very big messages, otherwise
  * serverLog() is to prefer. */
 void serverLogRaw(int level, const char *msg) {
@@ -195,8 +110,10 @@ void serverLogRaw(int level, const char *msg) {
     FILE *fp;
     char buf[64];
     int rawmode = (level & LL_RAW);
-    int log_to_stdout = LOG_FILE == '\0';
-
+    int log_to_stdout = LOG_FILE =='\0';
+    
+    // debug 
+    log_to_stdout = 1;
     level &= 0xff; /* clear flags */
     //if (level < server.verbosity) return;
 
@@ -242,34 +159,3 @@ void serverLog(int level, const char *fmt, ...) {
 
     serverLogRaw(level,msg);
 }
-
-unsigned int GetMsgID() {
-    atomic_fetch_add_explicit(&g_msg_id, 1, memory_order_relaxed);
-    return g_msg_id;
-}
-
-thread_type Thread_start(void* fn, void* parameter) {
-    thread_type thread = 0;
-    pthread_attr_t attr;
-
-    //FUNC_ENTRY
-    pthread_attr_init(&attr);
-    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
-    if (pthread_create(&thread, &attr, fn, parameter) != 0)
-        thread = 0;
-    pthread_attr_destroy(&attr);
-    //FUNC_EXIT;
-    return thread;
-}
-
-
-
-//thread_type thread = Thread_start(thread_fn fn, void* parameter);
-//mutex_type mutex = Thread_create_mutex();
-//rc = pthread_mutex_lock(mutex);
-//rc = pthread_mutex_unlock(mutex);
-//pthread_self();
-//pthread_detach(p);??????
-
-
-#endif

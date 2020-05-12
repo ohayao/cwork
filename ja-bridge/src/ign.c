@@ -62,49 +62,7 @@ int FSMHandle(task_node_t* tn) {
 }
 
 //create birdge profile
-ign_BridgeProfile Create_IgnBridgeProfile(char *bridgeID);
-ign_BridgeProfile Create_IgnBridgeProfile(char *bridgeID){
-    ign_BridgeProfile bp={};
-    bp.os_info=ign_OSType_LINUX;
-    char temp[100];
-    memset(temp,0,sizeof(temp));
-    strcpy(temp,bridgeID);
-    bp.bt_id.size=strlen(temp);
-    memcpy(bp.bt_id.bytes,temp,strlen(temp));
 
-    memset(temp,0,sizeof(temp));
-    strcpy(temp,"mac_addr");
-    bp.mac_addr.size=strlen(temp);
-    memcpy(bp.mac_addr.bytes,temp,strlen(temp));
-
-    memset(temp,0,sizeof(temp));
-    strcpy(temp,"local_ip");
-    bp.local_ip.size=strlen(temp);
-    memcpy(bp.local_ip.bytes,temp,strlen(temp));
-
-    memset(temp,0,sizeof(temp));
-    strcpy(temp,"public_ip");
-    bp.public_ip.size=strlen(temp);
-    memcpy(bp.public_ip.bytes,temp,strlen(temp));
-
-    memset(temp,0,sizeof(temp));
-    strcpy(temp,"sys_statics");
-    bp.sys_statics.size=strlen(temp);
-    memcpy(bp.sys_statics.bytes,temp,strlen(temp));
-
-    memset(temp,0,sizeof(temp));
-    strcpy(temp,"wifi_ssid");
-    bp.wifi_ssid.size=strlen(temp);
-    memcpy(bp.wifi_ssid.bytes,temp,strlen(temp));
-    bp.wifi_signal=2;
-    bp.inited_time=get_ustime();
-
-    memset(temp,0,sizeof(temp));
-    strcpy(temp,"bridge_name");
-    bp.name.size=strlen(temp);
-    memcpy(bp.name.bytes,temp,strlen(temp));
-    return bp;
-}
 
 int GetUserInfo(void* si) {
 	//send request to server to get userinfo
@@ -376,6 +334,7 @@ void WaitMQTT(sysinfo_t *si){
                        
         } else {
             //err log
+            printf("message null\n");
             HeartBeat();
         }
     }

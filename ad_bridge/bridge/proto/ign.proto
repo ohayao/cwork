@@ -1,0 +1,96 @@
+// version: 0.0.6
+// date: 28/04/2020
+syntax = "proto3";
+package ign;
+//-----------------------------------------------
+// Main message types
+//-----------------------------------------------
+enum EventType {
+  UNSPECIFIED        = 0; // 新加
+  // ---Bridge [1~127]---
+  // Device heartbeat
+  HEARTBEAT          = 1; // 更新
+  // Event contains activity log
+  LOCK_LOG           = 2; // 更新
+  // Get user account information
+  GET_USER_INFO      = 3; // 更新
+  // Updates server on lock status
+  UPDATE_LOCK_STATUS = 4; // 更新
+  // Adds a lock to bridge's list of connected lock
+  ADD_LOCK           = 5; // 更新
+  // Request for jobs
+  GET_JOBS           = 6; // 更新
+  // Update a job's status
+  UPDATE_JOB         = 7; // 更新
+  // ---Server [128~255]---
+  // Update user information on bridge
+  UPDATE_USER_INFO   = 128;
+  // Contains a job
+  LOCK_JOB           = 129;
+}
+message MsgInfo {
+  uint32          msg_id      = 1;
+  uint32          time        = 2;
+  EventType       event_type  = 3;
+  BridgeEventData bridge_data = 4;
+  ServerEventData server_data = 5;
+}
+//-----------------------------------------------
+// Bridge event types
+//-----------------------------------------------
+enum OSType {
+  UKNOWN = 0;
+  LINUX  = 1;
+  RTOS   = 2;
+}
+message BridgeProfile {
+  OSType os_info     = 1;
+  bytes  bt_id       = 2;
+  bytes  mac_addr    = 3;
+  bytes  local_ip    = 4;
+  bytes  public_ip   = 5;
+  // sys_statics:
+  //   byte[0] loader
+  //   byte[1] cpu_rate
+  //   byte[2] mem_rate
+  //   byte[3] disk_rate
+  bytes  sys_statics = 6;
+  bytes  wifi_ssid   = 7;
+  int32  wifi_signal = 8;
+  uint32 inited_time = 9;
+  bytes  name        = 10;
+}
+message LockLog {
+  // Bt id of lock that this log belongs to
+  string bt_id = 1;
+  // Contains (admin key) encrypted activity logs
+  bytes  log_data = 2;
+}
+message BridgeEventData {
+  BridgeProfile    profile = 1;
+  // List of lock bt id
+  repeated string  bt_ids  = 2;
+  // List of activity logs
+  repeated LockLog logs    = 3;
+}
+//-----------------------------------------------
+// Server event types
+//-----------------------------------------------
+message LockJob {
+  // Bt id of lock that this job is for
+  string bt_id    = 1;
+  // Contains (admin key) encrypted bluetooth commands
+  bytes  lock_cmd = 2;
+}
+message LockEntry {
+  // Lock bluetooth ID
+  string bt_id = 1;
+  // 'ekey' (with permissions) used to communicate with lock
+  bytes  ekey  = 2;
+}
+message ServerEventData {
+  // List of lock entries
+  repeated LockEntry lockEntries = 1;
+  // Job belonging to a lock
+  LockJob            job         = 2;
+}
