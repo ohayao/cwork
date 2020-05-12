@@ -18,8 +18,8 @@
 #include "cJSON.h"
 
 //临时定义发布和订阅的TOPIC
-#define PUB_TOPIC "igh/dev/abcdef"
-#define SUB_TOPIC "igh/srv/abcdef"
+#define PUB_TOPIC "igh/dev/IGN123456789"
+#define SUB_TOPIC "igh/srv/IGN123456789"
 
 //定义订阅和发布web端TOPIC
 #define SUB_WEBDEMO "/WEBSOCKET_DEMO_SUB"
@@ -31,6 +31,7 @@ LIST_HEAD(doing_task_head);
 sysinfo_t g_sysif;
 
 int DoWebMsg(char *topic,void *payload);
+
 
 
 int FSMHandle(task_node_t* tn) {
@@ -250,7 +251,7 @@ int HeartBeat(){
     hb.msg_id=get_ustime();
     ign_BridgeEventData bed={};
     bed.has_profile=true;
-    bed.profile=Create_IgnBridgeProfile("abcdef");
+    bed.profile=Create_IgnBridgeProfile("IGN123456789");
     hb.has_bridge_data=true;
     hb.bridge_data=bed;
 
@@ -325,6 +326,16 @@ void WaitMQTT(sysinfo_t *si){
                                 }
                             }
                             util_sendMessage(g_sysif.mqtt_c,SUB_WEBDEMO,1,msg->payload,msg->payloadlen);
+                            goto gomqttfree;
+                        break;
+                        case ign_EventType_NEW_JOB_NOTIFY:
+                            printf("RECV[NEW_JOB_NOTIFY]\n\tbt_id=%s\tlock_cmd_size=%d\tlock_cmd=%s\n",imsg.server_data.job.bt_id,(int)imsg.server_data.job.lock_cmd.size,imsg.server_data.job.lock_cmd.bytes);
+                            for(int i=0;i<imsg.server_data.job.lock_cmd.size;i++){
+                                char b=(char)imsg.server_data.job.lock_cmd.bytes[i];
+                                printf("%x",b);
+                            }
+                            printf("\n");
+                            //util_sendMessage(g_sysif.mqtt_c,SUB_WEBDEMO,1,msg->payload,msg->payloadlen);
                             goto gomqttfree;
                         break;
                         default:
