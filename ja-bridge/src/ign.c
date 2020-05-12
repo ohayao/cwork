@@ -131,7 +131,7 @@ int Init(void* tn) {
     // get AWS pem by http
 
     //task_node_t *ptn = (task_node_t*) tn; 
-    g_sysif.mqtt_c = util_initClients(HOST,SUBSCRIBE_CLIENT_ID,60,1,CA_PATH,TRUST_STORE,PRIVATE_KEY,KEY_STORE);
+    g_sysif.mqtt_c = util_initClients(HOST, SUBSCRIBE_CLIENT_ID, 60, 1, CA_PATH, TRUST_STORE, PRIVATE_KEY, KEY_STORE);
     if(NULL == g_sysif.mqtt_c) {
         //goto GoExit;
         printf("util_initClients err, mqtt_c is NULL.\n");
@@ -139,13 +139,13 @@ int Init(void* tn) {
     
     int rc = MQTTClient_subscribe(g_sysif.mqtt_c, SUB_TOPIC, 1);
     if(MQTTCLIENT_SUCCESS != rc){
-        printf("Subscribe [%s] error with code [%d].\n",SUB_TOPIC, rc);
+        printf("Subscribe [%s] error with code [%d].\n", SUB_TOPIC, rc);
     }else{
-        printf("Subscribe [%s] success!!!\n",SUB_TOPIC);
+        printf("Subscribe [%s] success!!!\n", SUB_TOPIC);
     }
-    rc=MQTTClient_subscribe(g_sysif.mqtt_c,PUB_WEBDEMO,1);
+    rc=MQTTClient_subscribe(g_sysif.mqtt_c,PUB_WEBDEMO, 1);
     if(rc!=MQTTCLIENT_SUCCESS){
-        printf("Subscribe [%s] error with code[%d]！！！\n",PUB_WEBDEMO,rc);
+        printf("Subscribe [%s] error with code[%d]！！！\n", PUB_WEBDEMO, rc);
     }else{
         printf("Subscribe [%s] success!!!\n",PUB_WEBDEMO);
     }
