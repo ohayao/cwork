@@ -8,8 +8,8 @@ set(IGN_DEPENDENCIES
   mqtt
   ign_proto
 )
-set(IGN_SRCS
-  ./ign.c
+
+set(IGN_LIB_SRCS
   ./log.c
   ./sysinfo.c
   ./task_queue.c
@@ -22,7 +22,16 @@ set(IGN_SRCS
   ./lock_list.c
 )
 
+set(IGN_SRCS
+  ./ign.c
+)
+
+add_library(ign_lib 
+  ${IGN_LIB_SRCS}
+)
+
 add_executable(ign ${IGN_SRCS})
 target_link_libraries(ign
   ${IGN_DEPENDENCIES}
+  ign_lib
 )

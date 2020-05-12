@@ -41,6 +41,8 @@ int bleSetAdminParam(ble_admin_param_t *unpair_param, igm_lock_t *lock);
 typedef struct BLEAdminResult {
   char addr[MAX_DEVICE_ADDR];
   int admin_successed;
+  int unlock_result;
+  int unpair_result;
 }ble_admin_result_t;
 
 int bleInitAdminResult(ble_admin_result_t *result);

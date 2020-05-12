@@ -79,6 +79,68 @@ bridge
   结构体成语变量,局部变量:addr_len 形式
   函数: updateCachedTime 形式
   枚举类型: FSM_STATE 形式
+
+### BLE TEST 相关程序:
+1. 启动相关发现, 发现的设备,会打印出下面形式列表
+
+运行命令:
+  ./bridge/test/test_ble_scan 
+
+所得结果:
+4115: 12 May 2020 00:58:54.080 * --------------print Lock begin----------------
+addr_len 17, addr: D9:78:2F:E3:1A:5C        // 蓝牙地址, 在pairing的时候需要
+name_len 12, name: IGM303e31a5c             // 名字
+paired 0                                    // 是否paired
+admin_connection 0                          // 是否admin_connection
+guest_connection 0
+connectionID 0                              // connectionID 是多少
+4115: 12 May 2020 00:58:54.081 * --------------print Lock end------------------
+
+2. ./bridge/test/test_ble_pair D9:78:2F:E3:1A:5C
+最后成功所得结果:
+5949: 12 May 2020 01:45:47.227 * saving ble TASK_BLE_PAIRING data
+5949: 12 May 2020 01:45:47.228 * pairing_result:
+5949: 12 May 2020 01:45:47.228 * pairing success: 1
+5949: 12 May 2020 01:45:47.229 * pairing admin_key:
+974341a13a966c3aa9ba9720af4a7237
+5949: 12 May 2020 01:45:47.229 * pairing password:
+b5fa603bb0d01d38
+
+
+3. ./bridge/test/test_ble_admin_unlock D9:78:2F:E3:1A:5C 974341a13a966c3aa9ba9720af4a7237 b5fa603bb0d01d38
+
+最后成功结果:
+7910: 12 May 2020 02:30:18.161 * saving ble TASK_BLE_ADMIN_UNLOCK data
+7910: 12 May 2020 02:30:18.161 * unlock_result:
+7910: 12 May 2020 02:30:18.161 * unlock error: 0 0 means unlock
+
+4. ./bridge/test/test_ble_admin_unpair D9:78:2F:E3:1A:5C 974341a13a966c3aa9ba9720af4a7237 b5fa603bb0d01d38
+
+最后成功结果:
+8719: 12 May 2020 02:47:06.231 * saving ble TASK_BLE_ADMIN_UNPAIR data
+8719: 12 May 2020 02:47:06.232 * unpair_result:
+8719: 12 May 2020 02:47:06.232 * unlock error: 0 0 means unlock
+8719: 12 May 2020 02:47:06.232 * doing_task_head is empty, check Lock list.
+
+### BLE 相关用法
+1. void addDiscoverTask(int msg_id)
+添加扫描任务
+扫描后, 会得到周围的数据, 打印出来如下,本例子只显示一个
+4115: 12 May 2020 00:58:54.080 * --------------print Lock begin----------------
+addr_len 17, addr: D9:78:2F:E3:1A:5C        // 蓝牙地只
+name_len 12, name: IGM303e31a5c             // 名字
+paired 0                                    // 是否paired
+admin_connection 0                          // 是否admin_connection
+guest_connection 0
+connectionID 0                              // connectionID 是多少
+4115: 12 May 2020 00:58:54.081 * --------------print Lock end------------------
+
+
+2. saveTaskData(ptn);
+根据不同的任务,保存不同的数据, 如果需要,就在这里获得我的数据和进行出来
+
+3. 
+
   
 ### TODO List
 1. 当锁已经被paired, 当前会出错.

@@ -629,6 +629,7 @@ static int handle_unlock_responce(const uint8_t* data, int data_length,void* use
   ble_admin_param_t *param = ble_data->ble_param;
   admin_connection_t *admin_unlock_connection = 
                               (admin_connection_t *)ble_data->ble_connection;
+  
   save_message_data(data, data_length, user_data);
 
   if (admin_unlock_connection->step_max_size == admin_unlock_connection->step_cur_size)
@@ -675,10 +676,16 @@ static int handle_unlock_responce(const uint8_t* data, int data_length,void* use
     {
       serverLog(LL_NOTICE, "ig_AdminUnlockResponse_decode err %d", err);
     }
-    else
+    serverLog(LL_NOTICE, "has unlock response %d %d",admin_unlock_resppnce.has_result, admin_unlock_resppnce.result);
+    if (admin_unlock_connection->has_admin_result && admin_unlock_resppnce.has_result)
     {
-      serverLog(LL_NOTICE, "has unpair response %d %d",admin_unlock_resppnce.has_result, admin_unlock_resppnce.result);
+      serverLog(LL_NOTICE, "set admin result to success");
+      admin_unlock_connection->admin_result->unlock_result= admin_unlock_resppnce.result;
     }
+     // 返回参数给调用进程
+    serverLog(LL_NOTICE, "handle_step3_message bleSetBleResult to ble data");
+    bleSetBleResult(
+      ble_data, admin_unlock_connection->admin_result, sizeof(ble_admin_result_t));
 
     if (admin_unlock_connection->gatt_connection)
     {
@@ -763,6 +770,15 @@ static int handle_unpair_responce(const uint8_t* data, int data_length,void* use
     }
     serverLog(LL_NOTICE, "has unpair response %d %d",unpair_resppnce.has_result, unpair_resppnce.result);
     
+    if (admin_unpair_connection->has_admin_result && unpair_resppnce.has_result)
+    {
+      serverLog(LL_NOTICE, "set admin result to success");
+      admin_unpair_connection->admin_result->unpair_result= unpair_resppnce.result;
+    }
+     // 返回参数给调用进程
+    serverLog(LL_NOTICE, "handle_unpair_response bleSetBleResult to ble data");
+    bleSetBleResult(
+      ble_data, admin_unpair_connection->admin_result, sizeof(ble_admin_result_t));
     
     ret = clearAdminConnectionGattConenction(admin_unpair_connection);
     if (ret != GATTLIB_SUCCESS)

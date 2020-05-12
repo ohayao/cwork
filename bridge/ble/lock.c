@@ -168,6 +168,7 @@ int setLockPassword(igm_lock_t *lock,
   uint8_t *password, int password_size)
 {
   releaseLockPassword(lock);
+  serverLog(LL_NOTICE, "releaseLockPassword");
   lock->has_password = 1;
   lock->password_size = password_size;
   lock->password = calloc(password_size, 1);
