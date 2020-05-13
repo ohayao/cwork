@@ -40,6 +40,31 @@ ign_BridgeProfile Create_IgnBridgeProfile(char *bridgeID);
 void addPairingTask(igm_lock_t *lock, int msg_id);
 void addDiscoverTask(int msg_id);
 void addAdminTask(igm_lock_t *lock, int msg_id);
+void addAdminUnlockTask(igm_lock_t *lock);
+
+
+int hexStrToByte(const char* source, uint8_t* dest, int sourceLen) {
+    short i;
+    unsigned char highByte, lowByte;
+    
+    for (i = 0; i < sourceLen; i += 2)
+    {
+        highByte = toupper(source[i]);
+        lowByte  = toupper(source[i + 1]);
+        if (highByte > 0x39)
+            highByte -= 0x37;
+        else
+            highByte -= 0x30;
+ 
+        if (lowByte > 0x39)
+            lowByte -= 0x37;
+        else
+            lowByte -= 0x30;
+ 
+        dest[i / 2] = (highByte << 4) | lowByte;
+    }
+    return sourceLen /2 ;
+}
 
 int FSMHandle(task_node_t* tn) {
     if(NULL == tn->task_sm_table) {
@@ -373,6 +398,24 @@ void WaitMQTT(sysinfo_t *si){
 							}
 							printf("\n");
 							//MQTT_sendMessage(g_sysif.mqtt_c,SUB_WEBDEMO,1,msg->payload,msg->payloadlen);
+
+							// addDiscoverTask(1);
+							igm_lock_t lock;
+							lockInit(&lock);
+							char device_address[] = "E1:93:2A:A3:16:E7";
+							char admin_key[] = "8d29d572299deda54de78c16fcce1451"; 
+							char passwd[] = "35f1cfb6f8bee257";
+							
+							lockSetAddr(&lock, device_address, strlen(device_address));
+							uint8_t tmp_buff[100];
+							memset(tmp_buff, 0, sizeof(tmp_buff));
+							int admin_len = hexStrToByte(admin_key, tmp_buff, strlen(admin_key));
+							setLockAdminKey(&lock, tmp_buff, admin_len);
+							memset(tmp_buff, 0, sizeof(tmp_buff));
+							int password_size = hexStrToByte(passwd, tmp_buff, strlen(passwd));
+							setLockPassword(&lock, tmp_buff, password_size);
+							addAdminUnlockTask(&lock);
+
 							goto gomqttfree;
 							break;
 						default:
@@ -656,7 +699,7 @@ void addAdminUnlockTask(igm_lock_t *lock)
     serverLog(LL_NOTICE, "1. set admin Unlock param lock to name %s addr %s", lock->name, lock->addr);
     bleSetAdminParam(admin_param, lock);
     serverLog(LL_NOTICE, "2. set msg_id to 4(or anything you want)");
-    int msg_id = 4;
+	int msg_id = GetMsgID();
     // 把参数写入data, 当前有个问题就是, 使用完, 得访问的人记的释放.
     serverLog(LL_NOTICE, "3. alloc ble data datatype, ble_data is used to devliver parameters and get result data");
     ble_data_t *ble_data = calloc(sizeof(ble_data_t), 1);
