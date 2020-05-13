@@ -30,3 +30,8 @@ add_executable(test_ble_admin_unpair ./test_ble_admin_unpair.c)
 target_link_libraries(test_ble_admin_unpair
   ${TEST_DEPENDENCIES}
 )
+
+add_executable(test_decode_base64 ./test_decode_base64.c)
+target_link_libraries(test_decode_base64
+  ${TEST_DEPENDENCIES}
+)
