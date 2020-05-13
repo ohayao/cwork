@@ -83,32 +83,35 @@ int FSMHandle(task_node_t* tn) {
 	for (int i = 0; i<table_max_num; i++) {
         serverLog(LL_NOTICE, "FSMHandle i %d ", i);
 		if (tn->cur_state == tn->task_sm_table[i].cur_state) {
-            serverLog(LL_NOTICE, "eventActFun begin---------------");
+			serverLog(LL_NOTICE, "eventActFun begin---------------, tn->task_sm_table[%d].cur_state[%d].", i, tn->task_sm_table[i].cur_state);
             // 增加一个判断当前函数, 是否当前函数出错. 0 表示没问题
 			int event_result = tn->task_sm_table[i].eventActFun(tn);
             if (event_result)
             {
-                flag = 0;
-                break;
-            }
-            else
-            {
-                tn->cur_state = tn->task_sm_table[i].next_state;
-                flag = 1;
-            }
-            serverLog(LL_NOTICE, "eventActFun end-----------------");
-            
+				serverLog(LL_ERROR, "tn->task_sm_table[%d].cur_state[%d] err[%d].", i, tn->task_sm_table[i].cur_state, event_result);
+				//flag = 0;
+				//break;
+				return -1;
+			}
+			else
+			{
+				tn->cur_state = tn->task_sm_table[i].next_state;
+				serverLog(LL_NOTICE, "update cur_state[%d].", tn->task_sm_table[i].next_state );
+				//flag = 1;
+			}
+			serverLog(LL_NOTICE, "eventActFun end-----------------");
 		}
 	}
-    serverLog(LL_NOTICE, "FSMHandle out for end-----------------");
-    if (0 == flag) {
-		// do nothing
-        // sm or cur_state err
-        serverLog(LL_ERROR, "something wrogin int fsm, one of the event function error, state(%d) error.", tn->cur_state);
-        return -1;
-	}
-    serverLog(LL_NOTICE, "FSMHandle end");
-    return 0;
+	serverLog(LL_NOTICE, "FSMHandle out for end-----------------");
+	/*
+	   if (0 == flag) {
+	// do nothing
+	// sm or cur_state err
+	serverLog(LL_ERROR, "state(%d) error.", tn->cur_state);
+	return -1;
+	}*/
+	serverLog(LL_NOTICE, "FSMHandle end");
+	return 0;
 }
 
 ign_BridgeProfile Create_IgnBridgeProfile(char *bridgeID){
@@ -878,10 +881,9 @@ int main() {
             serverLog(LL_NOTICE,"doing_task_head is empty, check Lock list.");
             // 应该去检查waiting list
             printLockList();
-            serverLog(LL_NOTICE,"doing_task_head is empty, ready to sleep.");
             sleep(1);
-        } 
-        else {
+        } else {
+            serverLog(LL_NOTICE,"doing_task_head not empty, do it.-----------");
         // if doing list has task
             // 获取当前doing list 的头部
             task_node_t *ptn=GetDHeadNode();
@@ -889,25 +891,21 @@ int main() {
             {
                 // TODO, 当任务完成,需要怎么处理?
                 int ret = FSMHandle(ptn);
-                if(ret)
-                {
+                if(ret) {
                     serverLog(LL_NOTICE, "one mission error");
-                }
-                else
-                {
+                } else {
                     serverLog(LL_NOTICE, "one mission finished, delete this task");
                 }
                 saveTaskData(ptn);
                 DeleteDTask(&ptn); // 自动置 ptn 为 NULL
                 
                 task_node_t *tmp = NextDTask(ptn);
-                if (tmp)
-                {
-                    serverLog(LL_NOTICE, "NextDTask not NULL");
+                if (tmp) {
+                    serverLog(LL_NOTICE, "NextDTask not NULL.");
                 }
-                
                 ptn = tmp;
             }
+            serverLog(LL_NOTICE,"doing_task_head not empty, do end.-----------");
         }
     }
 

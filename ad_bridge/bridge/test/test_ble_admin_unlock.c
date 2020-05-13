@@ -61,6 +61,7 @@ int FSMHandle(task_node_t* tn) {
 			int event_result = tn->task_sm_table[i].eventActFun(tn);
             if (event_result)
             {
+
                 flag = 0;
                 break;
             }
