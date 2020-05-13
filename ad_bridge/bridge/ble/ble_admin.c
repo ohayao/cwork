@@ -139,7 +139,7 @@ fsm_table_t admin_lock_fsm_table[ADMIN_LOCK_SM_TABLE_LEN] = {
 
 int write_admin_step2(void *arg)
 {
-  serverLog(LL_NOTICE, "write_admin_step2 start --------");
+  serverLog(LL_NOTICE, "@@@ 2 write_admin_step2 start --------");
   int ret;
   task_node_t *task_node = (task_node_t *)arg;
   ble_data_t *ble_data = task_node->ble_data;
@@ -331,7 +331,7 @@ UNPAIR_REQUEST_ERROR:
 
 static int write_unlock_request(void *arg)
 {
-  serverLog(LL_NOTICE, "write_unlock_request start --------");
+  serverLog(LL_NOTICE, "@@@ 4 write_unlock_request start --------");
   int ret = 0;
   task_node_t *task_node = (task_node_t *)arg;
   ble_data_t *ble_data = task_node->ble_data;
@@ -876,7 +876,7 @@ void message_handler(
 
 int register_admin_notfication(void *arg)
 {
-  serverLog(LL_NOTICE, "register_admin_notfication start --------");
+  serverLog(LL_NOTICE, "@@@ 0 register_admin_notfication start --------");
   int ret;
   task_node_t *task_node = (task_node_t *)arg;
   ble_data_t *ble_data = (ble_data_t *)(task_node->ble_data);
@@ -965,7 +965,7 @@ ADMIN_ERROR_EXIT:
 
 static int waiting_admin_step3(void *arg)
 {
-  serverLog(LL_NOTICE, "waiting_pairing_step3");
+  serverLog(LL_NOTICE, "@@@ 3 waiting_pairing_step3 start.");
   task_node_t *task_node = (task_node_t *)arg;
   ble_data_t *ble_data = (ble_data_t *)(task_node->ble_data);
   admin_connection_t *admin_connection = 
@@ -1003,7 +1003,7 @@ static int waiting_unpair_result(void *arg)
 
 static int waiting_unlock_result(void *arg)
 {
-  serverLog(LL_NOTICE, "waiting_unlock_result");
+  serverLog(LL_NOTICE, "@@@ 5 waiting_unlock_result start, last step");
   task_node_t *task_node = (task_node_t *)arg;
 
   // 在这儿用g_main_loop_run等待, 用线程锁和睡眠的方法不行, 就像是bluez不会调用
@@ -1043,13 +1043,12 @@ static int waiting_lock_result(void *arg)
 
 int waiting_admin_step1(void *arg)
 {
-  serverLog(LL_NOTICE, "waiting_pairing_step2");
+  serverLog(LL_NOTICE, "@@@ 1 waiting_admin_step1 start.");
   task_node_t *task_node = (task_node_t *)arg;
 
   // 在这儿用g_main_loop_run等待, 用线程锁和睡眠的方法不行, 就像是bluez不会调用
   // 我的回调函数, 在 rtos 应该会有相应的方法实现这样的等待事件到来的方法.
   // 当前 Linux 下, 这样用, works 
-  serverLog(LL_NOTICE, "waiting_admin_step1 new loop waiting");
   task_node->loop = g_main_loop_new(NULL, 0);
   g_main_loop_run(task_node->loop);
   serverLog(LL_NOTICE, "waiting_admin_step2 exit task_node->loop");
