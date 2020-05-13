@@ -40,7 +40,10 @@ protobuf
 * apt-get install libudev-dev  
 * apt-get install libical-dev  
 * apt-get install libreadline-dev  
-
+* 
+systemctl enable bluetooth
+systemctl start bluetooth
+bluetoothctl
 ### BLE 开发
 编译环境: ubuntu 18.04  
 编译工具: cmake  
