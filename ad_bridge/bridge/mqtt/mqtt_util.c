@@ -1,6 +1,6 @@
 #include <bridge/mqtt/mqtt_util.h>
 
-MQTTClient initClients(
+MQTTClient MQTT_initClients(
   char *host,char *clientID,int keepAliveInterval,int clearnSession,char *caPath,char *trustStore,char *privateKey,char *keyStore){
     MQTTClient client;
     MQTTClient_create(&client,host,clientID,MQTTCLIENT_PERSISTENCE_NONE,NULL);
@@ -18,27 +18,7 @@ MQTTClient initClients(
     return client;
 }
 
-MQTTClient_SSLOptions configSSL(char *caPath,char *trustStore,char *privateKey,char *keyStore){
-    MQTTClient_SSLOptions ssl=MQTTClient_SSLOptions_initializer;
-    ssl.CApath=caPath;
-    ssl.trustStore=trustStore;
-    ssl.privateKey=privateKey;
-    ssl.keyStore=keyStore;
-    return ssl;
-}
-
-MQTTClient_connectOptions configConnect(int keepAliveInterval,int cleanSession){
-    MQTTClient_connectOptions opts=MQTTClient_connectOptions_initializer;
-    opts.keepAliveInterval=keepAliveInterval;
-    opts.cleansession=cleanSession;
-    return opts;
-}
-
-void bindSSLToConnect(MQTTClient_connectOptions *opts,MQTTClient_SSLOptions *ssl){
-    opts->ssl=ssl;
-}
-
-int sendMessage(MQTTClient client,char *topic,int qos,void * message,int messageLength){
+int MQTT_sendMessage(MQTTClient client,char *topic,int qos,void * message,int messageLength){
     //    MQTTClient_message msg=MQTTClient_message_initializer;
     //    msg.qos=qos;
     //    msg.payload=message;
@@ -48,3 +28,24 @@ int sendMessage(MQTTClient client,char *topic,int qos,void * message,int message
     //printf("send result %d\n",rc);
     return rc;
 }
+
+static MQTTClient_SSLOptions configSSL(char *caPath,char *trustStore,char *privateKey,char *keyStore){
+    MQTTClient_SSLOptions ssl=MQTTClient_SSLOptions_initializer;
+    ssl.CApath=caPath;
+    ssl.trustStore=trustStore;
+    ssl.privateKey=privateKey;
+    ssl.keyStore=keyStore;
+    return ssl;
+}
+
+static MQTTClient_connectOptions configConnect(int keepAliveInterval,int cleanSession){
+    MQTTClient_connectOptions opts=MQTTClient_connectOptions_initializer;
+    opts.keepAliveInterval=keepAliveInterval;
+    opts.cleansession=cleanSession;
+    return opts;
+}
+
+static void bindSSLToConnect(MQTTClient_connectOptions *opts,MQTTClient_SSLOptions *ssl){
+    opts->ssl=ssl;
+}
+

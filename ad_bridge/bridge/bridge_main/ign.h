@@ -12,25 +12,20 @@
 // #include "MQTTClient.h"
 
 
-// atomic_int g_msg_id;
+atomic_int g_msg_id;
 
 //LIST_HEAD(task_head);
 //INIT_LIST_HEAD(task_head);
 
 
-
-
-
-
-
-
-
-
-
-// unsigned int GetMsgID() {
-//     atomic_fetch_add_explicit(&g_msg_id, 1, memory_order_relaxed);
-//     return g_msg_id;
-// // }
+unsigned int GetMsgID() {
+INC:
+    atomic_fetch_add_explicit(&g_msg_id, 1, memory_order_relaxed);
+	if(0 == g_msg_id % 2){
+		goto INC;
+	}
+	return g_msg_id;
+}
 
 // thread_type Thread_start(void* fn, void* parameter) {
 //     thread_type thread = 0;

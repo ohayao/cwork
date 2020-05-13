@@ -8,6 +8,7 @@
 #include <sys/time.h>
 #include <syslog.h>
 #include <stdlib.h>
+#include <assert.h> 
 #include <bridge/bridge_main/ign_constants.h>
 #include <bridge/bridge_main/log.h>
 #include <bridge/bridge_main/sysinfo.h>
@@ -29,7 +30,10 @@
 #include <bridge/proto/ign.pb.h>
 #include <bridge/proto/pb_encode.h>
 #include <bridge/proto/pb_decode.h>
-sysinfo_t g_sysif;
+static sysinfo_t g_sysif;
+
+//LIST_HEAD(waiting_task_head);
+//LIST_HEAD(doing_task_head);
 
 extern int WaitBtn(void *arg);
 ign_BridgeProfile Create_IgnBridgeProfile(char *bridgeID);
@@ -129,18 +133,18 @@ static int hbInterval=0;
 int HeartBeat(){
     //send MQTT HB to Server
     hbInterval++;
-    hbInterval=hbInterval%10;
-    if(hbInterval>0) return 0;
+    hbInterval = hbInterval%10;
+    if(hbInterval>0)
+		 return 0;
     ign_MsgInfo hb={};
     hb.event_type=ign_EventType_HEARTBEAT;
     hb.time=get_ustime();
-    hb.msg_id=get_ustime();
+    hb.msg_id=GetMsgID();//get_ustime();
     ign_BridgeEventData bed={};
     bed.has_profile=true;
-    bed.profile=Create_IgnBridgeProfile("abcdef");
+    bed.profile=Create_IgnBridgeProfile("IGN123456789");
     hb.has_bridge_data=true;
     hb.bridge_data=bed;
-
 
     int publish_result;
     uint8_t buf[1024];
@@ -148,34 +152,75 @@ int HeartBeat(){
     pb_ostream_t out=pb_ostream_from_buffer(buf,sizeof(buf));
     if(pb_encode(&out,ign_MsgInfo_fields,&hb)){
         size_t len=out.bytes_written;
-        if((publish_result=sendMessage(g_sysif.mqtt_c,PUB_TOPIC,1,buf,(int)len))!=MQTTCLIENT_SUCCESS){
-            serverLog(LL_ERROR, "SEND MQTT HB ERROR WITH CODE[%d]", publish_result);
+        if((publish_result=MQTT_sendMessage(g_sysif.mqtt_c,PUB_TOPIC,1,buf,(int)len))!=MQTTCLIENT_SUCCESS){
+            printf("SEND MQTT HB ERROR WITH CODE[%d]\n",publish_result);
         }else{
-            serverLog(LL_NOTICE, "SEND MQTT HB SUCCESS");
+            printf("SEND MQTT HB SUCCESS\n");
         }
     }else{
-        serverLog(LL_ERROR, "ENCODE MQTT HB ERROR");
+        printf("ENCODE MQTT HB ERROR\n");
     }
     return 0;
+}
+
+static ign_LockEntry glocks[5];
+static int glock_index=0;
+
+bool get_server_event_data(pb_istream_t *stream,const pb_field_t *field,void **arg);
+bool get_server_event_data(pb_istream_t *stream,const pb_field_t *field,void **arg){
+    ign_LockEntry lock={};
+    if(pb_decode(stream,ign_LockEntry_fields,&lock)){
+        glocks[glock_index]=lock;
+        glock_index++;
+        return true;
+    }    
+    return false;
 }
 
 int GetUserInfo(void* si) {
 	//send request to server to get userinfo
 	printf("send request to server to get userinfo!\n");
-    return 0;
+
+	ign_MsgInfo msg={};
+	msg.event_type=ign_EventType_GET_USER_INFO;
+	msg.time=get_ustime();
+	msg.msg_id=GetMsgID();//get_ustime();
+	ign_BridgeEventData bed={};
+	bed.has_profile=true;
+	bed.profile=Create_IgnBridgeProfile((char*)si);
+	msg.has_bridge_data=true;
+	msg.bridge_data=bed;
+
+	int pubResult;
+	uint8_t buf[1024];
+	memset(buf,0,sizeof(buf));
+	pb_ostream_t out=pb_ostream_from_buffer(buf,sizeof(buf));
+	if(pb_encode(&out,ign_MsgInfo_fields,&msg)){
+		size_t len=out.bytes_written;
+		if((pubResult=MQTT_sendMessage(g_sysif.mqtt_c,PUB_TOPIC,1,buf,(int)len))!=MQTTCLIENT_SUCCESS){
+			printf("SEND MQTT [GET_USER_INFO] ERROR WITH CODE[%d]\n",pubResult);
+		}else{
+			printf("SEND MQTT [GET_USER_INFO] SUCCESS\n");
+		}
+	}else{
+		printf("ENCODE GETUSERINFO ERROR\n");
+	}
+
+	return 0;
 }
 
-// int DealUserInfo(void* si) {
-// 	//Recv UserInfo from server 
-// 	printf("recv userinfo from server!\n");
-//     return 0;
-// }
+
+int DealUserInfo(void* si) {
+	//Recv UserInfo from server 
+	printf("recv userinfo from server!\n");
+	return 0;
+}
 
 // 首先实现这个扫描的 
 int ScanLock(void* tn) {
 	//Scan and connect with locks
 	printf("scan & connect with locks!\n");
-    return 0;
+	return 0;
 }
 
 int UpdateLockState(void* tn) {
@@ -198,46 +243,35 @@ int BLEParing(void* tn){
 
 int Init(void* tn) {
     serverLog(LL_NOTICE, "Init mqtt Clients");
-    g_sysif.mqtt_c = initClients(HOST,SUBSCRIBE_CLIENT_ID,60,1,CA_PATH,TRUST_STORE,PRIVATE_KEY,KEY_STORE);
+
+    g_sysif.mqtt_c = MQTT_initClients(HOST, SUBSCRIBE_CLIENT_ID, 60, 1, CA_PATH, TRUST_STORE, PRIVATE_KEY, KEY_STORE);
     if(NULL == g_sysif.mqtt_c) {
+    //if(NULL == g_sysif.mqtt_c) {
         //goto GoExit;
-        serverLog(LL_ERROR, "util_initClients err, mqtt_c is NULL.");
-        return 1;
+        serverLog(LL_ERROR, "MQTT_initClients err, mqtt_c is NULL.");
+        return -1;
     }
     serverLog(LL_NOTICE, "init mqtt Clients success");
     
     int rc = MQTTClient_subscribe(g_sysif.mqtt_c, SUB_TOPIC, 1);
     if(MQTTCLIENT_SUCCESS != rc){
         serverLog(LL_ERROR, "Subscribe [%s] error with code [%d].", SUB_TOPIC, rc);
-        return 1;
+        return -2;
     }
     serverLog(LL_NOTICE, "Subscribe [%s] success!!!", SUB_TOPIC);
     
 
     rc = MQTTClient_subscribe(g_sysif.mqtt_c,PUB_WEBDEMO,1);
-    if(rc!=MQTTCLIENT_SUCCESS){
+	if(MQTTCLIENT_SUCCESS != rc){
         serverLog(LL_ERROR, "Subscribe [%s] error with code [%d].", PUB_WEBDEMO, rc);
-        return 1;
+        return -3;
     }
     serverLog(LL_NOTICE, "Subscribe [%s] success!!!", PUB_WEBDEMO);
-
 
     //InitBLE(si);
     //InitBtn(si);
     return 0;
 }
-
-
-fsm_table_t g_fsm_table[] = {
-    // {  CMD_INIT,                Init,               GET_WIFI_USER},
-    // {  GET_WIFI_USER,           BLEParing,          CMD_REQ_USERINFO},
-    // {  CMD_REQ_USERINFO,        GetUserInfo,        CMD_UPDATE_USERINFO},
-    // {  CMD_UPDATE_USERINFO,     DealUserInfo,       CMD_CONNECT_LOCK},
-    {  CMD_CONNECT_LOCK,        ScanLock,           CMD_UPDATE_LOCKSTATUS},
-    {  CMD_UPDATE_LOCKSTATUS,   UpdateLockState,    DONE},
-    {  CMD_UNLOCK,              UnLock,             CMD_UPDATE_LOCKSTATUS},
-    {  }
-};
 
 
 // void GoExit(sysinfo_t *si) {
@@ -249,40 +283,12 @@ fsm_table_t g_fsm_table[] = {
 //     }
 // }
 
-    /*
-static int FSM(MQTTClient_message *msg){
-    switch (msg) {
-    case BTREE_TYPE_RBMT:
-        err = ctree_tree_open(ctree, path, attr, fd);
-        break;
-
-    case BTREE_TYPE_BTRFS:
-        err = ctree_bpt_open(ctree, path, attr, fd);
-        break;
-
-    case BTREE_TYPE_BITMAP:
-        err = do_open_bitmap(ctree, path, attr, fd);
-        break;
-
-    default:
-        err = -EINVAL;
-    }
-    return 0;
-}
-    */
-
-
-// int HeartBeat(){
-//     //send MQTT HB to Server
-//     return 0;
-// }
-
 //处理web端消息
 int DoWebMsg(char *topic,void *payload){
     printf("=============================================================\n");
     cJSON *root=NULL;
     root=cJSON_Parse((char *)payload);
-    if(root==NULL){
+    if(NULL == root){
         cJSON_Delete(root);
         return 0;
     }
@@ -290,24 +296,127 @@ int DoWebMsg(char *topic,void *payload){
     cJSON *bridgeId=cJSON_GetObjectItem(root,"bridge_id");
     cJSON *value=cJSON_GetObjectItem(root,"value");
     printf("recv CMD=%s,BRIDGEID=%s Value=%s\n",cmd->valuestring,bridgeId->valuestring,value->valuestring);
-    if(strcmp("getUserInfo",cmd->valuestring)==0){
+	//handle request CMD
+    if(0 == strcmp("getUserInfo",cmd->valuestring)){
+		printf("will do getUserInfo.\n");
         GetUserInfo(bridgeId->valuestring);
-    }else if(strcmp("unlock",cmd->valuestring)==0){
+    }else if(0 == strcmp("unlock",cmd->valuestring)){
+		printf("will do UnLock.\n");
         char* lockID=value->valuestring;
         UnLock(lockID);
     }
     printf("=============================================================\n");
     cJSON_Delete(root);
-    int msg_id = rand() % 25532;
+
+	/*
+    int msg_id = GetMsgID();//rand() % 25532;
     serverLog(LL_NOTICE, "addDiscoverTask msg_id %d", msg_id);
     igm_lock_t lock;
     lockSetName(&lock, "IGM303e31a5c", strlen("IGM303e31a5c"));
     // addPairingTask(&lock, msg_id);
     addAdminTask(&lock, msg_id);
     // addPairingTask(&lock, msg_id);
+	*/
     return 0;
 }
 
+
+void WaitMQTT(sysinfo_t *si){
+	while(1){
+		//if (NULL == si->mqtt_c)
+		char *topic = NULL;
+		int topicLen;
+		MQTTClient_message *msg = NULL;
+		int rc = MQTTClient_receive(si->mqtt_c, &topic, &topicLen, &msg, 1e3);
+		if (0 != rc) {
+			//err log
+			serverLog(LL_ERROR, "MQTTClient_receive err[%d], topic[%s].", rc, topic);
+		}
+		if(msg){
+			printf("MQTTClient_receive msg from server, topic[%s].\n", topic);
+			if(strcmp(topic,PUB_WEBDEMO)==0){
+				//web simulator request
+				DoWebMsg(topic,msg->payload);
+			}else{
+				//decode msg
+				memset(glocks,0,sizeof(glocks));
+				glock_index=0;
+				ign_MsgInfo imsg={};
+				pb_istream_t in=pb_istream_from_buffer(msg->payload,(size_t)msg->payloadlen);
+				imsg.server_data.lockEntries.funcs.decode=&get_server_event_data;
+				if(pb_decode(&in,ign_MsgInfo_fields,&imsg)){
+					switch(imsg.event_type){
+						case ign_EventType_HEARTBEAT:
+							printf("RECV MQTT HB msg\n");
+							goto gomqttfree;
+							break;
+						case ign_EventType_GET_USER_INFO:
+							printf("RECV MQTT GETUSERINFO msg LEN=%d\n",msg->payloadlen);
+							printf("RECV msgid=%d,signal=%d\n",imsg.msg_id,imsg.bridge_data.profile.wifi_signal);
+							printf("RECV profile_bt_id=%s,bridege_name=%s\n",imsg.bridge_data.profile.bt_id.bytes,imsg.bridge_data.profile.name.bytes);
+							goto gomqttfree;
+							break;
+						case ign_EventType_UPDATE_USER_INFO:
+							if(imsg.has_server_data){
+								for(int i=0;i<glock_index;i++){
+									printf("%02d bt_id=%s\n",i,glocks[i].bt_id);
+								}
+							}
+							MQTT_sendMessage(g_sysif.mqtt_c, SUB_WEBDEMO, 1, msg->payload, msg->payloadlen);
+							goto gomqttfree;
+							break;
+						case ign_EventType_NEW_JOB_NOTIFY:
+							printf("RECV[NEW_JOB_NOTIFY]\n\tbt_id=%s\tlock_cmd_size=%d\tlock_cmd=%s\n",imsg.server_data.job.bt_id,(int)imsg.server_data.job.lock_cmd.size,imsg.server_data.job.lock_cmd.bytes);
+							for(int i=0;i<imsg.server_data.job.lock_cmd.size;i++){
+								char b=(char)imsg.server_data.job.lock_cmd.bytes[i];
+								printf("%x",b);
+							}
+							printf("\n");
+							//MQTT_sendMessage(g_sysif.mqtt_c,SUB_WEBDEMO,1,msg->payload,msg->payloadlen);
+							goto gomqttfree;
+							break;
+						default:
+							printf("RECV MQTT %u msg\n",imsg.event_type);
+							goto gomqttfree;
+							break;
+					}
+
+					/*
+					//search task queue by msg_id
+					unsigned int current_state = 1;
+					task_node_t *ptn = NULL;
+					ptn = FindTaskByMsgID(imsg.msg_id, &waiting_task_head);
+
+					if (NULL!=ptn) {//move task_node into doing_list task queue
+						printf("find task_node.msg_id[%u], current_state[%d].\n", ptn->msg_id, ptn->cur_state);
+						//MoveTask();
+						pthread_mutex_lock(g_sysif.mutex);
+						MoveTask(&ptn->list, &doing_task_head);
+						pthread_mutex_unlock(g_sysif.mutex);
+					}
+					else {//if not exist, add into task queue
+						printf("find ptn==NULL.\n");
+						pthread_mutex_lock(g_sysif.mutex);
+						InsertTask(&doing_task_head, imsg.msg_id, current_state, NULL, NULL);
+						pthread_mutex_unlock(g_sysif.mutex);
+					}
+					*/
+gomqttfree:            
+					MQTTClient_freeMessage(&msg);
+					MQTTClient_free(topic);
+				}else{
+					printf("MQTT MSG DECODE ERROR!!!!\n");
+				}
+			}
+
+		} else {
+			//err log
+			HeartBeat();
+		}
+	}
+}
+
+/*
 void WaitMQTT(void *arg){
     sysinfo_t *si = (sysinfo_t *)arg;
     while(1){
@@ -333,7 +442,7 @@ void WaitMQTT(void *arg){
         }
         serverLog(LL_NOTICE, "topic %s", topic);
     }
-}
+}*/
 
 
 
@@ -669,8 +778,31 @@ void saveTaskData(task_node_t *ptn)
     }
 }
 
+
+fsm_table_t g_fsm_table[] = {
+    // {  CMD_INIT,                Init,               GET_WIFI_USER},
+    // {  GET_WIFI_USER,           BLEParing,          CMD_REQ_USERINFO},
+    // {  CMD_REQ_USERINFO,        GetUserInfo,        CMD_UPDATE_USERINFO},
+    // {  CMD_UPDATE_USERINFO,     DealUserInfo,       CMD_CONNECT_LOCK},
+    {  CMD_CONNECT_LOCK,        ScanLock,           CMD_UPDATE_LOCKSTATUS},
+    {  CMD_UPDATE_LOCKSTATUS,   UpdateLockState,    DONE},
+    {  CMD_UNLOCK,              UnLock,             CMD_UPDATE_LOCKSTATUS},
+    {  }
+};
+
+fsm_table_t g_sm_table[] = {
+    {  CMD_INIT,                Init,               GET_WIFI_USER},
+    {  GET_WIFI_USER,           BLEParing,          CMD_REQ_USERINFO},
+    {  CMD_REQ_USERINFO,        GetUserInfo,        CMD_UPDATE_USERINFO},
+    {  CMD_UPDATE_USERINFO,     DealUserInfo,       CMD_CONNECT_LOCK},
+    {  CMD_CONNECT_LOCK,        ScanLock,           CMD_UPDATE_LOCKSTATUS},
+    {  CMD_UPDATE_LOCKSTATUS,   UpdateLockState,    DONE},
+    {  CMD_UNLOCK,              UnLock,             CMD_UPDATE_LOCKSTATUS},
+};
+
 int main() {
-    Init(NULL);
+    int rc = Init(NULL);
+	assert(0 == rc);
     serverLog(LL_NOTICE,"Ready to start.");
 
     //daemon(1, 0);
@@ -683,7 +815,12 @@ int main() {
         GoExit(si);
         return -1;
     }*/
+ 
+    //g_sysif.mutex = Thread_create_mutex();
 
+    //INIT_LIST_HEAD(&waiting_task_head);
+    //INIT_LIST_HEAD(&doing_task_head);
+ 
     pthread_t mqtt_thread = Thread_start(WaitMQTT, &g_sysif);
     serverLog(LL_NOTICE,"new thread to WaitMQTT[%u].", mqtt_thread);
     // pthread_t ble_thread = Thread_start(WaitBLE, &g_sysif);

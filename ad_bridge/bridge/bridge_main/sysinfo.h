@@ -13,6 +13,7 @@ typedef struct SysInfo {
     MQTTClient mqtt_c;
     // 去除 这个mutex, 建议所有操作, 都写到相应的.c文件, 每次修改获取都自动加锁,
     // 以免某程序忘记加锁,减少出错
+	//pthread_mutex_t* mutex;
     char wifi_ssid[128];
     char wifi_pswd[32];
     char user_id[64];

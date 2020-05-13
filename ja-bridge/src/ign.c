@@ -296,9 +296,12 @@ void WaitMQTT(sysinfo_t *si){
         int rc = MQTTClient_receive(si->mqtt_c, &topic, &topicLen, &msg, 1e3);
         if (0 != rc) {
             //err log
+			serverLog(LL_ERROR, "MQTTClient_receive err[%d], topic[%s].", rc, topic);
         }
+		printf("MQTTClient_receive msg from server, topic[%s].\n", topic);
         if(msg){
             if(strcmp(topic,PUB_WEBDEMO)==0){
+				//web simulator request
                 DoWebMsg(topic,msg->payload);
             }else{
                 //decode msg

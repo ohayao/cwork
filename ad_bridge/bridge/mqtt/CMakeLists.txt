@@ -6,7 +6,7 @@ set(ALL_MQTT_SRCS)
 
 set(MQTT_DEPENDENCIES
   paho-mqtt3cs
-  cjson
+#  cjson
 )
 
 file(GLOB_RECURSE ALL_MQTT_HDRS "*.h")

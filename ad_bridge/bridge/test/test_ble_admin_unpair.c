@@ -151,7 +151,7 @@ int HeartBeat(){
     pb_ostream_t out=pb_ostream_from_buffer(buf,sizeof(buf));
     if(pb_encode(&out,ign_MsgInfo_fields,&hb)){
         size_t len=out.bytes_written;
-        if((publish_result=sendMessage(g_sysif.mqtt_c,PUB_TOPIC,1,buf,(int)len))!=MQTTCLIENT_SUCCESS){
+        if((publish_result=MQTT_sendMessage(g_sysif.mqtt_c,PUB_TOPIC,1,buf,(int)len))!=MQTTCLIENT_SUCCESS){
             serverLog(LL_ERROR, "SEND MQTT HB ERROR WITH CODE[%d]", publish_result);
         }else{
             serverLog(LL_NOTICE, "SEND MQTT HB SUCCESS");
@@ -201,10 +201,10 @@ int BLEParing(void* tn){
 
 int Init(void* tn) {
     serverLog(LL_NOTICE, "Init mqtt Clients");
-    g_sysif.mqtt_c = initClients(HOST,SUBSCRIBE_CLIENT_ID,60,1,CA_PATH,TRUST_STORE,PRIVATE_KEY,KEY_STORE);
+    g_sysif.mqtt_c = MQTT_initClients(HOST,SUBSCRIBE_CLIENT_ID,60,1,CA_PATH,TRUST_STORE,PRIVATE_KEY,KEY_STORE);
     if(NULL == g_sysif.mqtt_c) {
         //goto GoExit;
-        serverLog(LL_ERROR, "util_initClients err, mqtt_c is NULL.");
+        serverLog(LL_ERROR, "MQTT_initClients err, mqtt_c is NULL.");
         return 1;
     }
     serverLog(LL_NOTICE, "init mqtt Clients success");

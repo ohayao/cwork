@@ -113,7 +113,7 @@ void serverLogRaw(int level, const char *msg) {
     int log_to_stdout = LOG_FILE =='\0';
     
     // debug 
-    log_to_stdout = 1;
+    //log_to_stdout = 1;
     level &= 0xff; /* clear flags */
     //if (level < server.verbosity) return;
 
@@ -134,8 +134,7 @@ void serverLogRaw(int level, const char *msg) {
         nolocks_localtime(&tm, tv.tv_sec, timezone, daylight_active);
         off = strftime(buf,sizeof(buf),"%d %b %Y %H:%M:%S.",&tm);
         snprintf(buf+off,sizeof(buf)-off,"%03d",(int)tv.tv_usec/1000);
-        fprintf(fp,"%d: %s %c %s\n",
-            pid, buf,c[level],msg);
+        fprintf(fp,"%d: %s %c %s\n", pid, buf,c[level],msg);
     }
     fflush(fp);
 
