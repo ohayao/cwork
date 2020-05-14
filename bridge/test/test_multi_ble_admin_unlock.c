@@ -722,9 +722,9 @@ void TimerStop(int signum) {
     serverLog(LL_NOTICE, "Timer ran out! Stopping timer");
     char lock_addr[18] = "D9:78:2F:E3:1A:5C";
     lock_addr[17] = '\0';
-    uint8_t admin_key[33] = "ce05c08ddb4b76280bd9623fbf202fc8";
+    uint8_t admin_key[33] = "d4c33574f65b83cc8d214e545b89d049";
     admin_key[32] = '\0';
-    uint8_t passwd[17] = "22e0bfb6a529b982";
+    uint8_t passwd[17] = "94c5b5d4a6ad3497";
     passwd[16] = '\0';
     igm_lock_t lock;
     int msg_id = 4;
@@ -770,9 +770,9 @@ int WaitBLE(void *arg){
       // contnueDiscoverLock();
         char lock_addr[18] = "D9:78:2F:E3:1A:5C";
         lock_addr[17] = '\0';
-        uint8_t admin_key[33] = "ce05c08ddb4b76280bd9623fbf202fc8";
+        uint8_t admin_key[33] = "d4c33574f65b83cc8d214e545b89d049";
         admin_key[32] = '\0';
-        uint8_t passwd[17] = "22e0bfb6a529b982";
+        uint8_t passwd[17] = "94c5b5d4a6ad3497";
         passwd[16] = '\0';
         igm_lock_t lock;
         int msg_id = 4;
@@ -789,7 +789,7 @@ int WaitBLE(void *arg){
         setLockPassword(&lock, tmp_buff, password_size);
         serverLog(LL_NOTICE, "setLockPassword");
         addAdminUnlockTask(&lock, msg_id);
-      sleep(6);
+      sleep(10);
     }
     return 0;
 }

@@ -853,10 +853,11 @@ static gboolean on_handle_characteristic_property_change(
 	    const gchar *const *arg_invalidated_properties,
 	    gpointer user_data)
 {
-	// printf("xxxxxxxxxxxxxxx on_handle_characteristic_property_change\n");
+	printf("xxxxxxxxxxxxxxx on_handle_characteristic_property_change\n");
 	gatt_connection_t* connection = user_data;
 
 	if (gattlib_has_valid_handler(&connection->notification)) {
+			printf("xxxxxxxxxxxxxxx gattlib_has_valid_handler\n");
 		// Retrieve 'Value' from 'arg_changed_properties'
 		if (g_variant_n_children (arg_changed_properties) > 0) {
 			GVariantIter *iter;
