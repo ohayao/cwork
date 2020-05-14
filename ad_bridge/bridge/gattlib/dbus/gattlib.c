@@ -853,7 +853,7 @@ static gboolean on_handle_characteristic_property_change(
 	    const gchar *const *arg_invalidated_properties,
 	    gpointer user_data)
 {
-	// printf("xxxxxxxxxxxxxxx on_handle_characteristic_property_change\n");
+	printf("xxxxxxxxxxxxxxx on_handle_characteristic_property_change\n");
 	gatt_connection_t* connection = user_data;
 
 	if (gattlib_has_valid_handler(&connection->notification)) {
@@ -933,6 +933,8 @@ int gattlib_notification_start(gatt_connection_t* connection, const uuid_t* uuid
 	printf("xxxxxxxxxxx gattlib_notification_start\n");
 	struct dbus_characteristic dbus_characteristic = 
 		get_characteristic_from_uuid(connection, uuid);
+
+	printf("xxxxxxxxxxx uuid[%u], get dbus_characteristic.type[%u]\n", uuid, dbus_characteristic.type);
 	if (dbus_characteristic.type == TYPE_NONE) {
 		return GATTLIB_NOT_FOUND;
 	}

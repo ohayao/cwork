@@ -49,6 +49,7 @@ bool gattlib_has_valid_handler(struct gattlib_handler *handler) {
 }
 
 void gattlib_call_notification_handler(struct gattlib_handler *handler, const uuid_t* uuid, const uint8_t* data, size_t data_length) {
+	printf("@@@@@@ handler->type[%d]\n", handler->type);
 	if (handler->type == NATIVE_NOTIFICATION) {
 		handler->notification_handler(uuid, data, data_length, handler->user_data);
 	}

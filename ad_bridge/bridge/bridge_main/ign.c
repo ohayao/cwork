@@ -81,7 +81,7 @@ int FSMHandle(task_node_t* tn) {
 	int flag = 0;
     // 这儿是遍历所有的状态.
 	for (int i = 0; i<table_max_num; i++) {
-        serverLog(LL_NOTICE, "FSMHandle i %d ", i);
+        serverLog(LL_NOTICE, "FSMHandle state[%d].", i);
 		if (tn->cur_state == tn->task_sm_table[i].cur_state) {
 			serverLog(LL_NOTICE, "eventActFun begin---------------, tn->task_sm_table[%d].cur_state[%d].", i, tn->task_sm_table[i].cur_state);
             // 增加一个判断当前函数, 是否当前函数出错. 0 表示没问题
