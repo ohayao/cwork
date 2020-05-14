@@ -228,7 +228,7 @@ gatt_connection_t *gattlib_connect_async(const char *src, const char *dst,
 int gattlib_disconnect(gatt_connection_t* connection) {
 	gattlib_context_t* conn_context = connection->context;
 	GError *error = NULL;
-
+	printf("?????????????????????????????? gattlib_disconnect\n");
 	org_bluez_device1_call_disconnect_sync(conn_context->device, NULL, &error);
 	if (error) {
 		fprintf(stderr, "Failed to disconnect DBus Bluez Device: %s\n", error->message);
@@ -969,21 +969,22 @@ int gattlib_notification_start(gatt_connection_t* connection, const uuid_t* uuid
 }
 
 int gattlib_notification_stop(gatt_connection_t* connection, const uuid_t* uuid) {
+	printf("???????????????????????? gattlib_notification_stop");
 	struct dbus_characteristic dbus_characteristic = get_characteristic_from_uuid(connection, uuid);
 	if (dbus_characteristic.type == TYPE_NONE) {
 		return GATTLIB_NOT_FOUND;
 	}
-#if BLUEZ_VERSION > BLUEZ_VERSIONS(5, 40)
-	else if (dbus_characteristic.type == TYPE_BATTERY_LEVEL) {
-		g_signal_handlers_disconnect_by_func(
-				dbus_characteristic.battery,
-				G_CALLBACK (on_handle_battery_level_property_change),
-				connection);
-		return GATTLIB_SUCCESS;
-	} else {
-		assert(dbus_characteristic.type == TYPE_GATT);
-	}
-#endif
+// #if BLUEZ_VERSION > BLUEZ_VERSIONS(5, 40)
+	// else if (dbus_characteristic.type == TYPE_BATTERY_LEVEL) {
+	// 	g_signal_handlers_disconnect_by_func(
+	// 			dbus_characteristic.battery,
+	// 			G_CALLBACK (on_handle_battery_level_property_change),
+	// 			connection);
+	// 	return GATTLIB_SUCCESS;
+	// } else {
+	// 	assert(dbus_characteristic.type == TYPE_GATT);
+	// }
+// #endif
 
 	g_signal_handlers_disconnect_by_func(
 			dbus_characteristic.gatt,
