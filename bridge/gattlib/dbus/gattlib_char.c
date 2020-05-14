@@ -119,7 +119,6 @@ static bool handle_dbus_battery_from_uuid(gattlib_context_t* conn_context, const
 
 
 struct dbus_characteristic get_characteristic_from_uuid(gatt_connection_t* connection, const uuid_t* uuid) {
-	printf("gattlib_char.c get_characteristic_from_uuid \n");
 	gattlib_context_t* conn_context = connection->context;
 	GError *error = NULL;
 	bool is_battery_level_uuid = false;

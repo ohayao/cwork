@@ -7,6 +7,7 @@ static const char *kTag = "JNI_admin_connection";
 
 // 
 int igloohome_ble_lock_crypto_AdminConnection_beginConnection(uint8_t *jKey, int keyLen);
+void AdminConnection_endConnection(int connectionId);
 int igloohome_ble_lock_crypto_AdminConnection_genConnStep2Native(int connectionId, 
   uint8_t *jConnectionStep1, int step1Len, uint8_t **retBytes);
 bool igloohome_ble_lock_crypto_AdminConnection_recConnStep3Native(

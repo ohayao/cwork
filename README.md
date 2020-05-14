@@ -125,6 +125,15 @@ b5fa603bb0d01d38
 8719: 12 May 2020 02:47:06.232 * unlock error: 0 0 means unlock
 8719: 12 May 2020 02:47:06.232 * doing_task_head is empty, check Lock list.
 
+5. ./bridge/test/test_multi_ble_admin_unlock D9:78:2F:E3:1A:5C ca774dbb1320cebb57a77f24da67aacb f468f917f1a4f0c4
+./bridge/test/test_ble_admin_unlock D9:78:2F:E3:1A:5C ce05c08ddb4b76280bd9623fbf202fc8 22e0bfb6a529b982
+
+最后成功结果:
+8719: 12 May 2020 02:47:06.231 * saving ble TASK_BLE_ADMIN_UNPAIR data
+8719: 12 May 2020 02:47:06.232 * unpair_result:
+8719: 12 May 2020 02:47:06.232 * unlock error: 0 0 means unlock
+8719: 12 May 2020 02:47:06.232 * doing_task_head is empty, check Lock list.
+
 ### BLE 相关用法
 1. void addDiscoverTask(int msg_id)
 添加扫描任务

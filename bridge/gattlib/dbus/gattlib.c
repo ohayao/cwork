@@ -930,7 +930,6 @@ static gboolean on_handle_characteristic_indication(
 }
 
 int gattlib_notification_start(gatt_connection_t* connection, const uuid_t* uuid) {
-	printf("xxxxxxxxxxx gattlib_notification_start\n");
 	struct dbus_characteristic dbus_characteristic = 
 		get_characteristic_from_uuid(connection, uuid);
 	if (dbus_characteristic.type == TYPE_NONE) {

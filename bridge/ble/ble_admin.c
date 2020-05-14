@@ -153,11 +153,11 @@ int write_admin_step2(void *arg)
   int step2Len;
   int connectionID;
 
-  for (int j = 0; j < param->lock->admin_key_len; j++)
-  {
-    printf("%x ", param->lock->admin_key[j]);
-  }
-  printf("\n");
+  // for (int j = 0; j < param->lock->admin_key_len; j++)
+  // {
+  //   printf("%x ", param->lock->admin_key[j]);
+  // }
+  // printf("\n");
 
   ret = igloohome_ble_lock_crypto_AdminConnection_beginConnection(
                             param->lock->admin_key, param->lock->admin_key_len);
@@ -686,7 +686,9 @@ static int handle_unlock_responce(const uint8_t* data, int data_length,void* use
     serverLog(LL_NOTICE, "handle_step3_message bleSetBleResult to ble data");
     bleSetBleResult(
       ble_data, admin_unlock_connection->admin_result, sizeof(ble_admin_result_t));
-
+    
+    AdminConnection_endConnection((admin_unlock_connection->lock).connectionID);
+    serverLog(LL_NOTICE, "AdminConnection_endConnection success");
     if (admin_unlock_connection->gatt_connection)
     {
       // gattlib_notification_stop(
@@ -702,6 +704,16 @@ static int handle_unlock_responce(const uint8_t* data, int data_length,void* use
         serverLog(LL_NOTICE, "clearAdminConnectionGattConenction success ✓✓✓");
       }
     }
+
+    ret = gattlib_adapter_close(ble_data->adapter);
+    if (ret != GATTLIB_SUCCESS)
+    {
+      serverLog(LL_ERROR, "gattlib_adapter_close error");
+      return ret;
+    }
+    serverLog(LL_NOTICE, "gattlib_adapter_close success");
+
+    
 
 UNLOCK_RESULT_EXIT:
     g_main_loop_quit(task_node->loop);
@@ -790,8 +802,14 @@ static int handle_unpair_responce(const uint8_t* data, int data_length,void* use
       serverLog(LL_NOTICE, "clearAdminConnectionGattConenction success ✓✓✓");
     }
     
-    
-UNPAIR_RESULT_EXIT:
+    ret = gattlib_adapter_close(ble_data->adapter);
+    if (ret != GATTLIB_SUCCESS)
+    {
+      serverLog(LL_ERROR, "gattlib_adapter_close error");
+      return ret;
+    }
+    serverLog(LL_NOTICE, "gattlib_adapter_close success");
+  UNPAIR_RESULT_EXIT:
     g_main_loop_quit(task_node->loop);
 
   }

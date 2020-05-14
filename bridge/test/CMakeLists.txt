@@ -35,3 +35,8 @@ add_executable(test_decode_base64 ./test_decode_base64.c)
 target_link_libraries(test_decode_base64
   ${TEST_DEPENDENCIES}
 )
+
+add_executable(test_multi_ble_admin_unlock ./test_multi_ble_admin_unlock.c)
+target_link_libraries(test_multi_ble_admin_unlock
+  ${TEST_DEPENDENCIES}
+)
