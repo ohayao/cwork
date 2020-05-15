@@ -68,12 +68,12 @@ static int clearAdminConnectionGattConenction(admin_connection_t *admin_connecti
 		serverLog(LL_ERROR, "clearAdminConnectionGattConenction gattlib_notification_stop error");
 		return ret;
 	}
-	ret = gattlib_disconnect(admin_connection->gatt_connection);
-	if (ret != GATTLIB_SUCCESS)
-	{
-		serverLog(LL_ERROR, "clearAdminConnectionGattConenction gattlib_disconnect error");
-		return ret;
-	}
+	// ret = gattlib_disconnect(admin_connection->gatt_connection);
+	// if (ret != GATTLIB_SUCCESS)
+	// {
+	// 	serverLog(LL_ERROR, "clearAdminConnectionGattConenction gattlib_disconnect error");
+	// 	return ret;
+	// }
 	return ret;
 }
 
@@ -687,6 +687,8 @@ static int handle_unlock_responce(const uint8_t* data, int data_length,void* use
 		bleSetBleResult(
 				ble_data, admin_unlock_connection->admin_result, sizeof(ble_admin_result_t));
 
+		AdminConnection_endConnection((admin_unlock_connection->lock).connectionID);
+
 		if (admin_unlock_connection->gatt_connection)
 		{
 			// gattlib_notification_stop(
@@ -930,6 +932,7 @@ int register_admin_notfication(void *arg)
 	serverLog(LL_NOTICE, "success to start notification" );
 
 	admin_connection->admin_step = BLE_ADMIN_BEGIN;
+	task_node->loop = g_main_loop_new(NULL, 0);
 	serverLog(LL_NOTICE, "register_admin_notfication end --------");
 
 	return 0;
@@ -1001,17 +1004,25 @@ static int waiting_unlock_result(void *arg)
 {
 	serverLog(LL_NOTICE, "@@@ 5 waiting_unlock_result start, last step");
 	task_node_t *task_node = (task_node_t *)arg;
-
+	ble_data_t *ble_data = (ble_data_t *)(task_node->ble_data);
+  admin_connection_t *admin_connection = 
+                            (admin_connection_t *)ble_data->ble_connection;
 	// 在这儿用g_main_loop_run等待, 用线程锁和睡眠的方法不行, 就像是bluez不会调用
 	// 我的回调函数, 在 rtos 应该会有相应的方法实现这样的等待事件到来的方法.
 	// 当前 Linux 下, 这样用, works 
 	serverLog(LL_NOTICE, "waiting_unlock_result new loop waiting");
-	task_node->loop = g_main_loop_new(NULL, 0);
-	if (!task_node->loop)
-	{
-		serverLog(LL_ERROR, "task_node->loop error");
-	}
+
 	g_main_loop_run(task_node->loop);
+  g_main_loop_unref(task_node->loop);
+  task_node->loop = NULL;
+
+	int ret = gattlib_disconnect(admin_connection->gatt_connection);
+	if (ret != GATTLIB_SUCCESS)
+	{
+		serverLog(LL_ERROR, "clearAdminConnectionGattConenction gattlib_disconnect error");
+		return ret;
+	}
+
 	serverLog(LL_NOTICE, "waiting_unlock_result exit task_node->loop");
 	return 0;
 }
@@ -1045,7 +1056,7 @@ int waiting_admin_step1(void *arg)
 	// 在这儿用g_main_loop_run等待, 用线程锁和睡眠的方法不行, 就像是bluez不会调用
 	// 我的回调函数, 在 rtos 应该会有相应的方法实现这样的等待事件到来的方法.
 	// 当前 Linux 下, 这样用, works 
-	task_node->loop = g_main_loop_new(NULL, 0);
+	// task_node->loop = g_main_loop_new(NULL, 0);
 	g_main_loop_run(task_node->loop);
 	serverLog(LL_NOTICE, "waiting_admin_step2 exit task_node->loop");
 	return 0;

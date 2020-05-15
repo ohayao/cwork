@@ -129,4 +129,8 @@ int AdminConnection_decryptNative(
 }
 
 
+void AdminConnection_endConnection(int connectionId)
+{
+  endConnection(connectionId);
+}
 

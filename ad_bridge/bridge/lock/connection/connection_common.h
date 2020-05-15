@@ -41,6 +41,7 @@ typedef struct Connection {
 void generateRandomNonce(int nonceLength, uint8_t resultNonceArrar[]);
 int beginConnection(ConnectionType type, uint8_t *jKey, int keyLen);
 Connection* getConnection(int connectionId);
+void endConnection(int connectionId);
 int encryptNative(int connectionId, uint8_t *jPlaintext, int plaintextLen,
     uint8_t **retBytes);
 int decryptNative(
