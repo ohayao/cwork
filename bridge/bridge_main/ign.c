@@ -23,9 +23,9 @@
 #include <bridge/bridge_main/lock_list.h>
 #include <bridge/ble/ble_admin.h>
 #include <bridge/ble/ble_pairing.h>
-#include <bridge/mqtt/mqtt_constant.h>
-#include <bridge/mqtt/mqtt_util.h>
-#include <bridge/mqtt/cJSON.h>
+#include "bridge/mqtt/mqtt_constant.h"
+#include "bridge/mqtt/mqtt_util.h"
+#include "bridge/mqtt/cJSON.h"
 #include <bridge/proto/ign.pb.h>
 #include <bridge/proto/pb_encode.h>
 #include <bridge/proto/pb_decode.h>

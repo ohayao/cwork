@@ -157,5 +157,5 @@ connectionID 0                              // connectionID 是多少
 ### TODO List
 1. 当锁已经被paired, 当前会出错.
 2. 发送完成一个命令, 把锁有连接和监听都关闭, unpaired 命令
-
+3. 目前已经知道连续unlock的错误, 会有个dbus错误,以及卡在某个消息当中, 目前的gattlib似乎更新了很多,我逐个调查一下.
 

@@ -2,8 +2,8 @@
 #define __GATTLIB_INTERNAL_DEFS_H__
 
 #include <stdbool.h>
+
 #include "bridge/gattlib/gattlib.h"
-// #include "gattlib.h"
 
 enum handler_type { UNKNOWN = 0, NATIVE_NOTIFICATION, NATIVE_DISCONNECTION, PYTHON };
 
