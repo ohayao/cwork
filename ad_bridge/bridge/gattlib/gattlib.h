@@ -2,7 +2,7 @@
  *
  *  GattLib - GATT Library
  *
- *  Copyright (C) 2016-2019 Olivier Martin <olivier@labapart.org>
+ *  Copyright (C) 2016-2020 Olivier Martin <olivier@labapart.org>
  *
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -111,6 +111,7 @@ extern "C" {
 #define GATTLIB_DISCOVER_FILTER_USE_NONE                    0
 #define GATTLIB_DISCOVER_FILTER_USE_UUID                    (1 << 0)
 #define GATTLIB_DISCOVER_FILTER_USE_RSSI                    (1 << 1)
+#define GATTLIB_DISCOVER_FILTER_NOTIFY_CHANGE               (1 << 2)
 //@}
 
 /**
@@ -123,6 +124,17 @@ extern "C" {
 #define GATTLIB_EDDYSTONE_TYPE_EID                          (1 << 3)
 #define GATTLIB_EDDYSTONE_LIMIT_RSSI                        (1 << 4)
 //@}
+
+/**
+ * @name Eddystone ID types defined by its specification: https://github.com/google/eddystone
+ */
+//@{
+#define EDDYSTONE_TYPE_UID                                  0x00
+#define EDDYSTONE_TYPE_URL                                  0x10
+#define EDDYSTONE_TYPE_TLM                                  0x20
+#define EDDYSTONE_TYPE_EID                                  0x30
+//@}
+
 
 typedef struct _gatt_connection_t gatt_connection_t;
 typedef struct _gatt_stream_t gatt_stream_t;
@@ -191,6 +203,18 @@ typedef void (*gatt_connect_cb_t)(gatt_connection_t* connection, void* user_data
  */
 typedef void* (*gatt_read_cb_t)(const void *buffer, size_t buffer_len);
 
+
+/**
+ * @brief Constant defining Eddystone common data UID in Advertisement data
+ */
+extern const uuid_t gattlib_eddystone_common_data_uuid;
+
+/**
+ * @brief List of prefix for Eddystone URL Scheme
+ */
+extern const char *gattlib_eddystone_url_scheme_prefix[];
+
+
 /**
  * @brief Open Bluetooth adapter
  *
@@ -206,12 +230,12 @@ int gattlib_adapter_open(const char* adapter_name, void** adapter);
  *
  * @param adapter is the context of the newly opened adapter
  * @param discovered_device_cb is the function callback called for each new Bluetooth device discovered
- * @param timeout defines the duration of the Bluetooth scanning
+ * @param timeout defines the duration of the Bluetooth scanning. When timeout=0, we scan indefinitely.
  * @param user_data is the data passed to the callback `discovered_device_cb()`
  *
  * @return GATTLIB_SUCCESS on success or GATTLIB_* error code
  */
-int gattlib_adapter_scan_enable(void* adapter, gattlib_discovered_device_t discovered_device_cb, int timeout, void *user_data);
+int gattlib_adapter_scan_enable(void* adapter, gattlib_discovered_device_t discovered_device_cb, size_t timeout, void *user_data);
 
 /**
  * @brief Enable Bluetooth scanning on a given adapter
@@ -223,13 +247,13 @@ int gattlib_adapter_scan_enable(void* adapter, gattlib_discovered_device_t disco
  * @param enabled_filters defines the parameters to use for filtering. There are selected by using the macros
  *        GATTLIB_DISCOVER_FILTER_USE_UUID and GATTLIB_DISCOVER_FILTER_USE_RSSI.
  * @param discovered_device_cb is the function callback called for each new Bluetooth device discovered
- * @param timeout defines the duration of the Bluetooth scanning
+ * @param timeout defines the duration of the Bluetooth scanning. When timeout=0, we scan indefinitely.
  * @param user_data is the data passed to the callback `discovered_device_cb()`
  *
  * @return GATTLIB_SUCCESS on success or GATTLIB_* error code
  */
 int gattlib_adapter_scan_enable_with_filter(void *adapter, uuid_t **uuid_list, int16_t rssi_threshold, uint32_t enabled_filters,
-		gattlib_discovered_device_t discovered_device_cb, int timeout, void *user_data);
+		gattlib_discovered_device_t discovered_device_cb, size_t timeout, void *user_data);
 
 /**
  * @brief Enable Eddystone Bluetooth Device scanning on a given adapter
@@ -240,13 +264,13 @@ int gattlib_adapter_scan_enable_with_filter(void *adapter, uuid_t **uuid_list, i
  *        The types are defined by the macros `GATTLIB_EDDYSTONE_TYPE_*`. The macro `GATTLIB_EDDYSTONE_LIMIT_RSSI`
  *        can also be used to limit RSSI with rssi_threshold.
  * @param discovered_device_cb is the function callback called for each new Bluetooth device discovered
- * @param timeout defines the duration of the Bluetooth scanning
+ * @param timeout defines the duration of the Bluetooth scanning. When timeout=0, we scan indefinitely.
  * @param user_data is the data passed to the callback `discovered_device_cb()`
  *
  * @return GATTLIB_SUCCESS on success or GATTLIB_* error code
  */
 int gattlib_adapter_scan_eddystone(void *adapter, int16_t rssi_threshold, uint32_t eddystone_types,
-		gattlib_discovered_device_with_data_t discovered_device_cb, int timeout, void *user_data);
+		gattlib_discovered_device_with_data_t discovered_device_cb, size_t timeout, void *user_data);
 
 /**
  * @brief Disable Bluetooth scanning on a given adapter
@@ -269,24 +293,24 @@ int gattlib_adapter_close(void* adapter);
 /**
  * @brief Function to connect to a BLE device
  *
- * @param src		Local Adaptater interface
+ * @param adapter	Local Adaptater interface. When passing NULL, we use default adapter.
  * @param dst		Remote Bluetooth address
  * @param options	Options to connect to BLE device. See `GATTLIB_CONNECTION_OPTIONS_*`
  */
-gatt_connection_t *gattlib_connect(const char *src, const char *dst, unsigned long options);
+gatt_connection_t *gattlib_connect(void *adapter, const char *dst, unsigned long options);
 
 /**
  * @brief Function to asynchronously connect to a BLE device
  *
  * @note This function is mainly used before Bluez v5.42 (prior to D-BUS support)
  *
- * @param src		Local Adaptater interface
+ * @param adapter	Local Adaptater interface. When passing NULL, we use default adapter.
  * @param dst		Remote Bluetooth address
  * @param options	Options to connect to BLE device. See `GATTLIB_CONNECTION_OPTIONS_*`
  * @param connect_cb is the callback to call when the connection is established
  * @param user_data is the user specific data to pass to the callback
  */
-gatt_connection_t *gattlib_connect_async(const char *src, const char *dst,
+gatt_connection_t *gattlib_connect_async(void *adapter, const char *dst,
 		unsigned long options,
 		gatt_connect_cb_t connect_cb, void* user_data);
 

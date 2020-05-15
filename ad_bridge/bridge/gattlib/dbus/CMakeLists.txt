@@ -60,6 +60,7 @@ set(gattlib_SRCS gattlib.c
                  gattlib_advertisement.c
                  gattlib_char.c
                  gattlib_stream.c
+                 gattlib_notification.c
                  bluez5/lib/uuid.c
                  ${GATTLIB_ROOT_DIR}/common/gattlib_common.c
                  ${GATTLIB_ROOT_DIR}/common/gattlib_eddystone.c

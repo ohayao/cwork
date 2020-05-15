@@ -6,6 +6,20 @@ include(CrossCompilation.cmake)
 option(GATTLIB_SHARED_LIB "Build GattLib as a shared library" YES)
 option(GATTLIB_BUILD_DOCS "Build GattLib docs" NO)
 
+if (NOT BLUEZ_VERSION)
+	# Check version of Bluez to know which backend we use (ie: Bluez code or DBus)
+	pkg_search_module(BLUEZ bluez)
+	if (NOT BLUEZ_FOUND)
+		message(FATAL_ERROR "Please install 'libbluetooth-dev'")
+	endif()
+endif()
+
+# Extract Bluez version
+string(REPLACE "." ";" BLUEZ_VERSIONS "${BLUEZ_VERSION}")
+list(GET BLUEZ_VERSIONS 0 BLUEZ_VERSION_MAJOR)
+list(GET BLUEZ_VERSIONS 1 BLUEZ_VERSION_MINOR)
+add_definitions(-DBLUEZ_VERSION_MAJOR=${BLUEZ_VERSION_MAJOR} -DBLUEZ_VERSION_MINOR=${BLUEZ_VERSION_MINOR})
+
 find_package(PkgConfig REQUIRED)
 pkg_search_module(GLIB REQUIRED glib-2.0)
 pkg_search_module(GIO_UNIX REQUIRED gio-unix-2.0)

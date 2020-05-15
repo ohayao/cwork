@@ -2,7 +2,7 @@
  *
  *  GattLib - GATT Library
  *
- *  Copyright (C) 2016-2019 Olivier Martin <olivier@labapart.org>
+ *  Copyright (C) 2016-2020 Olivier Martin <olivier@labapart.org>
  *
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -25,6 +25,7 @@
 #define __GATTLIB_INTERNAL_H__
 
 #include <assert.h>
+
 #include "bridge/gattlib/common/gattlib_internal_defs.h"
 #include "bridge/gattlib/gattlib.h"
 
@@ -40,10 +41,14 @@
 #define BLUEZ_VERSION					BLUEZ_VERSIONS(BLUEZ_VERSION_MAJOR, BLUEZ_VERSION_MINOR)
 
 #if BLUEZ_VERSION > BLUEZ_VERSIONS(5, 40)
-	#include "org-bluez-battery1.h"
+	#include "bridge/gattlib/dbus/dbus-bluez-v5.48/org-bluez-battery1.h"
 #endif
 
+#define GATTLIB_DEFAULT_ADAPTER "hci0"
+
 typedef struct {
+	struct gattlib_adapter *adapter;
+
 	char* device_object_path;
 	OrgBluezDevice1* device;
 
@@ -52,7 +57,23 @@ typedef struct {
 	GMainLoop *connection_loop;
 	// ID of the timeout to know if we managed to connect to the device
 	guint connection_timeout;
+
+	// List of DBUS Object managed by 'adapter->device_manager'
+	GList *dbus_objects;
+
+	// List of 'OrgBluezGattCharacteristic1*' which has an attached notification
+	GList *notified_characteristics;
 } gattlib_context_t;
+
+struct gattlib_adapter {
+	GDBusObjectManager *device_manager;
+
+	OrgBluezAdapter1 *adapter_proxy;
+	char* adapter_name;
+
+	GMainLoop *scan_loop;
+	guint timeout_id;
+};
 
 struct dbus_characteristic {
 	union {
@@ -72,10 +93,15 @@ extern const uuid_t m_battery_level_uuid;
 
 gboolean stop_scan_func(gpointer data);
 
+struct gattlib_adapter *init_default_adapter(void);
+GDBusObjectManager *get_device_manager_from_adapter(struct gattlib_adapter *gattlib_adapter);
+
 void get_device_path_from_mac_with_adapter(OrgBluezAdapter1* adapter, const char *mac_address, char *object_path, size_t object_path_len);
 void get_device_path_from_mac(const char *adapter_name, const char *mac_address, char *object_path, size_t object_path_len);
-int get_bluez_device_from_mac(void *adapter, const char *mac_address, OrgBluezDevice1 **bluez_device1);
+int get_bluez_device_from_mac(struct gattlib_adapter *adapter, const char *mac_address, OrgBluezDevice1 **bluez_device1);
 
 struct dbus_characteristic get_characteristic_from_uuid(gatt_connection_t* connection, const uuid_t* uuid);
+
+void disconnect_all_notifications(gattlib_context_t* conn_context);
 
 #endif
