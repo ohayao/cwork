@@ -156,6 +156,26 @@ connectionID 0                              // connectionID 是多少
   
 ### TODO List
 1. 当锁已经被paired, 当前会出错.
+需要如何判断当前已经被paired
+
 2. 发送完成一个命令, 把锁有连接和监听都关闭, unpaired 命令
+
+
+3. 目前已经知道连续unlock的错误, 会有个dbus错误,以及卡在某个消息当中, 目前的gattlib似乎更新了很多,我逐个调查一下.  
+3 和 7 , 可能相同,当时没有详细记录
+
+4. 会有一个segment fault, 
+5. unlock的时候, 出现过一个 2 bytes len, 没法重现当中.
+6. 内存泄漏. 
+7. Device connected error (device:/org/bluez/hci0/dev_D9_78_2F_E3_1A_5C): GDBus.Error:org.bluez.Error.Failed: Software caused nection abort
+报文显示, 是master主动发起的断开. 
+没有出错处理,所以程序自己不能运行了
+相关位置信息:
+10627: 17 May 2020 08:29:37.611 * register_admin_notfication start --------
+10627: 17 May 2020 08:29:37.611 * register_admin_notfication ready to connection D9:78:2F:E3:1A:5C
+Device connected error (device:/org/bluez/hci0/dev_D9_78_2F_E3_1A_5C): GDBus.Error:org.bluez.Error.Failed: Software caused connection abort
+
+
+
 
 

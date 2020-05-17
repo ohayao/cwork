@@ -111,6 +111,7 @@ extern "C" {
 #define GATTLIB_DISCOVER_FILTER_USE_NONE                    0
 #define GATTLIB_DISCOVER_FILTER_USE_UUID                    (1 << 0)
 #define GATTLIB_DISCOVER_FILTER_USE_RSSI                    (1 << 1)
+#define GATTLIB_DISCOVER_FILTER_NOTIFY_CHANGE               (1 << 2)
 //@}
 
 /**
@@ -211,7 +212,7 @@ int gattlib_adapter_open(const char* adapter_name, void** adapter);
  *
  * @return GATTLIB_SUCCESS on success or GATTLIB_* error code
  */
-int gattlib_adapter_scan_enable(void* adapter, gattlib_discovered_device_t discovered_device_cb, int timeout, void *user_data);
+int gattlib_adapter_scan_enable(void* adapter, gattlib_discovered_device_t discovered_device_cb, size_t timeout, void *user_data);
 
 /**
  * @brief Enable Bluetooth scanning on a given adapter
@@ -229,7 +230,7 @@ int gattlib_adapter_scan_enable(void* adapter, gattlib_discovered_device_t disco
  * @return GATTLIB_SUCCESS on success or GATTLIB_* error code
  */
 int gattlib_adapter_scan_enable_with_filter(void *adapter, uuid_t **uuid_list, int16_t rssi_threshold, uint32_t enabled_filters,
-		gattlib_discovered_device_t discovered_device_cb, int timeout, void *user_data);
+		gattlib_discovered_device_t discovered_device_cb, size_t timeout, void *user_data);
 
 /**
  * @brief Enable Eddystone Bluetooth Device scanning on a given adapter
@@ -273,8 +274,8 @@ int gattlib_adapter_close(void* adapter);
  * @param dst		Remote Bluetooth address
  * @param options	Options to connect to BLE device. See `GATTLIB_CONNECTION_OPTIONS_*`
  */
-gatt_connection_t *gattlib_connect(const char *src, const char *dst, unsigned long options);
-
+// addd 
+gatt_connection_t *gattlib_connect(void* adapter, const char *dst, unsigned long options);
 /**
  * @brief Function to asynchronously connect to a BLE device
  *
@@ -286,7 +287,7 @@ gatt_connection_t *gattlib_connect(const char *src, const char *dst, unsigned lo
  * @param connect_cb is the callback to call when the connection is established
  * @param user_data is the user specific data to pass to the callback
  */
-gatt_connection_t *gattlib_connect_async(const char *src, const char *dst,
+gatt_connection_t *gattlib_connect_async(void *adapter, const char *dst,
 		unsigned long options,
 		gatt_connect_cb_t connect_cb, void* user_data);
 

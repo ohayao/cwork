@@ -338,15 +338,15 @@ int write_pairing_commit(void *arg)
     bleSetPairingResultPassword(
       pairing_connection->pairing_result, 1, step4->password, step4->password_size);
       serverLog(LL_NOTICE, "-------------------------step4.has_success ");
-			if (step4->has_password)
-			{
-					printf("step4.has_password: ");
-					for (int j = 0; j < step4->password_size;j++)
-					{
-							printf("%02x ", (step4->password)[j]);
-					}
-					printf("\n");
-			}
+			// if (step4->has_password)
+			// {
+			// 		printf("step4.has_password: ");
+			// 		for (int j = 0; j < step4->password_size;j++)
+			// 		{
+			// 				printf("%02x ", (step4->password)[j]);
+			// 		}
+			// 		printf("\n");
+			// }
 	}
 
   time_t current_time = time(NULL);
@@ -391,11 +391,11 @@ int write_pairing_commit(void *arg)
     bleSetPairingResultAdminKey(
       pairing_connection->pairing_result, 1, admin_key, key_len);
       serverLog(LL_NOTICE, "paired lock admin key:");
-      for (int j = 0; j < key_len; j++)
-      {
-          printf("%02x ", admin_key[j]);
-      }
-      printf("\n");
+      // for (int j = 0; j < key_len; j++)
+      // {
+      //     printf("%02x ", admin_key[j]);
+      // }
+      // printf("\n");
   }
 
   // 返回参数给调用进程

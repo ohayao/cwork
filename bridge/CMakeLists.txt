@@ -1,3 +1,5 @@
+set(CMAKE_BUILD_TYPE Debug)
+
 add_subdirectory("gattlib")
 add_subdirectory("lock")
 add_subdirectory("ble")

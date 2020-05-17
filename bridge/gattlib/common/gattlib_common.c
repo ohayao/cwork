@@ -23,51 +23,15 @@ void gattlib_register_on_disconnect(gatt_connection_t *connection, gattlib_disco
 	connection->disconnection.disconnection_handler = handler;
 	connection->disconnection.user_data = user_data;
 }
-
-#if defined(WITH_PYTHON)
-void gattlib_register_notification_python(gatt_connection_t* connection, PyObject *notification_handler, PyObject *user_data) {
-	connection->notification.type = PYTHON;
-	connection->notification.python_handler = notification_handler;
-	connection->notification.user_data = user_data;
-}
-
-void gattlib_register_indication_python(gatt_connection_t* connection, PyObject *indication_handler, PyObject *user_data) {
-	connection->indication.type = PYTHON;
-	connection->indication.python_handler = indication_handler;
-	connection->indication.user_data = user_data;
-}
-
-void gattlib_register_on_disconnect_python(gatt_connection_t *connection, PyObject *handler, PyObject *user_data) {
-	connection->disconnection.type = PYTHON;
-	connection->disconnection.python_handler = handler;
-	connection->disconnection.user_data = user_data;
-}
-#endif
-
 bool gattlib_has_valid_handler(struct gattlib_handler *handler) {
 	return ((handler->type != UNKNOWN) && (handler->notification_handler != NULL));
 }
 
 void gattlib_call_notification_handler(struct gattlib_handler *handler, const uuid_t* uuid, const uint8_t* data, size_t data_length) {
-	printf("handler->type %d\n", handler->type);
+	
 	if (handler->type == NATIVE_NOTIFICATION) {
 		handler->notification_handler(uuid, data, data_length, handler->user_data);
 	}
-#if defined(WITH_PYTHON)
-	else if (handler->type == PYTHON) {
-		char uuid_str[MAX_LEN_UUID_STR + 1];
-		PyGILState_STATE d_gstate;
-
-		gattlib_uuid_to_string(uuid, uuid_str, sizeof(uuid_str));
-
-		d_gstate = PyGILState_Ensure();
-
-		PyObject *arglist = Py_BuildValue("(sIIO)", uuid_str, data, data_length, handler->user_data);
-		PyEval_CallObject((PyObject *)handler->notification_handler, arglist);
-
-		PyGILState_Release(d_gstate);
-	}
-#endif
 	else {
 		fprintf(stderr, "Invalid notification handler.\n");
 	}
@@ -77,17 +41,6 @@ void gattlib_call_disconnection_handler(struct gattlib_handler *handler) {
 	if (handler->type == NATIVE_DISCONNECTION) {
 		handler->disconnection_handler(handler->user_data);
 	}
-#if defined(WITH_PYTHON)
-	else if (handler->type == PYTHON) {
-	    PyGILState_STATE d_gstate;
-	    d_gstate = PyGILState_Ensure();
-
-	    PyObject *arglist = Py_BuildValue("(O)", handler->user_data);
-	    PyEval_CallObject((PyObject *)handler->disconnection_handler, arglist);
-
-	    PyGILState_Release(d_gstate);
-	}
-#endif
 	else {
 		fprintf(stderr, "Invalid disconnection handler.\n");
 	}

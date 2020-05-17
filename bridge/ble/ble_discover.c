@@ -36,7 +36,7 @@ int discoverLock(void *arg)
   ret = gattlib_adapter_scan_enable(
 		adapter, ble_discovered_device, param->scan_timeout, arg /* task node*/);
 	if (ret) {
-		fprintf(stderr, "ERROR: Failed to scan.\n");
+    serverLog(LL_NOTICE, "ERROR: Failed to scan.");
 		goto EXIT;
 	}
 EXIT:
@@ -75,7 +75,7 @@ void ble_discovered_device(
   reti = regcomp(&regex, "^IGM", 0);
   // reti = regcomp(&regex, "^IGR", 0);
   if (reti) {
-    fprintf(stderr, "Could not compile regex\n");
+    serverLog(LL_ERROR, "Could not compile regex");
     return;
   }
   reti = regexec(&regex, name, 0, NULL, 0);
@@ -120,7 +120,7 @@ int contnueDiscoverLock()
   ret = gattlib_adapter_scan_enable(
 		adapter, continueDiscoveredDevice, 2, NULL /* task node*/);
 	if (ret) {
-		fprintf(stderr, "ERROR: Failed to scan.\n");
+    serverLog(LL_ERROR, "ERROR: Failed to scan.");
 		goto CONTINUE_DISCOVER_EXIT;
 	}
 CONTINUE_DISCOVER_EXIT:
@@ -146,7 +146,7 @@ void continueDiscoveredDevice(
   reti = regcomp(&regex, "^IGM", 0);
   // reti = regcomp(&regex, "^IGR", 0);
   if (reti) {
-    fprintf(stderr, "Could not compile regex\n");
+    serverLog(LL_ERROR, "Could not compile regex");
     return;
   }
   reti = regexec(&regex, name, 0, NULL, 0);

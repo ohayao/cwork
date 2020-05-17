@@ -60,6 +60,7 @@ set(gattlib_SRCS gattlib.c
                  gattlib_advertisement.c
                  gattlib_char.c
                  gattlib_stream.c
+                 gattlib_notification.c
                  bluez5/lib/uuid.c
                  ${GATTLIB_ROOT_DIR}/common/gattlib_common.c
                  ${GATTLIB_ROOT_DIR}/common/gattlib_eddystone.c
@@ -73,7 +74,7 @@ set(gattlib_SRCS gattlib.c
 list(APPEND gattlib_SRCS ${GATTLIB_ROOT_DIR}/dbus/${DBUS_BLUEZ_API}/org-bluez-battery1.c)
 
 
-set(gattlib_LIBS ${GLIB_LDFLAGS} ${GIO_UNIX_LDFLAGS})
+set(gattlib_LIBS ${GLIB_LDFLAGS} ${GIO_UNIX_LDFLAGS} bluetooth)
 
 # Gattlib
 add_library(gattlib SHARED ${gattlib_SRCS})

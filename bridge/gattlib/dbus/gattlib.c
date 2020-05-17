@@ -126,17 +126,28 @@ void get_device_path_from_mac(const char *adapter_name, const char *mac_address,
  * @param psm       Specify the PSM for GATT/ATT over BR/EDR
  * @param mtu       Specify the MTU size
  */
-gatt_connection_t *gattlib_connect(const char *src, const char *dst, unsigned long options)
+
+gatt_connection_t *gattlib_connect(void* adapter, const char *dst, unsigned long options)
 {
+	struct gattlib_adapter *gattlib_adapter = adapter;
+	const char* adapter_name = NULL;
+	GDBusObjectManager *device_manager;
 	GError *error = NULL;
 	char object_path[100];
 
-	get_device_path_from_mac(src, dst, object_path, sizeof(object_path));
+	// In case NULL is passed, we initialized default adapter
+	if (gattlib_adapter == NULL) {
+		gattlib_adapter = init_default_adapter();
+	}
+
+	get_device_path_from_mac(adapter_name, dst, object_path, sizeof(object_path));
 
 	gattlib_context_t* conn_context = calloc(sizeof(gattlib_context_t), 1);
 	if (conn_context == NULL) {
 		return NULL;
 	}
+
+	conn_context->adapter = gattlib_adapter;
 
 	gatt_connection_t* connection = calloc(sizeof(gatt_connection_t), 1);
 	if (connection == NULL) {
@@ -192,11 +203,15 @@ gatt_connection_t *gattlib_connect(const char *src, const char *dst, unsigned lo
 
 	conn_context->connection_timeout = g_timeout_add_seconds(CONNECT_TIMEOUT, stop_scan_func,
 								 conn_context->connection_loop);
+								 
 	g_main_loop_run(conn_context->connection_loop);
 	g_main_loop_unref(conn_context->connection_loop);
 	// Set the attribute to NULL even if not required
 	conn_context->connection_loop = NULL;
 
+	// Get list of objects belonging to Device Manager
+	device_manager = get_device_manager_from_adapter(conn_context->adapter);
+	conn_context->dbus_objects = g_dbus_object_manager_get_objects(device_manager);
 	return connection;
 
 FREE_DEVICE:
@@ -211,13 +226,13 @@ FREE_CONN_CONTEXT:
 	return NULL;
 }
 
-gatt_connection_t *gattlib_connect_async(const char *src, const char *dst,
+gatt_connection_t *gattlib_connect_async(void *adapter, const char *dst,
 				unsigned long options,
 				gatt_connect_cb_t connect_cb, void* data)
 {
 	gatt_connection_t *connection;
 
-	connection = gattlib_connect(src, dst, options);
+	connection = gattlib_connect(adapter, dst, options);
 	if ((connection != NULL) && (connect_cb != NULL)) {
 		connect_cb(connection, data);
 	}
@@ -228,7 +243,8 @@ gatt_connection_t *gattlib_connect_async(const char *src, const char *dst,
 int gattlib_disconnect(gatt_connection_t* connection) {
 	gattlib_context_t* conn_context = connection->context;
 	GError *error = NULL;
-	printf("?????????????????????????????? gattlib_disconnect\n");
+
+
 	org_bluez_device1_call_disconnect_sync(conn_context->device, NULL, &error);
 	if (error) {
 		fprintf(stderr, "Failed to disconnect DBus Bluez Device: %s\n", error->message);
@@ -237,6 +253,8 @@ int gattlib_disconnect(gatt_connection_t* connection) {
 
 	free(conn_context->device_object_path);
 	g_object_unref(conn_context->device);
+	g_list_free_full(conn_context->dbus_objects, g_object_unref);
+	disconnect_all_notifications(conn_context);
 
 	free(connection->context);
 	free(connection);
@@ -466,159 +484,6 @@ ON_DEVICE_MANAGER_ERROR:
 }
 #endif
 
-// Bluez was using org.bluez.Device1.GattServices until 5.37 to expose the list of available GATT Services
-#if BLUEZ_VERSION < BLUEZ_VERSIONS(5, 38)
-int gattlib_discover_char_range(gatt_connection_t* connection, int start, int end, gattlib_characteristic_t** characteristics, int* characteristics_count) {
-	gattlib_context_t* conn_context = connection->context;
-	OrgBluezDevice1* device = conn_context->device;
-	GError *error = NULL;
-	int handle;
-
-	const gchar* const* service_strs = org_bluez_device1_get_gatt_services(device);
-	const gchar* const* service_str;
-	const gchar* const* characteristic_strs;
-	const gchar* characteristic_str;
-
-	if (service_strs == NULL) {
-		return GATTLIB_INVALID_PARAMETER;
-	}
-
-	// Maximum number of primary services
-	int count_max = 0, count = 0;
-	for (service_str = service_strs; *service_str != NULL; service_str++) {
-		error = NULL;
-		OrgBluezGattService1* service_proxy = org_bluez_gatt_service1_proxy_new_for_bus_sync(
-				G_BUS_TYPE_SYSTEM,
-				G_DBUS_OBJECT_MANAGER_CLIENT_FLAGS_NONE,
-				"org.bluez",
-				*service_str,
-				NULL,
-				&error);
-		if (service_proxy == NULL) {
-			if (error) {
-				fprintf(stderr, "Failed to open services '%s': %s\n", *service_str, error->message);
-				g_error_free(error);
-			} else {
-				fprintf(stderr, "Failed to open services '%s'.\n", *service_str);
-			}
-			continue;
-		}
-
-		characteristic_strs = org_bluez_gatt_service1_get_characteristics(service_proxy);
-		if (characteristic_strs == NULL) {
-			g_object_unref(service_proxy);
-			continue;
-		}
-
-		for (characteristic_str = *characteristic_strs; characteristic_str != NULL; characteristic_str++) {
-			// Object path is in the form '/org/bluez/hci0/dev_DE_79_A2_A1_E9_FA/service0024/char0029'.
-			// We convert the last 4 hex characters into the handle
-			sscanf(characteristic_str + strlen(characteristic_str) - 4, "%x", &handle);
-
-			// Check if handle is in range
-			if ((handle < start) || (handle > end)) {
-				continue;
-			}
-
-			count_max++;
-		}
-
-		g_object_unref(service_proxy);
-	}
-
-
-	gattlib_characteristic_t* characteristic_list = malloc(count_max * sizeof(gattlib_characteristic_t));
-	if (characteristic_list == NULL) {
-		return GATTLIB_OUT_OF_MEMORY;
-	}
-
-	for (service_str = service_strs; *service_str != NULL; service_str++) {
-		error = NULL;
-		OrgBluezGattService1* service_proxy = org_bluez_gatt_service1_proxy_new_for_bus_sync(
-				G_BUS_TYPE_SYSTEM,
-				G_DBUS_OBJECT_MANAGER_CLIENT_FLAGS_NONE,
-				"org.bluez",
-				*service_str,
-				NULL,
-				&error);
-		if (service_proxy == NULL) {
-			if (error) {
-				fprintf(stderr, "Failed to open service '%s': %s\n", *service_str, error->message);
-				g_error_free(error);
-			} else {
-				fprintf(stderr, "Failed to open service '%s'.\n", *service_str);
-			}
-			continue;
-		}
-
-		characteristic_strs = org_bluez_gatt_service1_get_characteristics(service_proxy);
-		if (characteristic_strs == NULL) {
-			g_object_unref(service_proxy);
-			continue;
-		}
-
-		for (characteristic_str = *characteristic_strs; characteristic_str != NULL; characteristic_str++) {
-			// Object path is in the form '/org/bluez/hci0/dev_DE_79_A2_A1_E9_FA/service0024/char0029'.
-			// We convert the last 4 hex characters into the handle
-			sscanf(characteristic_str + strlen(characteristic_str) - 4, "%x", &handle);
-
-			// Check if handle is in range
-			if ((handle < start) || (handle > end)) {
-				continue;
-			}
-
-			OrgBluezGattCharacteristic1 *characteristic_proxy = org_bluez_gatt_characteristic1_proxy_new_for_bus_sync(
-					G_BUS_TYPE_SYSTEM,
-					G_DBUS_OBJECT_MANAGER_CLIENT_FLAGS_NONE,
-					"org.bluez",
-					characteristic_str,
-					NULL,
-					&error);
-			if (characteristic_proxy == NULL) {
-				if (error) {
-					fprintf(stderr, "Failed to open characteristic '%s': %s\n", characteristic_str, error->message);
-					g_error_free(error);
-				} else {
-					fprintf(stderr, "Failed to open characteristic '%s'.\n", characteristic_str);
-				}
-				continue;
-			} else {
-				characteristic_list[count].handle       = 0;
-				characteristic_list[count].value_handle = 0;
-
-				const gchar *const * flags = org_bluez_gatt_characteristic1_get_flags(characteristic_proxy);
-				for (; *flags != NULL; flags++) {
-					if (strcmp(*flags,"broadcast") == 0) {
-						characteristic_list[count].properties |= GATTLIB_CHARACTERISTIC_BROADCAST;
-					} else if (strcmp(*flags,"read") == 0) {
-						characteristic_list[count].properties |= GATTLIB_CHARACTERISTIC_READ;
-					} else if (strcmp(*flags,"write") == 0) {
-						characteristic_list[count].properties |= GATTLIB_CHARACTERISTIC_WRITE;
-					} else if (strcmp(*flags,"write-without-response") == 0) {
-						characteristic_list[count].properties |= GATTLIB_CHARACTERISTIC_WRITE_WITHOUT_RESP;
-					} else if (strcmp(*flags,"notify") == 0) {
-						characteristic_list[count].properties |= GATTLIB_CHARACTERISTIC_NOTIFY;
-					} else if (strcmp(*flags,"indicate") == 0) {
-						characteristic_list[count].properties |= GATTLIB_CHARACTERISTIC_INDICATE;
-					}
-				}
-
-				gattlib_string_to_uuid(
-						org_bluez_gatt_characteristic1_get_uuid(characteristic_proxy),
-						MAX_LEN_UUID_STR + 1,
-						&characteristic_list[count].uuid);
-				count++;
-			}
-			g_object_unref(characteristic_proxy);
-		}
-		g_object_unref(service_proxy);
-	}
-
-	*characteristics       = characteristic_list;
-	*characteristics_count = count;
-	return GATTLIB_SUCCESS;
-}
-#else
 static void add_characteristics_from_service(GDBusObjectManager *device_manager, const char* service_object_path, int start, int end,
 					     gattlib_characteristic_t* characteristic_list, int* count)
 {
@@ -795,7 +660,6 @@ int gattlib_discover_char_range(gatt_connection_t* connection, int start, int en
 	*characteristics_count = count;
 	return GATTLIB_SUCCESS;
 }
-#endif
 
 int gattlib_discover_char(gatt_connection_t* connection, gattlib_characteristic_t** characteristics, int* characteristics_count)
 {
@@ -847,236 +711,6 @@ gboolean on_handle_battery_level_property_change(
 }
 #endif
 
-static gboolean on_handle_characteristic_property_change(
-	    OrgBluezGattCharacteristic1 *object,
-	    GVariant *arg_changed_properties,
-	    const gchar *const *arg_invalidated_properties,
-	    gpointer user_data)
-{
-	printf("xxxxxxxxxxxxxxx on_handle_characteristic_property_change\n");
-	gatt_connection_t* connection = user_data;
-
-	if (gattlib_has_valid_handler(&connection->notification)) {
-			printf("xxxxxxxxxxxxxxx gattlib_has_valid_handler\n");
-		// Retrieve 'Value' from 'arg_changed_properties'
-		if (g_variant_n_children (arg_changed_properties) > 0) {
-			GVariantIter *iter;
-			const gchar *key;
-			GVariant *value;
-
-			g_variant_get (arg_changed_properties, "a{sv}", &iter);
-			while (g_variant_iter_loop (iter, "{&sv}", &key, &value)) {
-				if (strcmp(key, "Value") == 0) {
-					uuid_t uuid;
-					size_t data_length;
-					const uint8_t* data = g_variant_get_fixed_array(value, &data_length, sizeof(guchar));
-
-					gattlib_string_to_uuid(
-							org_bluez_gatt_characteristic1_get_uuid(object),
-							MAX_LEN_UUID_STR + 1,
-							&uuid);
-
-					gattlib_call_notification_handler(&connection->notification,
-							&uuid, data, data_length);
-					break;
-				}
-			}
-			g_variant_iter_free(iter);
-		}
-	}
-	return TRUE;
-}
-
-static gboolean on_handle_characteristic_indication(
-	    OrgBluezGattCharacteristic1 *object,
-	    GVariant *arg_changed_properties,
-	    const gchar *const *arg_invalidated_properties,
-	    gpointer user_data)
-{
-	printf("gattlibc on_handle_characteristic_indication \n");
-	gatt_connection_t* connection = user_data;
-
-	if (gattlib_has_valid_handler(&connection->indication)) {
-			printf("gattlibc gattlib_has_valid_handler \n");
-		// Retrieve 'Value' from 'arg_changed_properties'
-		if (g_variant_n_children (arg_changed_properties) > 0) {
-			printf("gattlibc g_variant_n_children (arg_changed_properties)  \n");
-			GVariantIter *iter;
-			const gchar *key;
-			GVariant *value;
-
-			g_variant_get (arg_changed_properties, "a{sv}", &iter);
-			while (g_variant_iter_loop (iter, "{&sv}", &key, &value)) {
-				printf("gattlibc g_variant_iter_loop \n");
-				if (strcmp(key, "Value") == 0) {
-					printf("gattlibc strcmp(key, Value \n");
-					uuid_t uuid;
-					size_t data_length;
-					const uint8_t* data = g_variant_get_fixed_array(value, &data_length, sizeof(guchar));
-
-					gattlib_string_to_uuid(
-							org_bluez_gatt_characteristic1_get_uuid(object),
-							MAX_LEN_UUID_STR + 1,
-							&uuid);
-
-					gattlib_call_notification_handler(&connection->indication,
-							&uuid, data, data_length);
-					break;
-				}
-			}
-			g_variant_iter_free(iter);
-		}
-	}
-	return TRUE;
-}
-
-int gattlib_notification_start(gatt_connection_t* connection, const uuid_t* uuid) {
-	struct dbus_characteristic dbus_characteristic = 
-		get_characteristic_from_uuid(connection, uuid);
-	if (dbus_characteristic.type == TYPE_NONE) {
-		return GATTLIB_NOT_FOUND;
-	}
-#if BLUEZ_VERSION > BLUEZ_VERSIONS(5, 40)
-	else if (dbus_characteristic.type == TYPE_BATTERY_LEVEL) {
-		// Register a handle for notification
-		g_signal_connect(dbus_characteristic.battery,
-			"g-properties-changed",
-			G_CALLBACK (on_handle_battery_level_property_change),
-			connection);
-
-		return GATTLIB_SUCCESS;
-	} else {
-		assert(dbus_characteristic.type == TYPE_GATT);
-	}
-#endif
-	// Register a handle for notification
-	g_signal_connect(dbus_characteristic.gatt,
-		"g-properties-changed",
-		G_CALLBACK (on_handle_characteristic_property_change),
-		connection);
-
-	GError *error = NULL;
-	org_bluez_gatt_characteristic1_call_start_notify_sync(
-		dbus_characteristic.gatt, NULL, &error);
-
-	if (error) {
-		fprintf(stderr, "Failed to start DBus GATT notification: %s\n", error->message);
-		g_error_free(error);
-		return GATTLIB_ERROR_DBUS;
-	} else {
-		return GATTLIB_SUCCESS;
-	}
-}
-
-int gattlib_notification_stop(gatt_connection_t* connection, const uuid_t* uuid) {
-	printf("???????????????????????? gattlib_notification_stop");
-	struct dbus_characteristic dbus_characteristic = get_characteristic_from_uuid(connection, uuid);
-	if (dbus_characteristic.type == TYPE_NONE) {
-		return GATTLIB_NOT_FOUND;
-	}
-// #if BLUEZ_VERSION > BLUEZ_VERSIONS(5, 40)
-	// else if (dbus_characteristic.type == TYPE_BATTERY_LEVEL) {
-	// 	g_signal_handlers_disconnect_by_func(
-	// 			dbus_characteristic.battery,
-	// 			G_CALLBACK (on_handle_battery_level_property_change),
-	// 			connection);
-	// 	return GATTLIB_SUCCESS;
-	// } else {
-	// 	assert(dbus_characteristic.type == TYPE_GATT);
-	// }
-// #endif
-
-	g_signal_handlers_disconnect_by_func(
-			dbus_characteristic.gatt,
-			G_CALLBACK (on_handle_characteristic_property_change),
-			connection);
-
-	GError *error = NULL;
-	org_bluez_gatt_characteristic1_call_stop_notify_sync(
-		dbus_characteristic.gatt, NULL, &error);
-
-	if (error) {
-		fprintf(stderr, "Failed to stop DBus GATT notification: %s\n", error->message);
-		g_error_free(error);
-		return GATTLIB_NOT_FOUND;
-	} else {
-		return GATTLIB_SUCCESS;
-	}
-}
-
-int gattlib_indication_start(gatt_connection_t* connection, const uuid_t* uuid) {
-	struct dbus_characteristic dbus_characteristic = get_characteristic_from_uuid(connection, uuid);
-	if (dbus_characteristic.type == TYPE_NONE) {
-		return GATTLIB_NOT_FOUND;
-	}
-	
-#if BLUEZ_VERSION > BLUEZ_VERSIONS(5, 40)
-	else if (dbus_characteristic.type == TYPE_BATTERY_LEVEL) {
-		printf("gattlibc BLUEZ_VERSION > BLUEZ_VERSIONS(5, 40)\n");
-		printf("gattlibc dbus_characteristic.type == TYPE_BATTERY_LEVEL\n");
-		// Register a handle for notification
-		g_signal_connect(dbus_characteristic.battery,
-			"g-properties-changed",
-			G_CALLBACK (on_handle_battery_level_property_change),
-			connection);
-
-		return GATTLIB_SUCCESS;
-	} else {
-		assert(dbus_characteristic.type == TYPE_GATT);
-	}
-#endif
-	// Register a handle for notification
-	g_signal_connect(dbus_characteristic.gatt,
-		"g-properties-changed",
-		G_CALLBACK (on_handle_characteristic_indication),
-		connection);
-
-	GError *error = NULL;
-	org_bluez_gatt_characteristic1_call_start_notify_sync(dbus_characteristic.gatt, NULL, &error);
-
-	if (error) {
-		fprintf(stderr, "Failed to start DBus GATT indication: %s\n", error->message);
-		g_error_free(error);
-		return GATTLIB_ERROR_DBUS;
-	} else {
-		return GATTLIB_SUCCESS;
-	}
-}
-
-int gattlib_indication_stop(gatt_connection_t* connection, const uuid_t* uuid) {
-	struct dbus_characteristic dbus_characteristic = get_characteristic_from_uuid(connection, uuid);
-	if (dbus_characteristic.type == TYPE_NONE) {
-		return GATTLIB_NOT_FOUND;
-	}
-#if BLUEZ_VERSION > BLUEZ_VERSIONS(5, 40)
-	else if (dbus_characteristic.type == TYPE_BATTERY_LEVEL) {
-		g_signal_handlers_disconnect_by_func(
-				dbus_characteristic.battery,
-				G_CALLBACK (on_handle_battery_level_property_change),
-				connection);
-		return GATTLIB_SUCCESS;
-	} else {
-		assert(dbus_characteristic.type == TYPE_GATT);
-	}
-#endif
-
-	g_signal_handlers_disconnect_by_func(
-			dbus_characteristic.gatt,
-			G_CALLBACK (on_handle_characteristic_indication),
-			connection);
-
-	GError *error = NULL;
-	org_bluez_gatt_characteristic1_call_stop_notify_sync(
-		dbus_characteristic.gatt, NULL, &error);
-
-	if (error) {
-		fprintf(stderr, "Failed to stop DBus GATT indication: %s\n", error->message);
-		g_error_free(error);
-		return GATTLIB_NOT_FOUND;
-	} else {
-		return GATTLIB_SUCCESS;
-	}
-}
 
 int get_bluez_device_from_mac(void *adapter, const char *mac_address, OrgBluezDevice1 **bluez_device1)
 {

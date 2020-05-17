@@ -161,7 +161,7 @@ int HeartBeat(){
 
 int GetUserInfo(void* si) {
 	//send request to server to get userinfo
-	printf("send request to server to get userinfo!\n");
+    serverLog(LL_NOTICE, "send request to server to get userinfo!");
     return 0;
 }
 
@@ -174,24 +174,24 @@ int GetUserInfo(void* si) {
 // 首先实现这个扫描的 
 int ScanLock(void* tn) {
 	//Scan and connect with locks
-	printf("scan & connect with locks!\n");
+    serverLog(LL_NOTICE, "scan & connect with locks!");
     return 0;
 }
 
 int UpdateLockState(void* tn) {
 	//update lock status to server
-	printf("update lock status to server!\n");
+    serverLog(LL_NOTICE, "update lock status to server!");
     return 0;
 }
 
 int UnLock(void* tn) {
 	//unlock
-	printf("unlock!\n");
+    serverLog(LL_NOTICE, "unlock!");
     return 0;
 }
 
 int BLEParing(void* tn){
-	printf("BLEParing!\n");
+    serverLog(LL_NOTICE, "BLEParing!");
     return 0;
 }
 

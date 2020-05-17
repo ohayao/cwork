@@ -39,6 +39,7 @@ static bool handle_dbus_gattcharacteristic_from_path(
 	struct dbus_characteristic *dbus_characteristic, 
 	const char* object_path, GError **error)
 {
+	printf("handle_dbus_gattcharacteristic_from_path\n");
 	OrgBluezGattCharacteristic1 *characteristic = NULL;
 
 	*error = NULL;
@@ -92,31 +93,6 @@ static bool handle_dbus_gattcharacteristic_from_path(
 
 	return false;
 }
-
-#if BLUEZ_VERSION > BLUEZ_VERSIONS(5, 40)
-static bool handle_dbus_battery_from_uuid(gattlib_context_t* conn_context, const uuid_t* uuid,
-		struct dbus_characteristic *dbus_characteristic, const char* object_path, GError **error)
-{
-	OrgBluezBattery1 *battery = NULL;
-
-	*error = NULL;
-	battery = org_bluez_battery1_proxy_new_for_bus_sync (
-			G_BUS_TYPE_SYSTEM,
-			G_DBUS_OBJECT_MANAGER_CLIENT_FLAGS_NONE,
-			"org.bluez",
-			object_path,
-			NULL,
-			error);
-	if (battery) {
-		dbus_characteristic->battery = battery;
-		dbus_characteristic->type = TYPE_BATTERY_LEVEL;
-	}
-
-	return false;
-}
-#endif
-
-
 
 struct dbus_characteristic get_characteristic_from_uuid(gatt_connection_t* connection, const uuid_t* uuid) {
 	gattlib_context_t* conn_context = connection->context;
