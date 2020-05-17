@@ -306,7 +306,7 @@ int DoWebMsg(char *topic,void *payload){
     int msg_id = rand() % 25532;
     serverLog(LL_NOTICE, "addDiscoverTask msg_id %d", msg_id);
     igm_lock_t lock;
-    lockSetName(&lock, "IGM303e31a5c", strlen("IGM303e31a5c"));
+    setLockName(&lock, "IGM303e31a5c", strlen("IGM303e31a5c"));
     // addPairingTask(&lock, msg_id);
     addAdminTask(&lock, msg_id);
     // addPairingTask(&lock, msg_id);
@@ -728,9 +728,9 @@ void TimerStop(int signum) {
     passwd[16] = '\0';
     igm_lock_t lock;
     int msg_id = 4;
-    lockInit(&lock);
-    lockSetAddr(&lock, lock_addr, strlen(lock_addr));
-    serverLog(LL_NOTICE, "lockSetAddr");
+    initLock(&lock);
+    setLockAddr(&lock, lock_addr, strlen(lock_addr));
+    serverLog(LL_NOTICE, "setLockAddr");
     uint8_t tmp_buff[100];
     memset(tmp_buff, 0, sizeof(tmp_buff));
     int admin_len = hexStrToByte(admin_key, tmp_buff, strlen(admin_key));
@@ -776,16 +776,19 @@ int WaitBLE(void *arg){
         passwd[16] = '\0';
         igm_lock_t lock;
         int msg_id = 4;
-        lockInit(&lock);
-        lockSetAddr(&lock, lock_addr, strlen(lock_addr));
-        serverLog(LL_NOTICE, "lockSetAddr");
+        initLock(&lock);
+        // 这分配了一个字符串
+        setLockAddr(&lock, lock_addr, strlen(lock_addr));
+        serverLog(LL_NOTICE, "setLockAddr");
         uint8_t tmp_buff[100];
         memset(tmp_buff, 0, sizeof(tmp_buff));
         int admin_len = hexStrToByte(admin_key, tmp_buff, strlen(admin_key));
+        // 这也分配了一个二进制的刘
         setLockAdminKey(&lock, tmp_buff, admin_len);
         serverLog(LL_NOTICE, "setLockAdminKey");
         memset(tmp_buff, 0, sizeof(tmp_buff));
         int password_size = hexStrToByte(passwd, tmp_buff, strlen(passwd));
+        // 这也分配了一个二进制的流
         setLockPassword(&lock, tmp_buff, password_size);
         serverLog(LL_NOTICE, "setLockPassword");
         addAdminUnlockTask(&lock, msg_id);

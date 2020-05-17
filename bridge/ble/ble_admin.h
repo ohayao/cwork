@@ -35,7 +35,7 @@ typedef struct BLEAdminParam {
 }ble_admin_param_t;
 
 int bleInitAdminParam(ble_admin_param_t *unpair_param);
-int bleReleaseAdminParam(ble_admin_param_t *unpair_param);
+int bleReleaseAdminParam(ble_admin_param_t **punpair_param);
 int bleSetAdminParam(ble_admin_param_t *unpair_param, igm_lock_t *lock);
 
 typedef struct BLEAdminResult {

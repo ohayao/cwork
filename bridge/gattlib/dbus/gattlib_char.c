@@ -33,7 +33,7 @@
 static bool handle_dbus_gattcharacteristic_from_path(gattlib_context_t* conn_context, const uuid_t* uuid,
 		struct dbus_characteristic *dbus_characteristic, const char* object_path, GError **error)
 {
-	printf("handle_dbus_gattcharacteristic_from_path\n");
+	// printf("handle_dbus_gattcharacteristic_from_path\n");
 	OrgBluezGattCharacteristic1 *characteristic = NULL;
 
 	*error = NULL;

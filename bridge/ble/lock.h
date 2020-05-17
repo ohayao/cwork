@@ -26,26 +26,34 @@ typedef struct IGMLock{
   int connectionID;
 }igm_lock_t;
 
-int lockInit(igm_lock_t *lock);
-int lockCopy(igm_lock_t *to, igm_lock_t *from);
-int lockSetName(igm_lock_t *lock, const char *name_, int name_len_);
-int lockSetAddr(igm_lock_t *lock, const char *addr_, int addr_len_);
-void printLock (igm_lock_t *lock);
+int getLock(igm_lock_t **pp_lock);
+int initLock(igm_lock_t *lock);
+int copyLock(igm_lock_t *to, igm_lock_t *from);
+// 不会泄漏
+int setLockName(igm_lock_t *lock, const char *name_, int name_len_);
+int setLockAddr(igm_lock_t *lock, const char *addr_, int addr_len_);
+
+
+void printLock(igm_lock_t *lock);
+
 int isLockPaired(igm_lock_t *lock);
 int isLockAdmin(igm_lock_t *lock);
 int setLockPaired(igm_lock_t *lock);
 int setLockConnectionID(igm_lock_t *lock, int ID);
 
+// 可能泄漏操作
 int releaseLockAminKey(igm_lock_t *lock);
 int releaseLockPassword(igm_lock_t *lock);
 int setLockAdminKey(igm_lock_t *lock, 
   uint8_t *admin_key, int admin_key_len);
 int setLockPassword(igm_lock_t *lock, 
   uint8_t *password, int password_size);
+
 int getLockAdminKey(igm_lock_t *lock, 
   uint8_t *admin_key, int *p_admin_key_len);
 int getLockPassword(igm_lock_t *lock, 
   uint8_t *password, int *p_password_size);
 
+void releaseLock(igm_lock_t **pp_lock);
 // isLockGuest()
 #endif

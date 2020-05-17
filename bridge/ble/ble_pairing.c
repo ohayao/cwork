@@ -734,7 +734,7 @@ int bleSetPairingParam(ble_pairing_param_t *pairing_param, igm_lock_t *lock)
 {
   bleReleaseParingParam(pairing_param);
   pairing_param->lock = calloc(sizeof(igm_lock_t), 1);
-  // lockCopy(pairing_param->lock, lock);
+  // copyLock(pairing_param->lock, lock);
   serverLog(LL_NOTICE, "bleSetPairingParam sizeof %d", sizeof(igm_lock_t));
   memcpy(pairing_param->lock, lock, sizeof(igm_lock_t));
   return 0;

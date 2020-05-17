@@ -303,7 +303,7 @@ int DoWebMsg(char *topic,void *payload){
     int msg_id = rand() % 25532;
     serverLog(LL_NOTICE, "addDiscoverTask msg_id %d", msg_id);
     igm_lock_t lock;
-    lockSetName(&lock, "IGM303e31a5c", strlen("IGM303e31a5c"));
+    setLockName(&lock, "IGM303e31a5c", strlen("IGM303e31a5c"));
     // addPairingTask(&lock, msg_id);
     addAdminTask(&lock, msg_id);
     // addPairingTask(&lock, msg_id);
@@ -739,11 +739,11 @@ int main(int argc, char *argv[]) {
     }
 
     int msg_id = 1;
-    // addDiscoverTask(1);
+    addDiscoverTask(1);
     igm_lock_t lock;
-    lockInit(&lock);
-    lockSetAddr(&lock, argv[1], strlen(argv[1]));
-    serverLog(LL_NOTICE, "lockSetAddr");
+    initLock(&lock);
+    setLockAddr(&lock, argv[1], strlen(argv[1]));
+    serverLog(LL_NOTICE, "setLockAddr");
     uint8_t tmp_buff[100];
     memset(tmp_buff, 0, sizeof(tmp_buff));
     int admin_len = hexStrToByte(argv[2], tmp_buff, strlen(argv[2]));

@@ -30,7 +30,7 @@ int isLocksListEmpty()
 int insertLock(igm_lock_t *lock)
 {
   igm_lock_t *new_lock = (igm_lock_t *)malloc(sizeof(igm_lock_t));
-  lockCopy(new_lock, lock);
+  copyLock(new_lock, lock);
   _lock();
   list_add(&(new_lock->list), &locks_head);
   _unlock();
