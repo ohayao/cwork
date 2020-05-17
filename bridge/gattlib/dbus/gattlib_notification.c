@@ -104,7 +104,6 @@ static int connect_signal_to_characteristic_uuid(gatt_connection_t* connection, 
 		"g-properties-changed",
 		G_CALLBACK(callback),
 		connection);
-
 	if (signal_id == 0) {
 		fprintf(stderr, "Failed to connect signal to DBus GATT notification\n");
 		return GATTLIB_ERROR_DBUS;

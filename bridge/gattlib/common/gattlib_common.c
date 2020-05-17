@@ -28,10 +28,37 @@ bool gattlib_has_valid_handler(struct gattlib_handler *handler) {
 }
 
 void gattlib_call_notification_handler(struct gattlib_handler *handler, const uuid_t* uuid, const uint8_t* data, size_t data_length) {
+<<<<<<< HEAD
 	
 	if (handler->type == NATIVE_NOTIFICATION) {
 		handler->notification_handler(uuid, data, data_length, handler->user_data);
 	}
+=======
+	if (handler->type == NATIVE_NOTIFICATION) {
+		handler->notification_handler(uuid, data, data_length, handler->user_data);
+	}
+#if defined(WITH_PYTHON)
+	else if (handler->type == PYTHON) {
+		char uuid_str[MAX_LEN_UUID_STR + 1];
+		PyGILState_STATE d_gstate;
+
+		gattlib_uuid_to_string(uuid, uuid_str, sizeof(uuid_str));
+
+		d_gstate = PyGILState_Ensure();
+
+		const char* argument_string;
+		if (sizeof(void*) == 8) {
+			argument_string = "(sLIO)";
+		} else {
+			argument_string = "(sIIO)";
+		}
+		PyObject *arglist = Py_BuildValue(argument_string, uuid_str, data, data_length, handler->user_data);
+		PyEval_CallObject((PyObject *)handler->notification_handler, arglist);
+
+		PyGILState_Release(d_gstate);
+	}
+#endif
+>>>>>>> 514ebaf0a34f10093fe516f9e215f93ab8a49e19
 	else {
 		fprintf(stderr, "Invalid notification handler.\n");
 	}

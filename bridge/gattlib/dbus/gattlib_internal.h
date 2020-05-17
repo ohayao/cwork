@@ -2,7 +2,7 @@
  *
  *  GattLib - GATT Library
  *
- *  Copyright (C) 2016-2019 Olivier Martin <olivier@labapart.org>
+ *  Copyright (C) 2016-2020 Olivier Martin <olivier@labapart.org>
  *
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -25,6 +25,7 @@
 #define __GATTLIB_INTERNAL_H__
 
 #include <assert.h>
+
 #include "bridge/gattlib/common/gattlib_internal_defs.h"
 #include "bridge/gattlib/gattlib.h"
 
@@ -75,7 +76,6 @@ struct gattlib_adapter {
 	guint timeout_id;
 };
 
-
 struct dbus_characteristic {
 	union {
 		OrgBluezGattCharacteristic1 *gatt;
@@ -96,7 +96,7 @@ GDBusObjectManager *get_device_manager_from_adapter(struct gattlib_adapter *gatt
 
 void get_device_path_from_mac_with_adapter(OrgBluezAdapter1* adapter, const char *mac_address, char *object_path, size_t object_path_len);
 void get_device_path_from_mac(const char *adapter_name, const char *mac_address, char *object_path, size_t object_path_len);
-int get_bluez_device_from_mac(void *adapter, const char *mac_address, OrgBluezDevice1 **bluez_device1);
+int get_bluez_device_from_mac(struct gattlib_adapter *adapter, const char *mac_address, OrgBluezDevice1 **bluez_device1);
 
 struct dbus_characteristic get_characteristic_from_uuid(gatt_connection_t* connection, const uuid_t* uuid);
 

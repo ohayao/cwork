@@ -907,7 +907,7 @@ int register_admin_notfication(void *arg)
   serverLog(LL_NOTICE, "register_admin_notfication ready to connection %s",
                                                             param->lock->addr);
   admin_connection->gatt_connection = gattlib_connect(
-    NULL, param->lock->addr, GATTLIB_CONNECTION_OPTIONS_LEGACY_DEFAULT);
+    ble_data->adapter, param->lock->addr, GATTLIB_CONNECTION_OPTIONS_LEGACY_DEFAULT);
   if (admin_connection->gatt_connection == NULL) {
 		serverLog(LL_ERROR, "Fail to connect to the bluetooth device." );
 		goto ADMIN_ERROR_EXIT;
