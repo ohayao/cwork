@@ -297,13 +297,8 @@ int gattlib_adapter_close(void* adapter);
  * @param dst		Remote Bluetooth address
  * @param options	Options to connect to BLE device. See `GATTLIB_CONNECTION_OPTIONS_*`
  */
-<<<<<<< HEAD
 // addd 
 gatt_connection_t *gattlib_connect(void* adapter, const char *dst, unsigned long options);
-=======
-gatt_connection_t *gattlib_connect(void *adapter, const char *dst, unsigned long options);
-
->>>>>>> 514ebaf0a34f10093fe516f9e215f93ab8a49e19
 /**
  * @brief Function to asynchronously connect to a BLE device
  *

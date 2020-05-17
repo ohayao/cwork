@@ -126,10 +126,6 @@ void get_device_path_from_mac(const char *adapter_name, const char *mac_address,
  * @param psm       Specify the PSM for GATT/ATT over BR/EDR
  * @param mtu       Specify the MTU size
  */
-<<<<<<< HEAD
-
-=======
->>>>>>> 514ebaf0a34f10093fe516f9e215f93ab8a49e19
 gatt_connection_t *gattlib_connect(void* adapter, const char *dst, unsigned long options)
 {
 	struct gattlib_adapter *gattlib_adapter = adapter;
@@ -149,8 +145,6 @@ gatt_connection_t *gattlib_connect(void* adapter, const char *dst, unsigned long
 	if (conn_context == NULL) {
 		return NULL;
 	}
-	conn_context->adapter = gattlib_adapter;
-
 	conn_context->adapter = gattlib_adapter;
 
 	gatt_connection_t* connection = calloc(sizeof(gatt_connection_t), 1);
@@ -470,8 +464,10 @@ int gattlib_discover_primary(gatt_connection_t* connection, gattlib_primary_serv
 }
 #endif
 
-static void add_characteristics_from_service(GDBusObjectManager *device_manager, const char* service_object_path, int start, int end,
-					     gattlib_characteristic_t* characteristic_list, int* count)
+static void add_characteristics_from_service(gattlib_context_t* conn_context, GDBusObjectManager *device_manager,
+			const char* service_object_path,
+			int start, int end,
+			gattlib_characteristic_t* characteristic_list, int* count)
 {
 	GError *error = NULL;
 

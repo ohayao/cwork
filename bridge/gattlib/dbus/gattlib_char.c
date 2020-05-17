@@ -30,11 +30,6 @@
 #define BLUEZ_GATT_WRITE_VALUE_TYPE_WRITE_WITHOUT_RESPONSE  (1 << 1)
 #define BLUEZ_GATT_WRITE_VALUE_TYPE_RELIABLE_WRITE          (1 << 2)
 
-
-const uuid_t m_battery_level_uuid = CREATE_UUID16(0x2A19);
-static const uuid_t m_ccc_uuid = CREATE_UUID16(0x2902);
-
-
 static bool handle_dbus_gattcharacteristic_from_path(gattlib_context_t* conn_context, const uuid_t* uuid,
 		struct dbus_characteristic *dbus_characteristic, const char* object_path, GError **error)
 {
@@ -90,37 +85,10 @@ static bool handle_dbus_gattcharacteristic_from_path(gattlib_context_t* conn_con
 	return false;
 }
 
-<<<<<<< HEAD
-=======
-#if BLUEZ_VERSION > BLUEZ_VERSIONS(5, 40)
-static bool handle_dbus_battery_from_uuid(gattlib_context_t* conn_context, const uuid_t* uuid,
-		struct dbus_characteristic *dbus_characteristic, const char* object_path, GError **error)
-{
-	OrgBluezBattery1 *battery = NULL;
-
-	*error = NULL;
-	battery = org_bluez_battery1_proxy_new_for_bus_sync (
-			G_BUS_TYPE_SYSTEM,
-			G_DBUS_OBJECT_MANAGER_CLIENT_FLAGS_NONE,
-			"org.bluez",
-			object_path,
-			NULL,
-			error);
-	if (battery) {
-		dbus_characteristic->battery = battery;
-		dbus_characteristic->type = TYPE_BATTERY_LEVEL;
-	}
-
-	return false;
-}
-#endif
-
->>>>>>> 514ebaf0a34f10093fe516f9e215f93ab8a49e19
 struct dbus_characteristic get_characteristic_from_uuid(gatt_connection_t* connection, const uuid_t* uuid) {
 	gattlib_context_t* conn_context = connection->context;
 	GDBusObjectManager *device_manager = get_device_manager_from_adapter(conn_context->adapter);
 	GError *error = NULL;
-	bool is_battery_level_uuid = false;
 
 	struct dbus_characteristic dbus_characteristic = {
 			.type = TYPE_NONE
@@ -129,14 +97,6 @@ struct dbus_characteristic get_characteristic_from_uuid(gatt_connection_t* conne
 	if (device_manager == NULL) {
 		fprintf(stderr, "Gattlib Context not initialized.\n");
 		return dbus_characteristic; // Return characteristic of type TYPE_NONE
-	}
-
-	// Some GATT Characteristics are handled by D-BUS
-	if (gattlib_uuid_cmp(uuid, &m_battery_level_uuid) == 0) {
-		is_battery_level_uuid = true;
-	} else if (gattlib_uuid_cmp(uuid, &m_ccc_uuid) == 0) {
-		fprintf(stderr, "Error: Bluez v5.42+ does not expose Client Characteristic Configuration Descriptor through DBUS interface\n");
-		return dbus_characteristic;
 	}
 
 	GList *l;
@@ -156,21 +116,21 @@ struct dbus_characteristic get_characteristic_from_uuid(gatt_connection_t* conne
 			}
 		}
 
-		if (!found && is_battery_level_uuid) {
-#if BLUEZ_VERSION > BLUEZ_VERSIONS(5, 40)
-			interface = g_dbus_object_manager_get_interface(device_manager, object_path, "org.bluez.Battery1");
-			if (interface) {
-				g_object_unref(interface);
+// 		if (!found && is_battery_level_uuid) {
+// #if BLUEZ_VERSION > BLUEZ_VERSIONS(5, 40)
+// 			interface = g_dbus_object_manager_get_interface(device_manager, object_path, "org.bluez.Battery1");
+// 			if (interface) {
+// 				g_object_unref(interface);
 
-				found = handle_dbus_battery_from_uuid(conn_context, uuid, &dbus_characteristic, object_path, &error);
-				if (found) {
-					break;
-				}
-			}
-#else
-			fprintf(stderr, "You might use Bluez v5.48 with gattlib built for pre-v5.40\n");
-#endif
-		}
+// 				found = handle_dbus_battery_from_uuid(conn_context, uuid, &dbus_characteristic, object_path, &error);
+// 				if (found) {
+// 					break;
+// 				}
+// 			}
+// #else
+// 			fprintf(stderr, "You might use Bluez v5.48 with gattlib built for pre-v5.40\n");
+// #endif
+// 		}
 	}
 
 	return dbus_characteristic;
@@ -224,15 +184,12 @@ static int read_gatt_characteristic(struct dbus_characteristic *dbus_characteris
 	GError *error = NULL;
 	int ret = GATTLIB_SUCCESS;
 
-#if BLUEZ_VERSION < BLUEZ_VERSIONS(5, 40)
-	org_bluez_gatt_characteristic1_call_read_value_sync(
-		dbus_characteristic->gatt, &out_value, NULL, &error);
-#else
+
 	GVariantBuilder *options =  g_variant_builder_new(G_VARIANT_TYPE("a{sv}"));
 	org_bluez_gatt_characteristic1_call_read_value_sync(
 			dbus_characteristic->gatt, g_variant_builder_end(options), &out_value, NULL, &error);
 	g_variant_builder_unref(options);
-#endif
+
 	if (error != NULL) {
 		fprintf(stderr, "Failed to read DBus GATT characteristic: %s\n", error->message);
 		g_error_free(error);
@@ -259,28 +216,11 @@ EXIT:
 	return ret;
 }
 
-#if BLUEZ_VERSION > BLUEZ_VERSIONS(5, 40)
-static int read_battery_level(struct dbus_characteristic *dbus_characteristic, void* buffer, size_t* buffer_len) {
-	guchar percentage = org_bluez_battery1_get_percentage(dbus_characteristic->battery);
-
-	memcpy(buffer, &percentage, sizeof(uint8_t));
-	*buffer_len = sizeof(uint8_t);
-
-	g_object_unref(dbus_characteristic->battery);
-	return GATTLIB_SUCCESS;
-}
-#endif
-
 int gattlib_read_char_by_uuid(gatt_connection_t* connection, uuid_t* uuid, void **buffer, size_t *buffer_len) {
 	struct dbus_characteristic dbus_characteristic = get_characteristic_from_uuid(connection, uuid);
 	if (dbus_characteristic.type == TYPE_NONE) {
 		return GATTLIB_NOT_FOUND;
 	}
-#if BLUEZ_VERSION > BLUEZ_VERSIONS(5, 40)
-	else if (dbus_characteristic.type == TYPE_BATTERY_LEVEL) {
-		return read_battery_level(&dbus_characteristic, buffer, buffer_len);
-	}
-#endif
 	else {
 		int ret;
 
@@ -301,33 +241,18 @@ int gattlib_read_char_by_uuid_async(gatt_connection_t* connection, uuid_t* uuid,
 	if (dbus_characteristic.type == TYPE_NONE) {
 		return GATTLIB_NOT_FOUND;
 	}
-#if BLUEZ_VERSION > BLUEZ_VERSIONS(5, 40)
-	else if (dbus_characteristic.type == TYPE_BATTERY_LEVEL) {
-		//TODO: Having 'percentage' as a 'static' is a limitation when we would support multiple connections
-		static uint8_t percentage;
-
-		percentage = org_bluez_battery1_get_percentage(dbus_characteristic.battery);
-
-		gatt_read_cb((const void*)&percentage, sizeof(percentage));
-
-		return GATTLIB_SUCCESS;
-	} else {
+	else {
 		assert(dbus_characteristic.type == TYPE_GATT);
 	}
-#endif
 
 	GVariant *out_value;
 	GError *error = NULL;
 
-#if BLUEZ_VERSION < BLUEZ_VERSIONS(5, 40)
-	org_bluez_gatt_characteristic1_call_read_value_sync(
-		dbus_characteristic.gatt, &out_value, NULL, &error);
-#else
 	GVariantBuilder *options =  g_variant_builder_new(G_VARIANT_TYPE("a{sv}"));
 	org_bluez_gatt_characteristic1_call_read_value_sync(
 			dbus_characteristic.gatt, g_variant_builder_end(options), &out_value, NULL, &error);
 	g_variant_builder_unref(options);
-#endif
+
 	if (error != NULL) {
 		fprintf(stderr, "Failed to read DBus GATT characteristic: %s\n", error->message);
 		g_error_free(error);
@@ -354,9 +279,6 @@ static int write_char(struct dbus_characteristic *dbus_characteristic, const voi
 	GError *error = NULL;
 	int ret = GATTLIB_SUCCESS;
 
-#if BLUEZ_VERSION < BLUEZ_VERSIONS(5, 40)
-	org_bluez_gatt_characteristic1_call_write_value_sync(dbus_characteristic->gatt, value, NULL, &error);
-#else
 	GVariantBuilder *variant_options = g_variant_builder_new(G_VARIANT_TYPE("a{sv}"));
 
 	if ((options & BLUEZ_GATT_WRITE_VALUE_TYPE_MASK) == BLUEZ_GATT_WRITE_VALUE_TYPE_WRITE_WITHOUT_RESPONSE) {
@@ -365,7 +287,6 @@ static int write_char(struct dbus_characteristic *dbus_characteristic, const voi
 
 	org_bluez_gatt_characteristic1_call_write_value_sync(dbus_characteristic->gatt, value, g_variant_builder_end(variant_options), NULL, &error);
 	g_variant_builder_unref(variant_options);
-#endif
 
 	if (error != NULL) {
 		fprintf(stderr, "Failed to write DBus GATT characteristic: %s\n", error->message);

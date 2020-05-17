@@ -1086,7 +1086,7 @@ int save_message_data(const uint8_t* data, int data_length, void* user_data)
       if (data[2] == 0xff)
       {
         admin_connection->n_size_byte = 3;
-        admin_connection->step_max_size = data[0] * (0xfe) + data[1] + dmin_connection->n_size_byte;
+        admin_connection->step_max_size = data[0] * (0xfe) + data[1] + admin_connection->n_size_byte;
         serverLog(LL_NOTICE, 
                       "2 bytes lenth %d", admin_connection->step_max_size);
       }

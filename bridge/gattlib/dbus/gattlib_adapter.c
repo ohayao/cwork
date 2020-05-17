@@ -1,36 +1,7 @@
-<<<<<<< HEAD
 #include "bridge/gattlib/dbus/gattlib_internal.h"
 
 // open 所做的事情是
 // 用 dbus 获取, 并且设置打开
-=======
-/*
- *
- *  GattLib - GATT Library
- *
- *  Copyright (C) 2016-2020 Olivier Martin <olivier@labapart.org>
- *
- *
- *  This program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2 of the License, or
- *  (at your option) any later version.
- *
- *  This program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with this program; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
- *
- */
-
-#include "bridge/gattlib/dbus/gattlib_internal.h"
-
-
->>>>>>> 514ebaf0a34f10093fe516f9e215f93ab8a49e19
 int gattlib_adapter_open(const char* adapter_name, void** adapter) {
 	char object_path[20];
 	OrgBluezAdapter1 *adapter_proxy;
@@ -46,11 +17,7 @@ int gattlib_adapter_open(const char* adapter_name, void** adapter) {
 	}
 
 	snprintf(object_path, sizeof(object_path), "/org/bluez/%s", adapter_name);
-<<<<<<< HEAD
 	// 主要是获得相关的 adapter_proxy
-=======
-
->>>>>>> 514ebaf0a34f10093fe516f9e215f93ab8a49e19
 	adapter_proxy = org_bluez_adapter1_proxy_new_for_bus_sync(
 			G_BUS_TYPE_SYSTEM, G_DBUS_PROXY_FLAGS_NONE,
 			"org.bluez",
