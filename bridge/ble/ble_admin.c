@@ -1026,9 +1026,11 @@ int bleReleaseAdminParam(ble_admin_param_t **pp_admin_param)
   ble_admin_param_t *admin_param = *pp_admin_param;
   if (admin_param->lock)
   {
+    serverLog(LL_NOTICE, "bleReleaseAdminParam");
     releaseLock(&admin_param->lock);
     admin_param->lock = NULL;
   }
+  free(*pp_admin_param );
   *pp_admin_param = NULL;
   return 0;
 }

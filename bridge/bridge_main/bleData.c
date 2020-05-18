@@ -12,7 +12,6 @@ int bleInitData(ble_data_t *data)
 int bleReleaseData(ble_data_t **pp_data)
 {
   bleReleaseBleResult(*pp_data);
-  bleReleaseBleParam(*pp_data);
   free(*pp_data);
   *pp_data = NULL;
 }
@@ -36,6 +35,7 @@ int bleReleaseBleParam(ble_data_t *data)
   if (!data) return 1;
   if (data->ble_param)
   {
+    serverLog(LL_NOTICE,"bleReleaseBleResult");
     data->ble_param_len = 0;
     free(data->ble_param);
     data->ble_param = NULL;
@@ -74,6 +74,7 @@ int bleReleaseBleResult(ble_data_t *data)
   if (!data) return 1;
   if (data->ble_result)
   {
+    serverLog(LL_NOTICE,"bleReleaseBleResult");
     data->ble_result_len = 0;
     free(data->ble_result);
     data->ble_result = NULL;

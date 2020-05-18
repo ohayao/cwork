@@ -58,7 +58,7 @@ int write_char_by_uuid_multi_atts (
 {
   int BLE_ATT_MAX_BYTES = 20;
 	int ret = GATTLIB_SUCCESS;
-	uint8_t *tmp_bytes[BLE_ATT_MAX_BYTES];
+	uint8_t tmp_bytes[BLE_ATT_MAX_BYTES];
 	size_t size_left;
 	int i;
 	for (i = 0; i < buffer_len; i += BLE_ATT_MAX_BYTES)
@@ -72,7 +72,7 @@ int write_char_by_uuid_multi_atts (
       serverLog(LL_ERROR, "write_char_by_uuid_multi_atts: gattlib_write_char_by_uuid failed in writint ");
 			return ret;
 		}
-    serverLog(LL_NOTICE, "write_char_by_uuid_multi_atts: gattlib_write_char_by_uuid success in writing");
+    // serverLog(LL_NOTICE, "write_char_by_uuid_multi_atts: gattlib_write_char_by_uuid success in writing");
 	}
 	return ret;
 }
