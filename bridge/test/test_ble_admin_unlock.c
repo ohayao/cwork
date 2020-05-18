@@ -55,7 +55,6 @@ void saveTaskData(task_node_t *ptn)
             break;
         }
     }
-    bleReleaseData(&ptn->ble_data);
 }
 
 int hexStrToByte(const char* source, uint8_t* dest, int sourceLen)
@@ -130,7 +129,7 @@ int testUnLock(igm_lock_t *lock) {
     }
 
     saveTaskData(tn);
-    
+    bleReleaseData(&tn->ble_data);
     free(tn);
     tn = NULL;
     

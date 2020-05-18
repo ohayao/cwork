@@ -294,7 +294,11 @@ static int write_lock_request(void *arg)
   serverLog(LL_NOTICE, "write_char_by_uuid_multi_atts success");
 
   free(encryptPayloadBytes);
+  retvalBytes = encryptPayloadBytes;
+  free(retvalBytes);
+  retvalBytes = NULL;
   admin_connection->admin_step = BLE_ADMIN_LOCK_REQUEST;
+  
   return 0;
 
 UNPAIR_REQUEST_ERROR:
@@ -536,8 +540,8 @@ int handle_step3_message(const uint8_t* data, int data_length,void* user_data)
     }
      // 返回参数给调用进程
     serverLog(LL_NOTICE, "handle_step3_message bleSetBleResult to ble data");
-    bleSetBleResult(
-      ble_data, admin_connection->admin_result, sizeof(ble_admin_result_t));
+    // bleSetBleResult(
+    //   ble_data, admin_connection->admin_result, sizeof(ble_admin_result_t));
     
     
     // ?>?释放内存?
@@ -594,7 +598,6 @@ static int handle_unlock_responce(const uint8_t* data, int data_length,void* use
 
     uint32_t responceMaxLen = decryptDataSize(messageLen);
     uint8_t responceBytes[responceMaxLen];
-    // uint8_t *responceBytes = (uint8_t *)calloc(responceMaxLen,1);
     serverLog(LL_NOTICE, "messageLen %d", messageLen);
     int32_t responceLen = AdminConnection_decryptNative(
       (admin_connection->lock)->connectionID, messageBytes, messageLen, (uint8_t **)(&responceBytes));
