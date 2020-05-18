@@ -184,6 +184,7 @@ https://valgrind.org/docs/manual/mc-manual.html
 sudo valgrind --tool=memcheck --leak-check=full --leak-resolution=low --show-leak-kinds=all --leak-check-heuristics=all --xtree-leak=yes ./bridge/test/test_ble_admin_unlock D9:78:2F:E3:1A:5C d4c33574f65b83cc8d214e545b89d049 94c5b5d4a6ad3497
 
 当前泄漏检测记录:
+1. 
 ==3692== LEAK SUMMARY:
 ==3692==    definitely lost: 440 bytes in 12 blocks
 ==3692==    indirectly lost: 707 bytes in 16 blocks

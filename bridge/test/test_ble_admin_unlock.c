@@ -35,70 +35,6 @@ void saveTaskData(task_node_t *ptn)
         int task_type = ptn->task_type;
         switch (task_type)
         {
-        case TASK_BLE_DISCOVER:
-        {
-            serverLog(LL_NOTICE, "saving ble TASK_BLE_DISCOVER data");
-            int num_of_result = bleGetNumsOfResult(ble_data);
-            void *result = ble_data->ble_result;
-            for (int j=0; j < num_of_result; j++)
-            {
-                igm_lock_t *lock = bleGetNResult(ble_data, j, sizeof(igm_lock_t));
-                serverLog(LL_NOTICE, "name %s  addr: %s", lock->name, lock->addr);
-                insertLock(lock);
-                // test 需要, 
-                // if (!lock->paired)
-                // {
-                //     serverLog(LL_NOTICE, "try to pair name %s  addr: %s", lock->name, lock->addr);
-                //     addPairingTask(lock);
-                // }              
-            }
-            break;
-        }
-        case TASK_BLE_PAIRING:
-        {
-            serverLog(LL_NOTICE, "saving ble TASK_BLE_PAIRING data");
-            ble_pairing_result_t *pairing_result = (ble_pairing_result_t *)ble_data->ble_result;
-            serverLog(LL_NOTICE, "pairing_result:");
-            serverLog(LL_NOTICE, "pairing success: %d", pairing_result->pairing_successed);
-            serverLog(LL_NOTICE, "pairing admin_key:");
-            for (int j = 0; j < pairing_result->admin_key_len; j++)
-            {
-              printf("%02x", pairing_result->admin_key[j]);
-            }
-            printf("\n");
-            serverLog(LL_NOTICE, "pairing password:");
-            for (int j = 0; j < pairing_result->password_size; j++)
-            {
-              printf("%02x", pairing_result->password[j]);
-            }
-            printf("\n");
-            
-            // igm_lock_t *lock = findLockByAddr(pairing_result->addr);
-            // 只有找到这把锁, 并且匹配成功, 成保存称为Paired
-            // 添加任务, 纯属测试需要
-            // if (lock && pairing_result->pairing_successed)
-            // {
-            //     serverLog(LL_NOTICE, "set name %s addr %s to paired", lock->name, lock->addr);
-            //     setLockPaired(lock);
-            //     setLockAdminKey(lock, pairing_result->admin_key, pairing_result->admin_key_len);
-            //     setLockPassword(lock, pairing_result->password, pairing_result->password_size);
-            //     // addAdminTask(lock, 2);
-            //     // addAdminUnpairTask(lock);
-            //     // addAdminUnlockTask(lock);
-            //     // addAdminLockTask(lock);
-            // }
-            break;
-        }
-        case TASK_BLE_ADMIN_CONNECTION:
-        {
-            serverLog(LL_NOTICE, "saving ble TASK_BLE_ADMIN_CONNECTION data");
-        }
-        case TASK_BLE_ADMIN_UNPAIR:
-        {
-            serverLog(LL_NOTICE, "saving ble TASK_BLE_ADMIN_UNPAIR data");
-            ble_admin_result_t *admin_unpair_result = (ble_admin_result_t *)ble_data->ble_result;
-            break;
-        }
         case TASK_BLE_ADMIN_UNLOCK:
         {
             serverLog(LL_NOTICE, "saving ble TASK_BLE_ADMIN_UNLOCK data");
@@ -112,21 +48,14 @@ void saveTaskData(task_node_t *ptn)
             {
                 serverLog(LL_ERROR, "unlock success");
             }
-
-            bleReleaseAdminResult(&admin_unlock_result);
-
-            break;
-        }
-        case TASK_BLE_ADMIN_LOCK:
-        {
-            serverLog(LL_NOTICE, "saving ble TASK_BLE_ADMIN_LOCK data");
-            ble_admin_result_t *admin_lock_result = (ble_admin_result_t *)ble_data->ble_result;
+                    
             break;
         }
         default:
             break;
         }
     }
+    bleReleaseData(&ptn->ble_data);
 }
 
 int hexStrToByte(const char* source, uint8_t* dest, int sourceLen)
@@ -201,7 +130,9 @@ int testUnLock(igm_lock_t *lock) {
     }
 
     saveTaskData(tn);
-
+    
+    free(tn);
+    tn = NULL;
     
     return 0;
 }

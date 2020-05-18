@@ -47,18 +47,31 @@ void initAdminConnection(admin_connection_t *admin_connection)
   memset(admin_connection, 0, sizeof(admin_connection_t));
 }
 
-void releaseAdminConnection(admin_connection_t **pp_admin_connection)
+int releaseAdminConnection(admin_connection_t **pp_admin_connection)
 {
   admin_connection_t *admin_connection = *pp_admin_connection;
-  gattlib_disconnect(admin_connection->gatt_connection);
+  int ret = gattlib_notification_stop(
+        admin_connection->gatt_connection, &admin_connection->admin_uuid);
+  if (ret != GATTLIB_SUCCESS)
+  {
+    serverLog(LL_ERROR, "clearAdminConnectionGattConenction gattlib_notification_stop error");
+    return ret;
+  }
+  ret = gattlib_disconnect(admin_connection->gatt_connection);
+  if (ret != GATTLIB_SUCCESS)
+  {
+    serverLog(LL_ERROR, " gattlib_disconnect error");
+    return ret;
+  }
   releaseLock(&admin_connection->lock);
   free(admin_connection->admin_result);
-  return;
+  free(*pp_admin_connection);
+  *pp_admin_connection = NULL;
+  return 0;
 }
 
 static int clearAdminConnection(admin_connection_t **pp_admin_connection);
 static int clearAdminConnectionStepData(admin_connection_t *admin_connection);
-static int clearAdminConnectionGattConenction(admin_connection_t *admin_connection);
 
 static int clearAdminConnectionStepData(admin_connection_t *admin_connection)
 {
@@ -72,26 +85,6 @@ static int clearAdminConnectionStepData(admin_connection_t *admin_connection)
   return 0;
 }
 
-static int clearAdminConnectionGattConenction(admin_connection_t *admin_connection)
-{
-  int ret;
-  ret = gattlib_notification_stop(
-        admin_connection->gatt_connection, &admin_connection->admin_uuid);
-  if (ret != GATTLIB_SUCCESS)
-  {
-    serverLog(LL_ERROR, "clearAdminConnectionGattConenction gattlib_notification_stop error");
-    return ret;
-  }
-
-  // ret = gattlib_disconnect(admin_connection->gatt_connection);
-  // if (ret != GATTLIB_SUCCESS)
-  // {
-  //   serverLog(LL_ERROR, "clearAdminConnectionGattConenction gattlib_disconnect error");
-  //   return ret;
-  // }
-  return ret;
-}
-
 // admin
 static int register_admin_notfication(void *arg);
 static void message_handler(
@@ -102,6 +95,7 @@ static int save_message_data(const uint8_t* data, int data_length, void* user_da
 static int write_admin_step2(void *arg);
 static int waiting_admin_step3(void *arg);
 static int handle_step3_message(const uint8_t* data, int data_length,void* user_data);
+
 
 fsm_table_t admin_fsm_table[ADMIN_SM_TABLE_LEN] = {
   {BLE_ADMIN_BEGIN,       register_admin_notfication,  BLE_ADMIN_STEP1},
@@ -209,40 +203,30 @@ int write_admin_step2(void *arg)
   serverLog(LL_NOTICE, "admin write step2 write_char_by_uuid_multi_atts success in writing packages");
 
   admin_connection->admin_step = BLE_ADMIN_STEP2;
-  
+
   admin_connection->step_max_size = 0;
   admin_connection->n_size_byte = 0;
   admin_connection->step_cur_size = 0;
   free(admin_connection->step_data);
   admin_connection->step_data = NULL;
-  free(payloadBytes);
-  free(step2Bytes);
 
+  free(step2Bytes);
+  step2Bytes = NULL;
+  free(payloadBytes);
+  payloadBytes = NULL;
 
   return 0;
 ADMIN_STEP2_ERROR_EXIT:
-  if (admin_connection->gatt_connection)
+  
+  if (step2Bytes)
   {
-    // gattlib_notification_stop(
-    //   admin_connection->gatt_connection, &(admin_connection->admin_uuid));
-    // gattlib_disconnect(admin_connection->gatt_connection);
-    ret = clearAdminConnectionGattConenction(admin_connection);
-    if (ret != GATTLIB_SUCCESS)
-    {
-      serverLog(LL_ERROR, "clearAdminConnectionGattConenction error");
-    }
-    else
-    {
-      serverLog(LL_NOTICE, "clearAdminConnectionGattConenction success ✓✓✓");
-    }
+    free(step2Bytes);
+    step2Bytes = NULL;
   }
   if (payloadBytes)
   {
     free(payloadBytes);
-  }
-  if (step2Bytes)
-  {
-    free(step2Bytes);
+    payloadBytes = NULL;
   }
   return 1;
 }
@@ -314,21 +298,6 @@ static int write_lock_request(void *arg)
   return 0;
 
 UNPAIR_REQUEST_ERROR:
-  if (admin_connection->gatt_connection)
-  {
-    // gattlib_notification_stop(
-    //   admin_connection->gatt_connection, &(admin_connection->admin_uuid));
-    // gattlib_disconnect(admin_connection->gatt_connection);
-    ret = clearAdminConnectionGattConenction(admin_connection);
-    if (ret != GATTLIB_SUCCESS)
-    {
-      serverLog(LL_ERROR, "clearAdminConnectionGattConenction error");
-    }
-    else
-    {
-      serverLog(LL_NOTICE, "clearAdminConnectionGattConenction success ✓✓✓");
-    }
-  }
 
   if (encryptPayloadBytes)
   {
@@ -350,6 +319,8 @@ static int write_unlock_request(void *arg)
   size_t buf_size = 32;
   size_t encode_size = 0;
   uint8_t buf[buf_size];
+  uint32_t retvalMaxLen;
+  uint8_t *retvalBytes;
   uint8_t *encryptPayloadBytes;
 	size_t encryptPayloadBytes_len;
 
@@ -375,9 +346,10 @@ static int write_unlock_request(void *arg)
 	}
   serverLog(LL_NOTICE, "ble_unpair_write_unpairreques success getting encry_connection" );
 
-  uint32_t retvalMaxLen = encryptDataSize(encode_size);
+  retvalMaxLen = encryptDataSize(encode_size);
   serverLog(LL_NOTICE, "ble_unpair_write_unpairreques PayloadBytes_len: %d", retvalMaxLen);
-  uint8_t *retvalBytes = (uint8_t *)calloc(retvalMaxLen,1);
+  retvalBytes = (uint8_t *)calloc(retvalMaxLen,1);
+
   int32_t retvalLen = encryptData(
     buf, encode_size,
     retvalBytes, retvalMaxLen,
@@ -418,32 +390,27 @@ static int write_unlock_request(void *arg)
 		goto UNPAIR_REQUEST_ERROR;
 	}
   serverLog(LL_NOTICE, "write_char_by_uuid_multi_atts success");
-
+  
   free(encryptPayloadBytes);
+  encryptPayloadBytes = NULL;
+  free(retvalBytes);
+  retvalBytes = NULL;
+  
   admin_connection->admin_step = BLE_ADMIN_UNLOCK_REQUEST;
 
   return 0;
 
 
 UNPAIR_REQUEST_ERROR:
-  if (admin_connection->gatt_connection)
-  {
-    // gattlib_notification_stop(
-    //   admin_connection->gatt_connection, &(admin_connection->admin_uuid));
-    // gattlib_disconnect(admin_connection->gatt_connection);
-    ret = clearAdminConnectionGattConenction(admin_connection);
-    if (ret != GATTLIB_SUCCESS)
-    {
-      serverLog(LL_ERROR, "clearAdminConnectionGattConenction error");
-    }
-    else
-    {
-      serverLog(LL_NOTICE, "clearAdminConnectionGattConenction success ✓✓✓");
-    }
-  }
   if (encryptPayloadBytes)
   {
     free(encryptPayloadBytes);
+    encryptPayloadBytes = NULL;
+  }
+  if (retvalBytes)
+  {
+    free(retvalBytes);
+    retvalBytes = NULL;
   }
   return 1;
 }
@@ -463,7 +430,10 @@ static int write_unpair_request(void *arg)
   uint8_t buf[buf_size];
   uint8_t *encryptPayloadBytes;
 	size_t encryptPayloadBytes_len;
-  
+  uint32_t retvalMaxLen;
+  uint8_t *retvalBytes;
+  int32_t retvalLen;
+
   IgUnpairRequest unpair_request;
   ig_UnpairRequest_init(&unpair_request);
   ig_UnpairRequest_set_operation_id(&unpair_request, requestID);
@@ -478,10 +448,10 @@ static int write_unpair_request(void *arg)
 	}
   serverLog(LL_NOTICE, "ig_UnpairRequest_encode success size:" );
 
-  uint32_t retvalMaxLen = encryptDataSize(encode_size);
-  uint8_t *retvalBytes = (uint8_t *)calloc(retvalMaxLen,1);
+  retvalMaxLen = encryptDataSize(encode_size);
+  retvalBytes = (uint8_t *)calloc(retvalMaxLen,1);
 
-  int32_t retvalLen = AdminConnection_encryptNative(
+  retvalLen = AdminConnection_encryptNative(
     admin_connection->lock->connectionID, buf, encode_size, &retvalBytes);
   if (!retvalLen) 
   {
@@ -507,31 +477,29 @@ static int write_unpair_request(void *arg)
 	}
   serverLog(LL_NOTICE, "write_char_by_uuid_multi_atts success");
 
+  free(retvalBytes);
+  retvalBytes = NULL;
+
   free(encryptPayloadBytes);
+  encryptPayloadBytes = NULL;
+  
   admin_connection->admin_step = BLE_ADMIN_UNPAIR_REQUEST;
   return 0;
 
 
 UNPAIR_REQUEST_ERROR:
-  if (admin_connection->gatt_connection)
+  if (retvalBytes)
   {
-    // gattlib_notification_stop(
-    //   admin_connection->gatt_connection, &(admin_connection->admin_uuid));
-    // gattlib_disconnect(admin_connection->gatt_connection);
-    ret = clearAdminConnectionGattConenction(admin_connection);
-    if (ret != GATTLIB_SUCCESS)
-    {
-      serverLog(LL_ERROR, "clearAdminConnectionGattConenction error");
-    }
-    else
-    {
-      serverLog(LL_NOTICE, "clearAdminConnectionGattConenction success ✓✓✓");
-    }
+    free(retvalBytes);
+    retvalBytes = NULL;
   }
+  
   if (encryptPayloadBytes)
   {
     free(encryptPayloadBytes);
+    encryptPayloadBytes = NULL;
   }
+  
   return 1;
 }
 
@@ -548,7 +516,7 @@ int handle_step3_message(const uint8_t* data, int data_length,void* user_data)
   if (admin_connection->step_max_size == admin_connection->step_cur_size)
   {
     int ret;
-    serverLog(LL_NOTICE, "handle_step2_message RECV step2 data finished");
+    serverLog(LL_NOTICE, "handle_step3_message RECV step3 data finished");
     admin_connection->admin_step = BLE_ADMIN_ESTABLISHED;
 
     int rec_ret = igloohome_ble_lock_crypto_AdminConnection_recConnStep3Native(
@@ -573,14 +541,11 @@ int handle_step3_message(const uint8_t* data, int data_length,void* user_data)
     
     
     // ?>?释放内存?
-    if (admin_connection->step_data)
-    {
-      admin_connection->step_max_size = 0;
-      admin_connection->n_size_byte = 0;
-      admin_connection->step_cur_size = 0;
-      free(admin_connection->step_data);
-      admin_connection->step_data = NULL;
-    }
+    admin_connection->step_max_size = 0;
+    admin_connection->n_size_byte = 0;
+    admin_connection->step_cur_size = 0;
+    free(admin_connection->step_data);
+    admin_connection->step_data = NULL;
     serverLog(LL_NOTICE, "g_main_loop_quit connection->properties_changes_loop");
     g_main_loop_quit(task_node->loop);
   }
@@ -626,11 +591,6 @@ static int handle_unlock_responce(const uint8_t* data, int data_length,void* use
     uint8_t *data_start = admin_connection->step_data + admin_connection->n_size_byte;
     uint8_t messageBytes[messageLen];
     memcpy(messageBytes, data_start, messageLen);
-    // for (int j = 0; j < messageLen; j++)
-    // {
-    //   printf("%02x ", messageBytes[j]);
-    // }
-    // printf("\n");
 
     uint32_t responceMaxLen = decryptDataSize(messageLen);
     uint8_t responceBytes[responceMaxLen];
@@ -643,12 +603,6 @@ static int handle_unlock_responce(const uint8_t* data, int data_length,void* use
       serverLog(LL_ERROR, "ble_unpair_write_unpairreques responceLen %d", responceLen);
     }
     serverLog(LL_NOTICE, "ble_unpair_write_unpairreques responceLen %d", responceLen);
-    // serverLog(LL_NOTICE, "unpair responce :");
-    // for (int j = 0; j < responceLen; j++)
-    // {
-    //   printf("%02x ", responceBytes[j]);
-    // }
-    // printf("\n");
     
     IgAdminUnlockResponse admin_unlock_resppnce;
     ig_AdminUnlockResponse_init(&admin_unlock_resppnce);
@@ -673,22 +627,7 @@ static int handle_unlock_responce(const uint8_t* data, int data_length,void* use
     AdminConnection_endConnection((admin_connection->lock)->connectionID);
 
     serverLog(LL_NOTICE, "AdminConnection_endConnection success");
-    if (admin_connection->gatt_connection)
-    {
-      // gattlib_notification_stop(
-      //   admin_connection->gatt_connection, &(admin_connection->admin_uuid));
-      // gattlib_disconnect(admin_connection->gatt_connection);
-      ret = clearAdminConnectionGattConenction(admin_connection);
-      if (ret != GATTLIB_SUCCESS)
-      {
-        serverLog(LL_ERROR, "clearAdminConnectionGattConenction error");
-      }
-      else
-      {
-        serverLog(LL_NOTICE, "clearAdminConnectionGattConenction success ✓✓✓");
-      }
-    }
-
+    
 UNLOCK_RESULT_EXIT:
     serverLog(LL_NOTICE, "UNLOCK_RESULT_EXIT--------------------------------");
     g_main_loop_quit(task_node->loop);
@@ -761,23 +700,6 @@ static int handle_unpair_responce(const uint8_t* data, int data_length,void* use
     bleSetBleResult(
       ble_data, admin_connection->admin_result, sizeof(ble_admin_result_t));
     
-    ret = clearAdminConnectionGattConenction(admin_connection);
-    if (ret != GATTLIB_SUCCESS)
-    {
-      serverLog(LL_ERROR, "clearAdminConnectionGattConenction error");
-    }
-    else
-    {
-      serverLog(LL_NOTICE, "clearAdminConnectionGattConenction success ✓✓✓");
-    }
-    
-    ret = gattlib_adapter_close(ble_data->adapter);
-    if (ret != GATTLIB_SUCCESS)
-    {
-      serverLog(LL_ERROR, "gattlib_adapter_close error");
-      return ret;
-    }
-    serverLog(LL_NOTICE, "gattlib_adapter_close success");
   UNPAIR_RESULT_EXIT:
     g_main_loop_quit(task_node->loop);
 
@@ -926,21 +848,6 @@ int register_admin_notfication(void *arg)
 ADMIN_ERROR_EXIT:
   serverLog(LL_ERROR, "register_admin_notfication ERROR EXIT.");
   
-  if (admin_connection->gatt_connection)
-  {
-    // gattlib_notification_stop(
-    //   admin_connection->gatt_connection, &(admin_connection->admin_uuid));
-    // gattlib_disconnect(admin_connection->gatt_connection);
-    ret = clearAdminConnectionGattConenction(admin_connection);
-    if (ret != GATTLIB_SUCCESS)
-    {
-      serverLog(LL_ERROR, "clearAdminConnectionGattConenction error");
-    }
-    else
-    {
-      serverLog(LL_NOTICE, "clearAdminConnectionGattConenction success ✓✓✓");
-    }
-  }
   if (ble_data->ble_connection)
   {
     free(ble_data->ble_connection);
@@ -976,34 +883,17 @@ static int waiting_unlock_result(void *arg)
   ble_data_t *ble_data = (ble_data_t *)(task_node->ble_data);
   admin_connection_t *admin_connection = 
                             (admin_connection_t *)ble_data->ble_connection;
-  // 在这儿用g_main_loop_run等待, 用线程锁和睡眠的方法不行, 就像是bluez不会调用
-  // 我的回调函数, 在 rtos 应该会有相应的方法实现这样的等待事件到来的方法.
-  // 当前 Linux 下, 这样用, works 
+
   serverLog(LL_NOTICE, "waiting_unlock_result new loop waiting");
-  // task_node->loop = g_main_loop_new(NULL, 0);
-  // if (!task_node->loop)
-  // {
-  //   serverLog(LL_ERROR, "task_node->loop error");
-  // }
   g_main_loop_run(task_node->loop);
   g_main_loop_unref(task_node->loop);
   task_node->loop = NULL;
-  int ret = gattlib_disconnect(admin_connection->gatt_connection);
-  if (ret != GATTLIB_SUCCESS)
+  int ret = releaseAdminConnection(&admin_connection);
+  if (ret)
   {
-    serverLog(LL_ERROR, "clearAdminConnectionGattConenction gattlib_disconnect error");
+    serverLog(LL_ERROR, "waiting_unlock_result releaseAdminConnection");
     return ret;
   }
-  
-  // ble_data->adapter
-  // ret = gattlib_adapter_close(ble_data->adapter);
-  // if (ret != GATTLIB_SUCCESS)
-  // {
-  //   serverLog(LL_ERROR, "gattlib_adapter_close error");
-  //   return ret;
-  // }
-  // serverLog(LL_NOTICE, "gattlib_adapter_close success");
-  // serverLog(LL_NOTICE, "waiting_unlock_result exit task_node->loop");
   return 0;
 }
 
@@ -1059,6 +949,8 @@ int save_message_data(const uint8_t* data, int data_length, void* user_data)
   ble_data_t *ble_data = task_node->ble_data;
   admin_connection_t *admin_connection = 
                               (admin_connection_t *)ble_data->ble_connection;
+
+  // 如果没有分配内存                            
   if (admin_connection->step_max_size == 0)
   {
     if (data_length<3)
@@ -1071,9 +963,10 @@ int save_message_data(const uint8_t* data, int data_length, void* user_data)
       if (data[2] == 0xff)
       {
         admin_connection->n_size_byte = 3;
-        admin_connection->step_max_size = data[0] * (0xfe) + data[1] + admin_connection->n_size_byte;
+        admin_connection->step_max_size = 
+                    data[0] * (0xfe) + data[1] + admin_connection->n_size_byte;
         serverLog(LL_NOTICE, 
-                      "2 bytes lenth %d", admin_connection->step_max_size);
+                        "2 bytes lenth %d", admin_connection->step_max_size);
       }
       else
       {
@@ -1095,7 +988,7 @@ int save_message_data(const uint8_t* data, int data_length, void* user_data)
 
   int size_left = 
         admin_connection->step_max_size - admin_connection->step_cur_size;
-
+  // 帕不够
   if (size_left < data_length)
 	{
     serverLog(LL_NOTICE, "size_left < data_length");
@@ -1111,11 +1004,11 @@ int save_message_data(const uint8_t* data, int data_length, void* user_data)
 		memcpy(
       admin_connection->step_data, old_data, admin_connection->step_cur_size);
 		free(old_data);
+    old_data = NULL;
 	}
 
-  // 空间足够, 直接放下空间里面
+  // 空间肯定足够, 直接放下空间里面
 	for (int j = 0; j < data_length; ) {
-		// printf("%02x ", data[i]);
 		admin_connection->step_data[admin_connection->step_cur_size++] = data[j++];
 	}
 }
