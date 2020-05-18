@@ -868,7 +868,7 @@ int register_admin_notfication(void *arg)
   int ret;
   task_node_t *task_node = (task_node_t *)arg;
   ble_data_t *ble_data = (ble_data_t *)(task_node->ble_data);
-  // 参数里面有分配, 但是没有释放的
+  
   ble_admin_param_t *param = (ble_admin_param_t *)(ble_data->ble_param);
   // 分配 connection, 传递到其他函数的数据,
   ble_data->ble_connection = calloc(sizeof(admin_connection_t), 1);
@@ -877,13 +877,11 @@ int register_admin_notfication(void *arg)
   initAdminConnection(admin_connection);
   
   getLock(&admin_connection->lock);
-  if (!admin_connection->lock)
-  {
-    serverLog(LL_NOTICE, "cant' get lock");
-  }
   copyLock(admin_connection->lock, param->lock);
+  serverLog(LL_NOTICE, "register_admin_notfication release admin param");
   bleReleaseAdminParam(&param);
   
+  serverLog(LL_NOTICE, "register_admin_notfication apply for a ble_admin_result_t, need user to release");
   admin_connection->has_admin_result = 1;
   admin_connection->admin_result = calloc(sizeof(ble_admin_result_t), 1);
   bleInitAdminResult(admin_connection->admin_result);
@@ -1216,4 +1214,12 @@ fsm_table_t *getAdminLockFsmTable()
 int getAdminLockFsmTableLen()
 {
   return ADMIN_LOCK_SM_TABLE_LEN;
+}
+
+void bleReleaseAdminResult(ble_admin_result_t **pp_result)
+{
+  if (!pp_result) return;
+  if (!*pp_result) return;
+  free(*pp_result);
+  *pp_result = NULL;
 }

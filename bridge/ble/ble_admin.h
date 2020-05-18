@@ -50,6 +50,7 @@ int bleSetAdminResultAddr(ble_admin_result_t *result,
   char *addr, size_t addr_len);
 int bleIsAdminSuccess(ble_admin_result_t *result);
 int bleSetAdminResultGattConnection(ble_admin_result_t *result, void* gatt_connection);
+void bleReleaseAdminResult(ble_admin_result_t **pp_result);
 
 // admin
 fsm_table_t *getAdminFsmTable();

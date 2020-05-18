@@ -165,8 +165,36 @@ connectionID 0                              // connectionID 是多少
 3 和 7 , 可能相同,当时没有详细记录
 
 4. 会有一个segment fault, 
+
 5. unlock的时候, 出现过一个 2 bytes len, 没法重现当中.
+
 6. 内存泄漏. 
+task_node, 不再复制, 只拷贝指针
+ble_data: 调用者申请, 调用者释放, 这个内存在获得结果前,不应该释放
+  ble_param: 进行蓝牙活动的使用者, 在获得参数之后, 就释放.
+  ble_result: 需要传递回参数给调用者, 调用者释放
+
+检查内存泄漏思路:
+int register_admin_notfication(void *arg): 这个函数, 需要参数来启动, 得到参数之后,把所需要的参数, 拷贝到自己connection, 然后释放参数
+
+
+https://valgrind.org/docs/manual/mc-manual.html
+
+内存测试命令:
+sudo valgrind --tool=memcheck --leak-check=full --leak-resolution=low --show-leak-kinds=all --leak-check-heuristics=all --xtree-leak=yes ./bridge/test/test_ble_admin_unlock D9:78:2F:E3:1A:5C d4c33574f65b83cc8d214e545b89d049 94c5b5d4a6ad3497
+
+当前泄漏检测记录:
+==3692== LEAK SUMMARY:
+==3692==    definitely lost: 440 bytes in 12 blocks
+==3692==    indirectly lost: 707 bytes in 16 blocks
+==3692==      possibly lost: 2,432 bytes in 26 blocks
+==3692==    still reachable: 213,490 bytes in 3,207 blocks
+==3692==                       of which reachable via heuristic:
+==3692==                         length64           : 1,632 bytes in 24 blocks
+==3692==                         newarray           : 1,792 bytes in 32 blocks
+==3692==         suppressed: 0 bytes in 0 blocks
+
+
 7. Device connected error (device:/org/bluez/hci0/dev_D9_78_2F_E3_1A_5C): GDBus.Error:org.bluez.Error.Failed: Software caused nection abort
 报文显示, 是master主动发起的断开. 
 没有出错处理,所以程序自己不能运行了
