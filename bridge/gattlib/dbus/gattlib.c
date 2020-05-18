@@ -248,13 +248,18 @@ int gattlib_disconnect(gatt_connection_t* connection) {
 		g_error_free(error);
 	}
 
-	free(conn_context->device_object_path);
-	g_object_unref(conn_context->device);
-	g_list_free_full(conn_context->dbus_objects, g_object_unref);
+	if (conn_context->device_object_path)
+		free(conn_context->device_object_path);
+	if (conn_context->device)
+		g_object_unref(conn_context->device);
+	if (conn_context->dbus_objects)
+		g_list_free_full(conn_context->dbus_objects, g_object_unref);
+	
 	disconnect_all_notifications(conn_context);
-
-	free(connection->context);
-	free(connection);
+	if (connection->context)
+		free(connection->context);
+	if (connection)
+		free(connection);
 	return GATTLIB_SUCCESS;
 }
 

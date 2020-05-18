@@ -50,7 +50,12 @@ void initAdminConnection(admin_connection_t *admin_connection)
 int releaseAdminConnection(admin_connection_t **pp_admin_connection)
 {
   admin_connection_t *admin_connection = *pp_admin_connection;
-  int ret = gattlib_notification_stop(
+  int ret;
+  
+  releaseLock(&admin_connection->lock);
+  bleReleaseAdminResult(&admin_connection->admin_result);
+
+  ret = gattlib_notification_stop(
         admin_connection->gatt_connection, &admin_connection->admin_uuid);
   if (ret != GATTLIB_SUCCESS)
   {
@@ -63,8 +68,7 @@ int releaseAdminConnection(admin_connection_t **pp_admin_connection)
     serverLog(LL_ERROR, " gattlib_disconnect error");
     return ret;
   }
-  releaseLock(&admin_connection->lock);
-  free(admin_connection->admin_result);
+  admin_connection->gatt_connection = NULL;
   free(*pp_admin_connection);
   *pp_admin_connection = NULL;
   return 0;
@@ -598,7 +602,7 @@ static int handle_unlock_responce(const uint8_t* data, int data_length,void* use
 
     uint32_t responceMaxLen = decryptDataSize(messageLen);
     uint8_t responceBytes[responceMaxLen];
-    serverLog(LL_NOTICE, "messageLen %d", messageLen);
+    // serverLog(LL_NOTICE, "messageLen %d", messageLen);
     int32_t responceLen = AdminConnection_decryptNative(
       (admin_connection->lock)->connectionID, messageBytes, messageLen, (uint8_t **)(&responceBytes));
     if (!responceLen)
@@ -814,11 +818,19 @@ int register_admin_notfication(void *arg)
                                       admin_connection->lock->addr, admin_connection->lock->addr_len);
 
   ble_data->adapter_name = NULL;
-  ble_data->adapter = NULL;
+	ble_data->adapter = NULL;
+
+	ret = gattlib_adapter_open(ble_data->adapter_name, &(ble_data->adapter));
+	if (ret) {
+		serverLog(LL_ERROR, 
+				"ERROR: register_admin_notfication Failed to open adapter.");
+		return 1;
+	}
+
   serverLog(LL_NOTICE, "register_admin_notfication ready to connection %s",
                                                             admin_connection->lock->addr);
   admin_connection->gatt_connection = gattlib_connect(
-    NULL, admin_connection->lock->addr, GATTLIB_CONNECTION_OPTIONS_LEGACY_DEFAULT);
+    ble_data->adapter, admin_connection->lock->addr, GATTLIB_CONNECTION_OPTIONS_LEGACY_DEFAULT);
   if (admin_connection->gatt_connection == NULL) {
 		serverLog(LL_ERROR, "Fail to connect to the bluetooth device." );
 		goto ADMIN_ERROR_EXIT;
@@ -891,10 +903,17 @@ static int waiting_unlock_result(void *arg)
   g_main_loop_run(task_node->loop);
   g_main_loop_unref(task_node->loop);
   task_node->loop = NULL;
+
   int ret = releaseAdminConnection(&admin_connection);
   if (ret)
   {
-    serverLog(LL_ERROR, "waiting_unlock_result releaseAdminConnection");
+    serverLog(LL_ERROR, "waiting_unlock_result releaseAdminConnection error");
+    return ret;
+  }
+  ret = gattlib_adapter_close(ble_data->adapter);
+  if (ret)
+  {
+    serverLog(LL_ERROR, "gattlib_adapter_close error ");
     return ret;
   }
   return 0;
@@ -1027,6 +1046,8 @@ int bleInitAdminParam(ble_admin_param_t *admin_param)
 int bleReleaseAdminParam(ble_admin_param_t **pp_admin_param)
 {
   ble_admin_param_t *admin_param = *pp_admin_param;
+  if (!pp_admin_param) return 1;
+  if (!admin_param) return 1;
   if (admin_param->lock)
   {
     serverLog(LL_NOTICE, "bleReleaseAdminParam");

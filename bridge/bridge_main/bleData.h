@@ -5,7 +5,7 @@
 // 所以使用者需要自己释放
 typedef struct BleData
 {
-  char *adapter_name; // 蓝牙接口的名字
+  char *adapter_name;
   void *adapter;
   void *ble_param;  // 设置什么参数
   int  ble_param_len;    

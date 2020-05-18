@@ -181,7 +181,9 @@ int register_admin_notfication(void *arg): 这个函数, 需要参数来启动, 
 https://valgrind.org/docs/manual/mc-manual.html
 
 内存测试命令:
-sudo valgrind --tool=memcheck --leak-check=full --leak-resolution=low --show-leak-kinds=all --leak-check-heuristics=all --xtree-leak=yes ./bridge/test/test_ble_admin_unlock D9:78:2F:E3:1A:5C d4c33574f65b83cc8d214e545b89d049 94c5b5d4a6ad3497
+sudo G_DEBUG=gc-friendly G_SLICE=always-malloc valgrind --track-origins=yes --tool=memcheck --leak-check=full ./bridge/test/test_ble_admin_unlock D9:78:2F:E3:1A:5C d4c33574f65b83cc8d214e545b89d049 94c5b5d4a6ad3497
+
+
 
 当前泄漏检测记录:
 1. 

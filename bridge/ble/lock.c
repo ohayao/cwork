@@ -6,7 +6,7 @@ int getLock(igm_lock_t **pp_lock)
 {
   if (!pp_lock) return 1;
   if (*pp_lock) releaseLock(pp_lock);
-  *pp_lock = calloc(sizeof(igm_lock_t), 1);
+  *pp_lock = malloc(sizeof(igm_lock_t));
   return 0;
 }
 
@@ -144,6 +144,7 @@ int releaseLockAminKey(igm_lock_t *lock)
 {
   if (lock && lock->has_admin_key && lock->admin_key && lock->admin_key_len)
   {
+    serverLog(LL_NOTICE, "releaseLockAminKey");
     lock->has_admin_key = 0;
     lock->admin_key_len = 0;
     free(lock->admin_key);
@@ -156,6 +157,7 @@ int releaseLockPassword(igm_lock_t *lock)
 {
   if (lock && lock->has_password && lock->password_size && lock->password)
   {
+    serverLog(LL_NOTICE, "releaseLockPassword");
     lock->has_password = 0;
     lock->password_size = 0;
     free(lock->password);
@@ -217,6 +219,8 @@ int setLockAdminConnection(igm_lock_t *lock, int admin_connection)
 
 void releaseLock(igm_lock_t ** pp_lock)
 {
+  if (!pp_lock) return;
+  if (!(*pp_lock)) return;
   releaseLockAminKey(*pp_lock);
   releaseLockPassword(*pp_lock);
   free(*pp_lock);

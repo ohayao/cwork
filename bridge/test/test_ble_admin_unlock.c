@@ -85,10 +85,11 @@ int hexStrToByte(const char* source, uint8_t* dest, int sourceLen)
 int testUnLock(igm_lock_t *lock) {
     serverLog(LL_NOTICE,"UnLock cmd ask invoker to release the lock.");
       
-    ble_admin_param_t *admin_param = (ble_admin_param_t *)calloc(sizeof(ble_admin_param_t), 1);
+    ble_admin_param_t *admin_param = (ble_admin_param_t *)malloc(sizeof(ble_admin_param_t));
+    bleInitAdminParam(admin_param);
     bleSetAdminParam(admin_param, lock);
 
-    ble_data_t *ble_data = calloc(sizeof(ble_data_t), 1);
+    ble_data_t *ble_data = malloc(sizeof(ble_data_t));
     bleInitData(ble_data);
     bleSetBleParam(ble_data, admin_param, sizeof(ble_admin_param_t));
 
@@ -124,15 +125,18 @@ int testUnLock(igm_lock_t *lock) {
     }
     if (error)
     {
-        serverLog(LL_NOTICE, "unlock error");
+        serverLog(LL_ERROR, "unlock error");
         return error;
     }
 
     saveTaskData(tn);
-    bleReleaseData(&tn->ble_data);
+   
+    bleReleaseBleResult(ble_data);
+    free(ble_data);
+    ble_data = NULL;
     free(tn);
     tn = NULL;
-    
+    serverLog(LL_NOTICE, "unlock end-------");
     return 0;
 }
 
@@ -144,24 +148,26 @@ int main(int argc, char *argv[]) {
     serverLog(LL_NOTICE,"test ble unlock ing to start.");
     
     serverLog(LL_NOTICE,"select the lock you want to unlock.");
-    igm_lock_t lock;
-    initLock(&lock);
-    setLockAddr(&lock, argv[1], strlen(argv[1]));
+    igm_lock_t *lock=NULL;
+    getLock(&lock);
+    initLock(lock);
+    setLockAddr(lock, argv[1], strlen(argv[1]));
     serverLog(LL_NOTICE, "setLockAddr success");
 
     uint8_t tmp_buff[100];
     memset(tmp_buff, 0, sizeof(tmp_buff));
     int admin_len = hexStrToByte(argv[2], tmp_buff, strlen(argv[2]));
-    setLockAdminKey(&lock, tmp_buff, admin_len);
+    setLockAdminKey(lock, tmp_buff, admin_len);
     serverLog(LL_NOTICE, "setLockAdminKey success");
 
     memset(tmp_buff, 0, sizeof(tmp_buff));
     int password_size = hexStrToByte(argv[3], tmp_buff, strlen(argv[3]));
-    setLockPassword(&lock, tmp_buff, password_size);
+    setLockPassword(lock, tmp_buff, password_size);
     serverLog(LL_NOTICE, "setLockPassword success");
 
     serverLog(LL_NOTICE, "unlock cmd test go");
-    int res = testUnLock(&lock);
-    return res;
+    int res = testUnLock(lock);
+    releaseLock(&lock);
+    return 0;
 }
 

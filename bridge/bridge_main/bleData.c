@@ -11,6 +11,7 @@ int bleInitData(ble_data_t *data)
 
 int bleReleaseData(ble_data_t **pp_data)
 {
+  bleReleaseBleParam(*pp_data);
   bleReleaseBleResult(*pp_data);
   free(*pp_data);
   *pp_data = NULL;
@@ -74,7 +75,7 @@ int bleReleaseBleResult(ble_data_t *data)
   if (!data) return 1;
   if (data->ble_result)
   {
-    serverLog(LL_NOTICE,"bleReleaseBleResult");
+    serverLog(LL_NOTICE,"bleReleaseBleResult????");
     data->ble_result_len = 0;
     free(data->ble_result);
     data->ble_result = NULL;
@@ -84,8 +85,9 @@ int bleReleaseBleResult(ble_data_t *data)
 
 int bleSetBleResult(ble_data_t *data, void *ble_result, int ble_result_len)
 {
+  if (!data) return 1;
   bleReleaseBleResult(data);
-  data->ble_result = calloc(ble_result_len, 1);
+  data->ble_result = malloc(ble_result_len);
   // TODO 申请内存可能出错
   data->ble_result_len = ble_result_len;
   memcpy(data->ble_result, ble_result, data->ble_result_len);

@@ -55,7 +55,6 @@ void saveTaskData(task_node_t *ptn)
             break;
         }
     }
-    bleReleaseData(&ptn->ble_data);
 }
 
 int hexStrToByte(const char* source, uint8_t* dest, int sourceLen)
@@ -86,10 +85,11 @@ int hexStrToByte(const char* source, uint8_t* dest, int sourceLen)
 int testUnLock(igm_lock_t *lock) {
     serverLog(LL_NOTICE,"UnLock cmd ask invoker to release the lock.");
       
-    ble_admin_param_t *admin_param = (ble_admin_param_t *)calloc(sizeof(ble_admin_param_t), 1);
+    ble_admin_param_t *admin_param = (ble_admin_param_t *)malloc(sizeof(ble_admin_param_t));
+    bleInitAdminParam(admin_param);
     bleSetAdminParam(admin_param, lock);
 
-    ble_data_t *ble_data = calloc(sizeof(ble_data_t), 1);
+    ble_data_t *ble_data = malloc(sizeof(ble_data_t));
     bleInitData(ble_data);
     bleSetBleParam(ble_data, admin_param, sizeof(ble_admin_param_t));
 
@@ -129,11 +129,13 @@ int testUnLock(igm_lock_t *lock) {
         return error;
     }
 
-    saveTaskData(tn);
-    
+    // saveTaskData(tn);
+   
+    bleReleaseBleResult(ble_data);
+    free(ble_data);
+    ble_data = NULL;
     free(tn);
     tn = NULL;
-    
     return 0;
 }
 
@@ -162,7 +164,7 @@ int main(int argc, char *argv[]) {
     serverLog(LL_NOTICE, "setLockPassword success");
 
     serverLog(LL_NOTICE, "multi unlock cmd test go");
-    int n_test = 100;
+    int n_test = 30;
     int res;
     while (n_test)
     {

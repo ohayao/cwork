@@ -638,15 +638,6 @@ int register_pairing_notfication(void *arg)
                                       param->lock->addr, param->lock->addr_len);
   // char *adapter_name = NULL;
   // void *adapter = NULL;
-  ble_data->adapter_name = NULL;
-  ble_data->adapter = NULL;
-  ret = gattlib_adapter_open(ble_data->adapter_name, &(ble_data->adapter));
-  if (ret) {
-		serverLog(LL_ERROR, 
-      "ERROR: register_pairing_notfication Failed to open adapter.");
-		return 1;
-	}
-  serverLog(LL_NOTICE, "register_pairing_notfication Success to open adapter.." );
   serverLog(LL_NOTICE, "register_pairing_notfication ready to connection %s",
                                                               param->lock->addr);
   pairing_connection->gatt_connection = gattlib_connect(
