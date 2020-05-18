@@ -195,6 +195,17 @@ sudo valgrind --tool=memcheck --leak-check=full --leak-resolution=low --show-lea
 ==3692==                         newarray           : 1,792 bytes in 32 blocks
 ==3692==         suppressed: 0 bytes in 0 blocks
 
+2. 
+==5934==    definitely lost: 305 bytes in 11 blocks
+==5934==    indirectly lost: 318 bytes in 7 blocks
+==5934==      possibly lost: 2,432 bytes in 26 blocks
+==5934==    still reachable: 213,269 bytes in 3,192 blocks
+==5934==                       of which reachable via heuristic:
+==5934==                         length64           : 1,632 bytes in 24 blocks
+==5934==                         newarray           : 1,792 bytes in 32 blocks
+==5934==         suppressed: 0 bytes in 0 blocks
+
+
 
 7. Device connected error (device:/org/bluez/hci0/dev_D9_78_2F_E3_1A_5C): GDBus.Error:org.bluez.Error.Failed: Software caused nection abort
 报文显示, 是master主动发起的断开. 
