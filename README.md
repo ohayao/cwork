@@ -168,12 +168,7 @@ connectionID 0                              // connectionID 是多少
 
 5. unlock的时候, 出现过一个 2 bytes len, 没法重现当中.
 
-6. 内存泄漏. 
-task_node, 不再复制, 只拷贝指针
-ble_data: 调用者申请, 调用者释放, 这个内存在获得结果前,不应该释放
-  ble_param: 进行蓝牙活动的使用者, 在获得参数之后, 就释放.
-  ble_result: 需要传递回参数给调用者, 调用者释放
-
+6. 内存泄漏.  (在unlock这个命令下fix)
 检查内存泄漏思路:
 int register_admin_notfication(void *arg): 这个函数, 需要参数来启动, 得到参数之后,把所需要的参数, 拷贝到自己connection, 然后释放参数
 
@@ -183,29 +178,27 @@ https://valgrind.org/docs/manual/mc-manual.html
 内存测试命令:
 sudo G_DEBUG=gc-friendly G_SLICE=always-malloc valgrind --track-origins=yes --tool=memcheck --leak-check=full ./bridge/test/test_ble_admin_unlock D9:78:2F:E3:1A:5C d4c33574f65b83cc8d214e545b89d049 94c5b5d4a6ad3497
 
+命令所显示结果为:
+==20824== LEAK SUMMARY:
+==20824==    definitely lost: 200 bytes in 5 blocks
+==20824==    indirectly lost: 313 bytes in 6 blocks
+==20824==      possibly lost: 2,432 bytes in 26 blocks
+==20824==    still reachable: 165,902 bytes in 2,049 blocks
+==20824==                       of which reachable via heuristic:
+==20824==                         length64           : 1,632 bytes in 24 blocks
+==20824==                         newarray           : 1,792 bytes in 32 blocks
+==20824==         suppressed: 0 bytes in 0 blocks
+
+我测试过,即使我什么都不做,在glib使用的当中, 会产生一定的消耗,上面的 definitely lost 可能是glib的.
+我逐句运行,测我所写代码的内存泄漏. 确定运行我的代码,没有任何增加上面的 definitely lost下,再进行下句
+
+sudo ./bridge/test/test_multi_ble_admin_unlock D9:78:2F:E3:1A:5C d4c33574f65b83cc8d214e545b89d049 94c5b5d4a6ad3497
+进行一个 50 次解锁无错的结果
+top显示, 从0.5上升到0.6,应该没明显的内存泄漏在代码中.
 
 
-当前泄漏检测记录:
-1. 
-==3692== LEAK SUMMARY:
-==3692==    definitely lost: 440 bytes in 12 blocks
-==3692==    indirectly lost: 707 bytes in 16 blocks
-==3692==      possibly lost: 2,432 bytes in 26 blocks
-==3692==    still reachable: 213,490 bytes in 3,207 blocks
-==3692==                       of which reachable via heuristic:
-==3692==                         length64           : 1,632 bytes in 24 blocks
-==3692==                         newarray           : 1,792 bytes in 32 blocks
-==3692==         suppressed: 0 bytes in 0 blocks
 
-2. 
-==5934==    definitely lost: 305 bytes in 11 blocks
-==5934==    indirectly lost: 318 bytes in 7 blocks
-==5934==      possibly lost: 2,432 bytes in 26 blocks
-==5934==    still reachable: 213,269 bytes in 3,192 blocks
-==5934==                       of which reachable via heuristic:
-==5934==                         length64           : 1,632 bytes in 24 blocks
-==5934==                         newarray           : 1,792 bytes in 32 blocks
-==5934==         suppressed: 0 bytes in 0 blocks
+
 
 
 
