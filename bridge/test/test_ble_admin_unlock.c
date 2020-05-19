@@ -129,8 +129,7 @@ int testUnLock(igm_lock_t *lock) {
         return error;
     }
 
-    saveTaskData(tn);
-   
+    // saveTaskData(tn);
     bleReleaseBleResult(ble_data);
     free(ble_data);
     ble_data = NULL;

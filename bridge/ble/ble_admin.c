@@ -47,11 +47,24 @@ void initAdminConnection(admin_connection_t *admin_connection)
   memset(admin_connection, 0, sizeof(admin_connection_t));
 }
 
+void releaseAdminConnectionData(admin_connection_t *admin_connection)
+{
+  if (!admin_connection) return;
+  if (admin_connection->step_max_size && admin_connection->step_data)
+  {
+    admin_connection->step_max_size = 0;
+    admin_connection->n_size_byte = 0;
+    admin_connection->step_cur_size = 0;
+    free(admin_connection->step_data);
+    admin_connection->step_data = NULL;
+  }
+}
+
 int releaseAdminConnection(admin_connection_t **pp_admin_connection)
 {
   admin_connection_t *admin_connection = *pp_admin_connection;
   int ret;
-  
+
   releaseLock(&admin_connection->lock);
   bleReleaseAdminResult(&admin_connection->admin_result);
 
@@ -208,16 +221,11 @@ int write_admin_step2(void *arg)
 
   admin_connection->admin_step = BLE_ADMIN_STEP2;
 
-  admin_connection->step_max_size = 0;
-  admin_connection->n_size_byte = 0;
-  admin_connection->step_cur_size = 0;
-  free(admin_connection->step_data);
-  admin_connection->step_data = NULL;
-
   free(step2Bytes);
   step2Bytes = NULL;
   free(payloadBytes);
   payloadBytes = NULL;
+  releaseAdminConnectionData(admin_connection);
 
   return 0;
 ADMIN_STEP2_ERROR_EXIT:
@@ -234,6 +242,7 @@ ADMIN_STEP2_ERROR_EXIT:
   }
   return 1;
 }
+
 
 static int write_lock_request(void *arg)
 {
@@ -327,7 +336,7 @@ static int write_unlock_request(void *arg)
   size_t buf_size = 32;
   size_t encode_size = 0;
   uint8_t buf[buf_size];
-  uint32_t retvalMaxLen;
+  int retvalLen;
   uint8_t *retvalBytes;
   uint8_t *encryptPayloadBytes;
 	size_t encryptPayloadBytes_len;
@@ -342,7 +351,7 @@ static int write_unlock_request(void *arg)
   if (IgErr)
 	{
     serverLog(LL_ERROR, "ig_UnpairRequest_encode err");
-    goto UNPAIR_REQUEST_ERROR;
+    goto UNLOCK_REQUEST_ERROR;
 	}
   serverLog(LL_NOTICE, "ig_UnpairRequest_encode success size:" );
 
@@ -350,52 +359,34 @@ static int write_unlock_request(void *arg)
 	if (!encry_connection)
 	{
     serverLog(LL_ERROR, "ble_unpair_write_unpairreques can't get encry_connection");
-		goto UNPAIR_REQUEST_ERROR;
+		goto UNLOCK_REQUEST_ERROR;
 	}
   serverLog(LL_NOTICE, "ble_unpair_write_unpairreques success getting encry_connection" );
 
-  retvalMaxLen = encryptDataSize(encode_size);
-  serverLog(LL_NOTICE, "ble_unpair_write_unpairreques PayloadBytes_len: %d", retvalMaxLen);
-  retvalBytes = (uint8_t *)calloc(retvalMaxLen,1);
+  retvalLen = AdminConnection_encryptNative(
+    admin_connection->lock->connectionID, buf, encode_size, &retvalBytes);
+  if (!retvalLen) 
+  {
+    serverLog(LL_ERROR, "failed in AdminConnection_encryptNative");
+    goto UNLOCK_REQUEST_ERROR;
+  }
+  
 
-  int32_t retvalLen = encryptData(
-    buf, encode_size,
-    retvalBytes, retvalMaxLen,
-    encry_connection->key, kConnectionKeyLength,
-    encry_connection->txNonce, kNonceLength
-  );
-  serverLog(LL_NOTICE, "------------- encry_connection->key: ");
-  // for (int j = 0; j < kConnectionKeyLength; j++)
-  // {
-  //   printf("%02x ", encry_connection->key[j]);
-  // }
-  // printf("\n");
-
-  serverLog(LL_NOTICE, "------------- encry_connection->txNonce: ");
-  // for (int j = 0; j < kNonceLength; j++)
-  // {
-  //   printf("%02x ", encry_connection->txNonce[j]);
-  // }
-  // printf("\n");
-
-  incrementNonce(encry_connection->txNonce);
-  serverLog(LL_NOTICE, "ble_unpair_write_unpairreques retvalLen: %d", retvalLen);
-
+  
   if (!build_msg_payload(
 		&encryptPayloadBytes, &encryptPayloadBytes_len, retvalBytes, retvalLen))
 	{
     serverLog(LL_ERROR, "failed in build_msg_payload");
-		goto UNPAIR_REQUEST_ERROR;
+		goto UNLOCK_REQUEST_ERROR;
 	}
   serverLog(LL_NOTICE, "build_msg_payload success");
-
 
   ret = write_char_by_uuid_multi_atts(
 		admin_connection->gatt_connection, &admin_connection->admin_uuid, 
     encryptPayloadBytes, encryptPayloadBytes_len);
 	if (ret != GATTLIB_SUCCESS) {
     serverLog(LL_ERROR, "write_char_by_uuid_multi_atts failed in writing th packags");
-		goto UNPAIR_REQUEST_ERROR;
+		goto UNLOCK_REQUEST_ERROR;
 	}
   serverLog(LL_NOTICE, "write_char_by_uuid_multi_atts success");
   
@@ -403,13 +394,13 @@ static int write_unlock_request(void *arg)
   encryptPayloadBytes = NULL;
   free(retvalBytes);
   retvalBytes = NULL;
-  
+  ig_AdminUnlockRequest_deinit(&unlock_request);
   admin_connection->admin_step = BLE_ADMIN_UNLOCK_REQUEST;
 
   return 0;
 
 
-UNPAIR_REQUEST_ERROR:
+UNLOCK_REQUEST_ERROR:
   if (encryptPayloadBytes)
   {
     free(encryptPayloadBytes);
@@ -524,7 +515,7 @@ int handle_step3_message(const uint8_t* data, int data_length,void* user_data)
   if (admin_connection->step_max_size == admin_connection->step_cur_size)
   {
     int ret;
-    serverLog(LL_NOTICE, "handle_step3_message RECV step3 data finished");
+    serverLog(LL_NOTICE, "handle_step3_message RECV step3 data finished %d", admin_connection->step_max_size);
     admin_connection->admin_step = BLE_ADMIN_ESTABLISHED;
 
     int rec_ret = igloohome_ble_lock_crypto_AdminConnection_recConnStep3Native(
@@ -549,11 +540,7 @@ int handle_step3_message(const uint8_t* data, int data_length,void* user_data)
     
     
     // ?>?释放内存?
-    admin_connection->step_max_size = 0;
-    admin_connection->n_size_byte = 0;
-    admin_connection->step_cur_size = 0;
-    free(admin_connection->step_data);
-    admin_connection->step_data = NULL;
+    releaseAdminConnectionData(admin_connection);
     serverLog(LL_NOTICE, "g_main_loop_quit connection->properties_changes_loop");
     g_main_loop_quit(task_node->loop);
   }
@@ -585,7 +572,9 @@ static int handle_unlock_responce(const uint8_t* data, int data_length,void* use
   ble_data_t *ble_data = task_node->ble_data;
   admin_connection_t *admin_connection = 
                               (admin_connection_t *)ble_data->ble_connection;
-  
+  int responceLen;
+  uint8_t *responceBytes = NULL;
+
   save_message_data(data, data_length, user_data);
 
   if (admin_connection->step_max_size == admin_connection->step_cur_size)
@@ -600,11 +589,9 @@ static int handle_unlock_responce(const uint8_t* data, int data_length,void* use
     uint8_t messageBytes[messageLen];
     memcpy(messageBytes, data_start, messageLen);
 
-    uint32_t responceMaxLen = decryptDataSize(messageLen);
-    uint8_t responceBytes[responceMaxLen];
-    // serverLog(LL_NOTICE, "messageLen %d", messageLen);
-    int32_t responceLen = AdminConnection_decryptNative(
-      (admin_connection->lock)->connectionID, messageBytes, messageLen, (uint8_t **)(&responceBytes));
+    
+    responceLen = AdminConnection_decryptNative(
+      (admin_connection->lock)->connectionID, messageBytes, messageLen, &responceBytes);
     if (!responceLen)
     { 
       serverLog(LL_ERROR, "ble_unpair_write_unpairreques responceLen %d", responceLen);
@@ -620,7 +607,7 @@ static int handle_unlock_responce(const uint8_t* data, int data_length,void* use
     {
       serverLog(LL_NOTICE, "ig_AdminUnlockResponse_decode err %d", err);
     }
-    serverLog(LL_NOTICE, "has unlock response %d %d",admin_unlock_resppnce.has_result, admin_unlock_resppnce.result);
+    serverLog(LL_NOTICE, "has unlock response %d error %d",admin_unlock_resppnce.has_result, admin_unlock_resppnce.result);
     if (admin_connection->has_admin_result && admin_unlock_resppnce.has_result)
     {
       serverLog(LL_NOTICE, "set admin result to success");
@@ -634,9 +621,9 @@ static int handle_unlock_responce(const uint8_t* data, int data_length,void* use
     AdminConnection_endConnection((admin_connection->lock)->connectionID);
 
     serverLog(LL_NOTICE, "AdminConnection_endConnection success");
-    
-UNLOCK_RESULT_EXIT:
+
     serverLog(LL_NOTICE, "UNLOCK_RESULT_EXIT--------------------------------");
+    free(responceBytes);
     g_main_loop_quit(task_node->loop);
   }
 }
@@ -648,6 +635,8 @@ static int handle_unpair_responce(const uint8_t* data, int data_length,void* use
   ble_data_t *ble_data = task_node->ble_data;
   admin_connection_t *admin_connection = 
                               (admin_connection_t *)ble_data->ble_connection;
+  int responceLen;
+  uint8_t *responceBytes;
   save_message_data(data, data_length, user_data);
   if (admin_connection->step_max_size == admin_connection->step_cur_size)
   {
@@ -661,18 +650,10 @@ static int handle_unpair_responce(const uint8_t* data, int data_length,void* use
     uint8_t *data_start = admin_connection->step_data + admin_connection->n_size_byte;
     uint8_t messageBytes[messageLen];
     memcpy(messageBytes, data_start, messageLen);
-    // for (int j = 0; j < messageLen; j++)
-    // {
-    //   printf("%02x ", messageBytes[j]);
-    // }
-    // printf("\n");
 
-    uint32_t responceMaxLen = decryptDataSize(messageLen);
-    uint8_t responceBytes[responceMaxLen];
-    // uint8_t *responceBytes = (uint8_t *)calloc(responceMaxLen,1);
     serverLog(LL_NOTICE, "messageLen %d", messageLen);
     int32_t responceLen = AdminConnection_decryptNative(
-      (admin_connection->lock)->connectionID, messageBytes, messageLen, (uint8_t **)(&responceBytes));
+      (admin_connection->lock)->connectionID, messageBytes, messageLen, (&responceBytes));
     if (!responceLen)
     { 
       serverLog(LL_ERROR, "ble_unpair_write_unpairreques responceLen %d", responceLen);
@@ -800,11 +781,10 @@ int register_admin_notfication(void *arg)
   
   ble_admin_param_t *param = (ble_admin_param_t *)(ble_data->ble_param);
   // 分配 connection, 传递到其他函数的数据,
-  ble_data->ble_connection = calloc(sizeof(admin_connection_t), 1);
+  ble_data->ble_connection = malloc(sizeof(admin_connection_t));
   admin_connection_t *admin_connection = 
                             (admin_connection_t *)ble_data->ble_connection;
   initAdminConnection(admin_connection);
-  
   getLock(&admin_connection->lock);
   copyLock(admin_connection->lock, param->lock);
   serverLog(LL_NOTICE, "register_admin_notfication release admin param");
@@ -812,7 +792,7 @@ int register_admin_notfication(void *arg)
   
   serverLog(LL_NOTICE, "register_admin_notfication apply for a ble_admin_result_t, need user to release");
   admin_connection->has_admin_result = 1;
-  admin_connection->admin_result = calloc(sizeof(ble_admin_result_t), 1);
+  admin_connection->admin_result = malloc(sizeof(ble_admin_result_t));
   bleInitAdminResult(admin_connection->admin_result);
   bleSetAdminResultAddr(admin_connection->admin_result, 
                                       admin_connection->lock->addr, admin_connection->lock->addr_len);
@@ -870,8 +850,6 @@ ADMIN_ERROR_EXIT:
   return 1;
 }
 
-
-
 static int waiting_unpair_result(void *arg)
 {
   serverLog(LL_NOTICE, "waiting_unpair_result");
@@ -904,6 +882,9 @@ static int waiting_unlock_result(void *arg)
   g_main_loop_unref(task_node->loop);
   task_node->loop = NULL;
 
+  serverLog(LL_NOTICE, "waiting_admin_step3 exit task_node->loop");
+
+  releaseAdminConnectionData(admin_connection);
   int ret = releaseAdminConnection(&admin_connection);
   if (ret)
   {
@@ -916,6 +897,7 @@ static int waiting_unlock_result(void *arg)
     serverLog(LL_ERROR, "gattlib_adapter_close error ");
     return ret;
   }
+  ble_data->adapter = NULL;
   return 0;
 }
 
@@ -950,7 +932,6 @@ static int waiting_admin_step3(void *arg)
   serverLog(LL_NOTICE, "waiting_admin_step3 new loop waiting");
   g_main_loop_run(task_node->loop);
   admin_connection->admin_step = BLE_ADMIN_DONE;
-  serverLog(LL_NOTICE, "waiting_admin_step3 exit task_node->loop");
   return 0;
 }
 

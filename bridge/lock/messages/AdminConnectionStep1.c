@@ -42,7 +42,8 @@ IgSerializerError ig_AdminConnectionStep1_encode(IgAdminConnectionStep1 *obj,uin
   
   return IgSerializerNoError;
 }
-IgSerializerError ig_AdminConnectionStep1_decode(uint8_t *buf,size_t buf_size,IgAdminConnectionStep1 *retval,size_t index)
+IgSerializerError ig_AdminConnectionStep1_decode(
+  uint8_t *buf,size_t buf_size,IgAdminConnectionStep1 *retval,size_t index)
 {
   CborParser parser;
   CborValue it;

@@ -2,6 +2,9 @@
 
 // open 所做的事情是
 // 用 dbus 获取, 并且设置打开
+// 资源: 
+// adapter_proxy
+// gattlib_adapter
 int gattlib_adapter_open(const char* adapter_name, void** adapter) {
 	char object_path[20];
 	OrgBluezAdapter1 *adapter_proxy;
@@ -42,6 +45,7 @@ int gattlib_adapter_open(const char* adapter_name, void** adapter) {
 	}
 
 	// Initialize stucture
+	// 这儿, 泄漏了?
 	gattlib_adapter->adapter_name = strdup(adapter_name);
 	gattlib_adapter->adapter_proxy = adapter_proxy;
 
@@ -314,9 +318,19 @@ int gattlib_adapter_scan_disable(void* adapter) {
 int gattlib_adapter_close(void* adapter)
 {
 	struct gattlib_adapter *gattlib_adapter = adapter;
-
-	g_object_unref(gattlib_adapter->device_manager);
-	g_object_unref(gattlib_adapter->adapter_proxy);
+	// open and the close, will fault
+	if (gattlib_adapter->device_manager)
+	{
+		g_object_unref(gattlib_adapter->device_manager);
+	}
+	if (gattlib_adapter->adapter_proxy)
+	{
+		g_object_unref(gattlib_adapter->adapter_proxy);
+	}
+	if (gattlib_adapter->adapter_name)
+	{
+		free(gattlib_adapter->adapter_name);
+	}
 	free(gattlib_adapter);
 
 	return GATTLIB_SUCCESS;

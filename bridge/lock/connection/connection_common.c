@@ -103,7 +103,7 @@ int decryptNative(
         return 0;
     }
     *retBytes = (uint8_t*)calloc(retvalLen, 1);
-    memcpy(retBytes, plaintext, retvalLen);
+    memcpy(*retBytes, plaintext, retvalLen);
     return retvalLen;
 }
 
