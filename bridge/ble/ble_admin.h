@@ -40,18 +40,20 @@ int bleSetAdminParam(ble_admin_param_t *unpair_param, igm_lock_t *lock);
 
 typedef struct BLEAdminResult {
   char addr[MAX_DEVICE_ADDR];
-  int admin_successed;
+  int admin_result;
   int unlock_result;
   int unpair_result;
 }ble_admin_result_t;
 
-int bleInitAdminResult(ble_admin_result_t *result);
-int bleSetAdminResultAddr(ble_admin_result_t *result, 
+int initAdminResult(ble_admin_result_t *result);
+int setAdminResultAddr(ble_admin_result_t *result, 
   char *addr, size_t addr_len);
-int bleIsAdminSuccess(ble_admin_result_t *result);
-int bleSetAdminResultGattConnection(ble_admin_result_t *result, void* gatt_connection);
 void bleReleaseAdminResult(ble_admin_result_t **pp_result);
+void setAdminResultErr(ble_admin_result_t *result, int err);
+void setAdminResultUnlockErr(ble_admin_result_t *result, int err);
 
+
+int isAdminSuccess(ble_admin_result_t *result);
 // admin
 fsm_table_t *getAdminFsmTable();
 int getAdminFsmTableLen();
