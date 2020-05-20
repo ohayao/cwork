@@ -117,7 +117,8 @@ b5fa603bb0d01d38
 7910: 12 May 2020 02:30:18.161 * unlock_result:
 7910: 12 May 2020 02:30:18.161 * unlock error: 0 0 means unlock
 
-4. ./bridge/test/test_ble_admin_unpair D9:78:2F:E3:1A:5C 974341a13a966c3aa9ba9720af4a7237 b5fa603bb0d01d38
+4. 测试 unpair 的程序
+./bridge/test/test_ble_admin_unpair D9:78:2F:E3:1A:5C 974341a13a966c3aa9ba9720af4a7237 b5fa603bb0d01d38
 
 最后成功结果:
 8719: 12 May 2020 02:47:06.231 * saving ble TASK_BLE_ADMIN_UNPAIR data
@@ -125,14 +126,21 @@ b5fa603bb0d01d38
 8719: 12 May 2020 02:47:06.232 * unlock error: 0 0 means unlock
 8719: 12 May 2020 02:47:06.232 * doing_task_head is empty, check Lock list.
 
-5. ./bridge/test/test_multi_ble_admin_unlock D9:78:2F:E3:1A:5C d4c33574f65b83cc8d214e545b89d049 94c5b5d4a6ad3497
+5. 测试 unlock 的程序
+
+./bridge/test/test_multi_ble_admin_unlock D9:78:2F:E3:1A:5C d4c33574f65b83cc8d214e545b89d049 94c5b5d4a6ad3497
 ./bridge/test/test_ble_admin_unlock D9:78:2F:E3:1A:5C d4c33574f65b83cc8d214e545b89d049 94c5b5d4a6ad3497
 
+
 最后成功结果:
 8719: 12 May 2020 02:47:06.231 * saving ble TASK_BLE_ADMIN_UNPAIR data
 8719: 12 May 2020 02:47:06.232 * unpair_result:
 8719: 12 May 2020 02:47:06.232 * unlock error: 0 0 means unlock
 8719: 12 May 2020 02:47:06.232 * doing_task_head is empty, check Lock list.
+
+5. 测试 unlock 的程序
+./bridge/test/test_ble_admin_lock D9:78:2F:E3:1A:5C d4c33574f65b83cc8d214e545b89d049 94c5b5d4a6ad3497
+./bridge/test/test_multi_ble_admin_lock D9:78:2F:E3:1A:5C d4c33574f65b83cc8d214e545b89d049 94c5b5d4a6ad3497
 
 ### BLE 相关用法
 1. void addDiscoverTask(int msg_id)

@@ -23,10 +23,7 @@ target_link_libraries(test_ble_pair
   ${TEST_DEPENDENCIES}
 )
 
-add_executable(test_ble_admin_unlock ./test_ble_admin_unlock.c)
-target_link_libraries(test_ble_admin_unlock
-  ${TEST_DEPENDENCIES}
-)
+
 
 add_executable(test_ble_admin_unpair ./test_ble_admin_unpair.c)
 target_link_libraries(test_ble_admin_unpair
@@ -38,7 +35,17 @@ target_link_libraries(test_decode_base64
   ${TEST_DEPENDENCIES}
 )
 
+add_executable(test_ble_admin_unlock ./test_ble_admin_unlock.c)
+target_link_libraries(test_ble_admin_unlock
+  ${TEST_DEPENDENCIES}
+)
+
 add_executable(test_multi_ble_admin_unlock ./test_multi_ble_admin_unlock.c)
 target_link_libraries(test_multi_ble_admin_unlock
+  ${TEST_DEPENDENCIES}
+)
+
+add_executable(test_ble_admin_lock ./test_ble_admin_lock.c)
+target_link_libraries(test_ble_admin_lock
   ${TEST_DEPENDENCIES}
 )
