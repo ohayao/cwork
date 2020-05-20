@@ -35,6 +35,7 @@ typedef struct TaskNode {
     fsm_table_t *task_sm_table; // 外部数据
     int sm_table_len;
     GMainLoop *loop;
+    guint timeout_id;
 }task_node_t;
 
 // 获取param长度

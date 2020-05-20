@@ -164,7 +164,7 @@ int main(int argc, char *argv[]) {
     serverLog(LL_NOTICE, "setLockPassword success");
 
     serverLog(LL_NOTICE, "multi unlock cmd test go");
-    int n_test = 50;
+    int n_test = 200;
     int res;
     while (n_test)
     {

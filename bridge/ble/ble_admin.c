@@ -14,6 +14,7 @@
 
 static char admin_str[] = "5c3a659f-897e-45e1-b016-007107c96df6";
 
+
 // --------------------------- function declearation --------------------------
 
 static int register_admin_notfication(void *arg);
@@ -67,6 +68,7 @@ typedef struct AdminConnection {
   uuid_t admin_uuid;
   int has_admin_result;
   ble_admin_result_t *admin_result;
+  int waiting_err;
 }admin_connection_t;
 
 
@@ -125,6 +127,22 @@ static int clearAdminConnectionStepData(admin_connection_t *admin_connection)
     admin_connection->step_data = NULL;
   }
   return 0;
+}
+
+// --------------------------- waiting function -----------------------------
+
+static size_t main_loop_timeout = 3;
+static gboolean stop_main_loop_func(gpointer data)
+{
+  serverLog(LL_ERROR, "stop_main_loop_func timeout");
+  task_node_t *task_node = (task_node_t *)data;
+  ble_data_t *ble_data = task_node->ble_data;
+  admin_connection_t *admin_connection = 
+                              (admin_connection_t *)ble_data->ble_connection;
+  admin_connection->waiting_err = 1;
+  g_source_remove(task_node->timeout_id);
+	g_main_loop_quit(task_node->loop);
+	return FALSE;
 }
 
 //  ------------------------ Admin step start ------------------------
@@ -273,6 +291,10 @@ int register_admin_notfication(void *arg)
 
   admin_connection->admin_step = BLE_ADMIN_BEGIN;
   task_node->loop = g_main_loop_new(NULL, 0);
+  if (main_loop_timeout>0)
+  {
+    task_node->timeout_id = g_timeout_add_seconds(main_loop_timeout, stop_main_loop_func, arg);
+  }
   return 0;
 
 ADMIN_ERROR_EXIT:
@@ -307,11 +329,44 @@ int waiting_admin_step1(void *arg)
 {
   serverLog(LL_NOTICE, "waiting_pairing_step2");
   task_node_t *task_node = (task_node_t *)arg;
-
+  ble_data_t *ble_data = (ble_data_t *)(task_node->ble_data);
+  admin_connection_t *admin_connection = 
+                            (admin_connection_t *)ble_data->ble_connection;
+  
   serverLog(LL_NOTICE, "waiting_admin_step1 new loop waiting");
   g_main_loop_run(task_node->loop);
-  serverLog(LL_NOTICE, "waiting_admin_step2 exit task_node->loop");
+  if (admin_connection->waiting_err)
+    goto WAITING_STEP1_ERROR;
+  serverLog(LL_NOTICE, "waiting_admin_step1 exit task_node->loop");
   return 0;
+
+WAITING_STEP1_ERROR:
+  // 这儿, 需要释放订阅,释放数据
+  serverLog(LL_ERROR, "WAITING_STEP1_ERROR ");
+  g_source_remove(task_node->timeout_id);
+  g_main_loop_unref(task_node->loop);
+  releaseAdminConnectionData(admin_connection);
+  setAdminResultErr(admin_connection->admin_result, 1);
+  bleSetBleResult(ble_data, admin_connection->admin_result, sizeof(ble_admin_result_t));
+  int ret = releaseAdminConnection(&admin_connection);
+  if (ret)
+  {
+    serverLog(LL_ERROR, 
+      "register_admin_notfication releaseAdminConnection error");
+    return ret;
+  }
+  serverLog(LL_NOTICE, 
+      "register_admin_notfication releaseAdminConnection success");
+
+  ret = gattlib_adapter_close(ble_data->adapter);
+  if (ret)
+  {
+    serverLog(LL_ERROR, "gattlib_adapter_close error ");
+    return ret;
+  }
+  serverLog(LL_NOTICE, 
+      "register_admin_notfication gattlib_adapter_close success");
+  return 1;
 }
 
 int handle_step1_message(const uint8_t* data, int data_length,void* user_data)
@@ -519,9 +574,37 @@ static int waiting_admin_step3(void *arg)
 
   serverLog(LL_NOTICE, "waiting_admin_step3 new loop waiting");
   g_main_loop_run(task_node->loop);
+  if (admin_connection->waiting_err)
+    goto WAITING_STEP3_ERROR;
   serverLog(LL_NOTICE, "waiting_admin_step3 end loop waiting");
   admin_connection->admin_step = BLE_ADMIN_DONE;
   return 0;
+WAITING_STEP3_ERROR:
+  serverLog(LL_ERROR, "WAITING_STEP3_ERROR ");
+  g_source_remove(task_node->timeout_id);
+  g_main_loop_unref(task_node->loop);
+  releaseAdminConnectionData(admin_connection);
+  setAdminResultErr(admin_connection->admin_result, 1);
+  bleSetBleResult(ble_data, admin_connection->admin_result, sizeof(ble_admin_result_t));
+  int ret = releaseAdminConnection(&admin_connection);
+  if (ret)
+  {
+    serverLog(LL_ERROR, 
+      "register_admin_notfication releaseAdminConnection error");
+    return ret;
+  }
+  serverLog(LL_NOTICE, 
+      "register_admin_notfication releaseAdminConnection success");
+
+  ret = gattlib_adapter_close(ble_data->adapter);
+  if (ret)
+  {
+    serverLog(LL_ERROR, "gattlib_adapter_close error ");
+    return ret;
+  }
+  serverLog(LL_NOTICE, 
+      "register_admin_notfication gattlib_adapter_close success");
+  return 1;
 }
 
 int handle_step3_message(const uint8_t* data, int data_length,void* user_data)
@@ -557,10 +640,7 @@ int handle_step3_message(const uint8_t* data, int data_length,void* user_data)
     }
      // 返回参数给调用进程
     serverLog(LL_NOTICE, "handle_step3_message bleSetBleResult to ble data");
-    // bleSetBleResult(
-    //   ble_data, admin_connection->admin_result, sizeof(ble_admin_result_t));
-    
-    
+
     // ?>?释放内存?
     releaseAdminConnectionData(admin_connection);
     serverLog(LL_NOTICE, "g_main_loop_quit connection->properties_changes_loop");
@@ -650,9 +730,7 @@ static int write_unlock_request(void *arg)
   retvalBytes = NULL;
   ig_AdminUnlockRequest_deinit(&unlock_request);
   admin_connection->admin_step = BLE_ADMIN_UNLOCK_REQUEST;
-
   return 0;
-
 
 UNLOCK_REQUEST_ERROR:
   ig_AdminUnlockRequest_deinit(&unlock_request);
@@ -699,7 +777,11 @@ static int waiting_unlock_result(void *arg)
 
   serverLog(LL_NOTICE, "waiting_unlock_result new loop waiting");
   g_main_loop_run(task_node->loop);
+  if (admin_connection->waiting_err)
+    goto WAITING_UNLOCK_ERROR;
+  g_source_remove(task_node->timeout_id);
   g_main_loop_unref(task_node->loop);
+
   task_node->loop = NULL;
 
   serverLog(LL_NOTICE, "waiting_admin_step3 exit task_node->loop");
@@ -719,6 +801,33 @@ static int waiting_unlock_result(void *arg)
   }
   ble_data->adapter = NULL;
   return 0;
+
+WAITING_UNLOCK_ERROR:
+  serverLog(LL_ERROR, "WAITING_UNLOCK_ERROR ");
+  g_source_remove(task_node->timeout_id);
+  g_main_loop_unref(task_node->loop);
+  releaseAdminConnectionData(admin_connection);
+  setAdminResultErr(admin_connection->admin_result, 1);
+  bleSetBleResult(ble_data, admin_connection->admin_result, sizeof(ble_admin_result_t));
+  ret = releaseAdminConnection(&admin_connection);
+  if (ret)
+  {
+    serverLog(LL_ERROR, 
+      "register_admin_notfication releaseAdminConnection error");
+    return ret;
+  }
+  serverLog(LL_NOTICE, 
+      "register_admin_notfication releaseAdminConnection success");
+
+  ret = gattlib_adapter_close(ble_data->adapter);
+  if (ret)
+  {
+    serverLog(LL_ERROR, "gattlib_adapter_close error ");
+    return ret;
+  }
+  serverLog(LL_NOTICE, 
+      "register_admin_notfication gattlib_adapter_close success");
+
 }
 
 
@@ -1090,20 +1199,20 @@ static int waiting_unpair_result(void *arg)
 
 static int waiting_lock_result(void *arg)
 {
-  serverLog(LL_NOTICE, "waiting_unlock_result");
+  serverLog(LL_NOTICE, "waiting_lock_result");
   task_node_t *task_node = (task_node_t *)arg;
 
   // 在这儿用g_main_loop_run等待, 用线程锁和睡眠的方法不行, 就像是bluez不会调用
   // 我的回调函数, 在 rtos 应该会有相应的方法实现这样的等待事件到来的方法.
   // 当前 Linux 下, 这样用, works 
-  serverLog(LL_NOTICE, "waiting_unlock_result new loop waiting");
+  serverLog(LL_NOTICE, "waiting_lock_result new loop waiting");
   task_node->loop = g_main_loop_new(NULL, 0);
   if (!task_node->loop)
   {
     serverLog(LL_ERROR, "task_node->loop error");
   }
   g_main_loop_run(task_node->loop);
-  serverLog(LL_NOTICE, "waiting_unlock_result exit task_node->loop");
+  serverLog(LL_NOTICE, "waiting_lock_result exit task_node->loop");
   return 0;
 }
 

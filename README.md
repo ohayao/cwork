@@ -168,6 +168,7 @@ connectionID 0                              // connectionID 是多少
 
 5. unlock的时候, 出现过一个 2 bytes len, 没法重现当中.
 
+
 6. 内存泄漏.  (在unlock这个命令下fix)
 检查内存泄漏思路:
 int register_admin_notfication(void *arg): 这个函数, 需要参数来启动, 得到参数之后,把所需要的参数, 拷贝到自己connection, 然后释放参数
