@@ -8,22 +8,23 @@
 #include <sys/time.h>
 #include <syslog.h>
 #include <stdlib.h>
-#include <bridge/bridge_main/ign_constants.h>
-#include <bridge/bridge_main/log.h>
-#include <bridge/bridge_main/sysinfo.h>
-#include <bridge/bridge_main/ign.h>
-#include <bridge/bridge_main/task.h>
-#include <bridge/bridge_main/thread_helper.h>
-#include <bridge/bridge_main/mutex_helper.h>
-#include <bridge/bridge_main/task_queue.h>
-#include <bridge/bridge_main/wait_ble.h>
-#include <bridge/ble/ble_discover.h>
-#include <bridge/ble/lock.h>
-#include <bridge/ble/ble_pairing.h>
-#include <bridge/bridge_main/lock_list.h>
-#include <bridge/ble/ble_admin.h>
-#include <bridge/ble/ble_pairing.h>
 #include <ctype.h>
+#include "bridge/bridge_main/ign_constants.h"
+#include "bridge/bridge_main/log.h"
+#include "bridge/bridge_main/sysinfo.h"
+#include "bridge/bridge_main/ign.h"
+#include "bridge/bridge_main/task.h"
+#include "bridge/bridge_main/thread_helper.h"
+#include "bridge/bridge_main/mutex_helper.h"
+#include "bridge/bridge_main/task_queue.h"
+#include "bridge/bridge_main/wait_ble.h"
+#include "bridge/ble/ble_discover.h"
+#include "bridge/ble/lock.h"
+#include "bridge/ble/ble_pairing.h"
+#include "bridge/bridge_main/lock_list.h"
+#include "bridge/ble/ble_admin.h"
+#include "bridge/ble/ble_pairing.h"
+#include "bridge/lock/messages/AdminLockResponse.h"
 
 void saveTaskData(task_node_t *ptn)
 {
@@ -48,7 +49,7 @@ void saveTaskData(task_node_t *ptn)
             {
                 serverLog(LL_ERROR, "lock success");
             }
-                    
+            IgAdminLockResponse *lock_response = admin_unlock_result->cmd_response;
             break;
         }
         default:
@@ -130,6 +131,8 @@ int testLock(igm_lock_t *lock) {
     }
 
     saveTaskData(tn);
+    ble_admin_result_t *admin_unlock_result = (ble_admin_result_t *)ble_data->ble_result;
+    releaseAdminResult(&admin_unlock_result);
     bleReleaseBleResult(ble_data);
     free(ble_data);
     ble_data = NULL;

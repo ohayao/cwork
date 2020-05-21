@@ -9,23 +9,22 @@
 #include <syslog.h>
 #include <stdlib.h>
 #include <ctype.h>
+#include "bridge/bridge_main/ign_constants.h"
+#include "bridge/bridge_main/log.h"
+#include "bridge/bridge_main/sysinfo.h"
+#include "bridge/bridge_main/ign.h"
+#include "bridge/bridge_main/task.h"
+#include "bridge/bridge_main/thread_helper.h"
+#include "bridge/bridge_main/mutex_helper.h"
+#include "bridge/bridge_main/task_queue.h"
+#include "bridge/bridge_main/wait_ble.h"
+#include "bridge/ble/ble_discover.h"
+#include "bridge/ble/lock.h"
+#include "bridge/ble/ble_pairing.h"
+#include "bridge/bridge_main/lock_list.h"
+#include "bridge/ble/ble_admin.h"
+#include "bridge/ble/ble_pairing.h"
 
-#include <bridge/bridge_main/ign_constants.h>
-#include <bridge/bridge_main/log.h>
-#include <bridge/bridge_main/sysinfo.h>
-#include <bridge/bridge_main/ign.h>
-#include <bridge/bridge_main/task.h>
-#include <bridge/bridge_main/thread_helper.h>
-#include <bridge/bridge_main/mutex_helper.h>
-#include <bridge/bridge_main/task_queue.h>
-#include <bridge/bridge_main/wait_ble.h>
-#include <bridge/ble/ble_discover.h>
-#include <bridge/ble/lock.h>
-#include <bridge/ble/ble_pairing.h>
-#include <bridge/bridge_main/lock_list.h>
-#include <bridge/ble/ble_admin.h>
-#include <bridge/ble/ble_pairing.h>
-#include "bridge/lock/messages/AdminUnlockResponse.h"
 
 void saveTaskData(task_node_t *ptn)
 {
@@ -37,30 +36,20 @@ void saveTaskData(task_node_t *ptn)
         int task_type = ptn->task_type;
         switch (task_type)
         {
-        case TASK_BLE_ADMIN_UNLOCK:
+        case TASK_BLE_ADMIN_GETLOCKSTATUS:
         {
             serverLog(LL_NOTICE, "saving ble TASK_BLE_ADMIN_UNLOCK data");
             ble_admin_result_t *admin_unlock_result = (ble_admin_result_t *)ble_data->ble_result;
-            
-            int unlock_error = admin_unlock_result->unlock_result;
+            int unlock_error = admin_unlock_result->getlockstatus_result;
             if (unlock_error)
             {
-                serverLog(LL_ERROR, "unlock error");
+                serverLog(LL_ERROR, "lock error");
             }
             else
             {
-                serverLog(LL_ERROR, "unlock success");
+                serverLog(LL_ERROR, "lock success");
             }
-            serverLog(LL_NOTICE, "admin_unlock response");
-            IgAdminUnlockResponse *unlock_response = admin_unlock_result->cmd_response;
-            if (unlock_response->has_operation_id)
-            {
-                serverLog(LL_NOTICE, "admin_unlock operation id: %d", unlock_response->operation_id);
-            }
-            if (unlock_response->has_result)
-            {
-                serverLog(LL_NOTICE, "admin_unlock result %d", unlock_response->result);
-            }
+                    
             break;
         }
         default:
@@ -94,8 +83,8 @@ int hexStrToByte(const char* source, uint8_t* dest, int sourceLen)
 }
 
 
-int testUnLock(igm_lock_t *lock) {
-    serverLog(LL_NOTICE,"UnLock cmd ask invoker to release the lock.");
+int testGetLockStatus(igm_lock_t *lock) {
+    serverLog(LL_NOTICE,"get lock status cmd ask invoker to release the lock.");
       
     ble_admin_param_t *admin_param = (ble_admin_param_t *)malloc(sizeof(ble_admin_param_t));
     bleInitAdminParam(admin_param);
@@ -105,8 +94,8 @@ int testUnLock(igm_lock_t *lock) {
     bleInitData(ble_data);
     bleSetBleParam(ble_data, admin_param, sizeof(ble_admin_param_t));
 
-    fsm_table_t *unlock_fsm = getAdminUnlockFsmTable();
-    int fsm_max_n = getAdminUnlockFsmTableLen();
+    fsm_table_t *get_lock_status_fsm = getAdminGetLockStatusFsmTable();
+    int fsm_max_n = getAdminGetLockStatusFsmTableLen();
     int current_state = BLE_ADMIN_BEGIN;
     int error = 0;
 
@@ -114,9 +103,9 @@ int testUnLock(igm_lock_t *lock) {
     tn->ble_data = ble_data;
 
     tn->sm_table_len = fsm_max_n;
-    tn->task_sm_table = unlock_fsm;
+    tn->task_sm_table = get_lock_status_fsm;
 
-    tn->task_type = TASK_BLE_ADMIN_UNLOCK;
+    tn->task_type = TASK_BLE_ADMIN_GETLOCKSTATUS;
 
     for (int j = 0; j < fsm_max_n; j++)
     {
@@ -137,19 +126,17 @@ int testUnLock(igm_lock_t *lock) {
     }
     if (error)
     {
-        serverLog(LL_ERROR, "unlock error");
+        serverLog(LL_ERROR, "lock error");
         return error;
     }
 
     saveTaskData(tn);
-    ble_admin_result_t *admin_unlock_result = (ble_admin_result_t *)ble_data->ble_result;
-    releaseAdminResult(&admin_unlock_result);
     bleReleaseBleResult(ble_data);
     free(ble_data);
     ble_data = NULL;
     free(tn);
     tn = NULL;
-    serverLog(LL_NOTICE, "unlock end-------");
+    serverLog(LL_NOTICE, "lock end-------");
     return 0;
 }
 
@@ -178,8 +165,8 @@ int main(int argc, char *argv[]) {
     setLockPassword(lock, tmp_buff, password_size);
     serverLog(LL_NOTICE, "setLockPassword success");
 
-    serverLog(LL_NOTICE, "unlock cmd test go");
-    int res = testUnLock(lock);
+    serverLog(LL_NOTICE, "lock cmd test go");
+    int res = testGetLockStatus(lock);
     releaseLock(&lock);
     return 0;
 }
