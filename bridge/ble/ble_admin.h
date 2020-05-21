@@ -1,7 +1,7 @@
 #ifndef _BLE_ADMIN_H_
 #define _BLE_ADMIN_H_
-#include <bridge/ble/lock.h>
-#include <bridge/bridge_main/fsm.h>
+#include "bridge/ble/lock.h"
+#include "bridge/bridge_main/fsm.h"
 
 enum BLE_ADMIN_STATE {
   BLE_ADMIN_BEGIN = 0,          // 注册一个改变通知
@@ -21,6 +21,12 @@ enum BLE_ADMIN_UNLOCK_STATE {
   BLE_ADMIN_UNLOCK_REQUEST = 8, // 发送请求
   BLE_ADMIN_UNLOCK_RESULT = 9,  // 等待结果
   BLE_ADMIN_UNLOCK_DONE = 10     // 完成
+};
+
+enum BLE_ADMIN_GETLOGS_STATE {
+  BLE_ADMIN_GETLOGS_REQUEST = 14, // 发送请求
+  BLE_ADMIN_GETLOGS_RESULT = 15,  // 等待结果
+  BLE_ADMIN_GETLOGS_DONE = 16     // 完成
 };
 
 enum BLE_ADMIN_LOCK_STATE {
@@ -66,6 +72,10 @@ int getAdminUnpairFsmTableLen();
 // admin unlock
 fsm_table_t *getAdminUnlockFsmTable();
 int getAdminUnlockFsmTableLen();
+
+// admin get logs
+fsm_table_t *getAdminGetLogsFsmTable();
+int getAdminGetLogsFsmTableLen();
 
 // admin lock
 int getAdminLockFsmTableLen();

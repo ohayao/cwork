@@ -49,3 +49,8 @@ add_executable(test_ble_admin_lock ./test_ble_admin_lock.c)
 target_link_libraries(test_ble_admin_lock
   ${TEST_DEPENDENCIES}
 )
+
+add_executable(test_ble_admin_getlogs ./test_ble_admin_getlogs.c)
+target_link_libraries(test_ble_admin_getlogs
+  ${TEST_DEPENDENCIES}
+)
