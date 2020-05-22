@@ -48,8 +48,9 @@ void saveTaskData(task_node_t *ptn)
             else
             {
                 serverLog(LL_ERROR, "lock success");
+                IgAdminLockResponse *lock_response = admin_unlock_result->cmd_response;
             }
-            IgAdminLockResponse *lock_response = admin_unlock_result->cmd_response;
+            
             break;
         }
         default:
@@ -132,6 +133,8 @@ int testLock(igm_lock_t *lock) {
 
     saveTaskData(tn);
     ble_admin_result_t *admin_unlock_result = (ble_admin_result_t *)ble_data->ble_result;
+    ig_AdminLockResponse_deinit(admin_unlock_result->cmd_response);
+    // 这儿是释放结果, 因为已经用完
     releaseAdminResult(&admin_unlock_result);
     bleReleaseBleResult(ble_data);
     free(ble_data);

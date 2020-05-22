@@ -137,16 +137,16 @@ b5fa603bb0d01d38
 8719: 12 May 2020 02:47:06.232 * doing_task_head is empty, check Lock list.
 
 5. 测试 多次unlock 的程序
-./bridge/test/test_multi_ble_admin_lock D9:78:2F:E3:1A:5C d4c33574f65b83cc8d214e545b89d049 94c5b5d4a6ad3497
+./bridge/test/multi_admin_lock D9:78:2F:E3:1A:5C d4c33574f65b83cc8d214e545b89d049 94c5b5d4a6ad3497
 
 6. 测试get logs的程序
-sudo ./bridge/test/test_ble_admin_getlogs D9:78:2F:E3:1A:5C d4c33574f65b83cc8d214e545b89d049 94c5b5d4a6ad3497
+sudo ./bridge/test/admin_get_logs D9:78:2F:E3:1A:5C d4c33574f65b83cc8d214e545b89d049 94c5b5d4a6ad3497
 
 7. 测试 get lock status 程序
 sudo ./bridge/test/admin_get_lock_status D9:78:2F:E3:1A:5C d4c33574f65b83cc8d214e545b89d049 94c5b5d4a6ad3497
 
 8. 测试 admin_create_pin
-sudo ./bridge/test/admin_create_pin D9:78:2F:E3:1A:5C d4c33574f65b83cc8d214e545b89d049 94c5b5d4a6ad3497
+sudo ./bridge/test/admin_create_pin D9:78:2F:E3:1A:5C d4c33574f65b83cc8d214e545b89d049 94c5b5d4a6ad3497 88888888
 
 ### BLE 相关用法
 1. void addDiscoverTask(int msg_id)

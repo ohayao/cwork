@@ -79,6 +79,8 @@ void bleReleaseAdminResult(ble_admin_result_t **pp_result);
 void setAdminResultErr(ble_admin_result_t *result, int err);
 void setAdminResultCreatePinRequestErr(ble_admin_result_t *result, int err);
 void setAdminResultUnlockErr(ble_admin_result_t *result, int err);
+void setAdminResultLockErr(ble_admin_result_t *result, int err);
+void setAdminResultGetLogsErr(ble_admin_result_t *result, int err);
 void setAdminResultCMDResponse(
       ble_admin_result_t *result, void *cmd_response, size_t cmd_response_size);
 void releaseAdminResultCMDResponse(ble_admin_result_t *result);

@@ -24,6 +24,7 @@
 #include "bridge/bridge_main/lock_list.h"
 #include "bridge/ble/ble_admin.h"
 #include "bridge/ble/ble_pairing.h"
+#include "bridge/lock/messages/GetLogsResponse.h"
 
 
 void saveTaskData(task_node_t *ptn)
@@ -39,17 +40,18 @@ void saveTaskData(task_node_t *ptn)
         case TASK_BLE_ADMIN_GETLOGS:
         {
             serverLog(LL_NOTICE, "saving ble TASK_BLE_ADMIN_UNLOCK data");
-            ble_admin_result_t *admin_unlock_result = (ble_admin_result_t *)ble_data->ble_result;
-            int unlock_error = admin_unlock_result->lock_result;
+            ble_admin_result_t *admin_get_logs_result = (ble_admin_result_t *)ble_data->ble_result;
+            int unlock_error = admin_get_logs_result->lock_result;
             if (unlock_error)
             {
-                serverLog(LL_ERROR, "lock error");
+                serverLog(LL_ERROR, "get lock logs error");
             }
             else
             {
-                serverLog(LL_ERROR, "lock success");
-            }
-                    
+                serverLog(LL_ERROR, "get lock logs success");
+                IgGetLogsResponse *get_logs_response = admin_get_logs_result->cmd_response;
+                serverLog(LL_ERROR, "get lock logs success data size %d", get_logs_response->data_size);
+            }   
             break;
         }
         default:
@@ -131,6 +133,10 @@ int testGetLogs(igm_lock_t *lock) {
     }
 
     saveTaskData(tn);
+    ble_admin_result_t *admin_get_logs_result = (ble_admin_result_t *)ble_data->ble_result;
+    // 只是释放里面的 data
+    ig_GetLogsResponse_deinit(admin_get_logs_result->cmd_response);
+    releaseAdminResultCMDResponse(admin_get_logs_result);
     bleReleaseBleResult(ble_data);
     free(ble_data);
     ble_data = NULL;
