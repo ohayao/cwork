@@ -143,7 +143,10 @@ b5fa603bb0d01d38
 sudo ./bridge/test/test_ble_admin_getlogs D9:78:2F:E3:1A:5C d4c33574f65b83cc8d214e545b89d049 94c5b5d4a6ad3497
 
 7. 测试 get lock status 程序
-sudo ./bridge/test/test_ble_admin_getlockstatus D9:78:2F:E3:1A:5C d4c33574f65b83cc8d214e545b89d049 94c5b5d4a6ad3497
+sudo ./bridge/test/admin_get_lock_status D9:78:2F:E3:1A:5C d4c33574f65b83cc8d214e545b89d049 94c5b5d4a6ad3497
+
+8. 测试 admin_create_pin
+sudo ./bridge/test/admin_create_pin D9:78:2F:E3:1A:5C d4c33574f65b83cc8d214e545b89d049 94c5b5d4a6ad3497
 
 ### BLE 相关用法
 1. void addDiscoverTask(int msg_id)

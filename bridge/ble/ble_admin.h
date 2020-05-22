@@ -35,6 +35,12 @@ enum BLE_ADMIN_GETLOCKSTATUS_STATE {
   BLE_ADMIN_GETLOCKSTATUS_DONE = 19     // 完成
 };
 
+enum BLE_ADMIN_CREATEPINREQUEST_STATE {
+  BLE_ADMIN_CREATEPINREQUEST_REQUEST = 20, // 发送请求
+  BLE_ADMIN_CREATEPINREQUEST_RESULT = 21,  // 等待结果
+  BLE_ADMIN_CREATEPINREQUEST_DONE = 22     // 完成
+};
+
 enum BLE_ADMIN_LOCK_STATE {
   BLE_ADMIN_LOCK_REQUEST = 11, // 发送请求
   BLE_ADMIN_LOCK_RESULT = 12,  // 等待结果
@@ -42,13 +48,16 @@ enum BLE_ADMIN_LOCK_STATE {
 };
 
 typedef struct BLEAdminParam {
-  // 需要addr, 需要key和password
   igm_lock_t *lock;
+  size_t cmd_request_size; // 某些请求太多了参数, 用一个指针来传入
+  void *cmd_request;
 }ble_admin_param_t;
 
 int bleInitAdminParam(ble_admin_param_t *unpair_param);
-int bleReleaseAdminParam(ble_admin_param_t **punpair_param);
+int bleReleaseAdminParam(ble_admin_param_t **pp_admin_param);
 int bleSetAdminParam(ble_admin_param_t *unpair_param, igm_lock_t *lock);
+int bleSetAdminRequest(
+  ble_admin_param_t *admin_param, void *cmd_request, size_t cmd_request_size);
 
 typedef struct BLEAdminResult {
   char addr[MAX_DEVICE_ADDR];
@@ -58,6 +67,7 @@ typedef struct BLEAdminResult {
   int unpair_result;
   int getlogs_result;
   int getlockstatus_result;
+  int create_pin_request_result;
   size_t cmd_response_size;     // ****_response 就是相关的response的结构体
   void *cmd_response;     // 纯粹用来把相关的结构体,拷贝出去
 }ble_admin_result_t;
@@ -67,6 +77,7 @@ int setAdminResultAddr(ble_admin_result_t *result,
   char *addr, size_t addr_len);
 void bleReleaseAdminResult(ble_admin_result_t **pp_result);
 void setAdminResultErr(ble_admin_result_t *result, int err);
+void setAdminResultCreatePinRequestErr(ble_admin_result_t *result, int err);
 void setAdminResultUnlockErr(ble_admin_result_t *result, int err);
 void setAdminResultCMDResponse(
       ble_admin_result_t *result, void *cmd_response, size_t cmd_response_size);
@@ -93,6 +104,10 @@ int getAdminGetLogsFsmTableLen();
 // get lock status
 fsm_table_t *getAdminGetLockStatusFsmTable();
 int getAdminGetLockStatusFsmTableLen();
+
+// create pin request
+fsm_table_t *getAdminCreatePinRequestFsmTable();
+int getAdminCreatePinRequestFsmTableLen();
 
 // admin lock
 int getAdminLockFsmTableLen();
