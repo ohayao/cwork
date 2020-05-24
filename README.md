@@ -148,6 +148,9 @@ sudo ./bridge/test/admin_get_lock_status D9:78:2F:E3:1A:5C d4c33574f65b83cc8d214
 8. 测试 admin_create_pin
 sudo ./bridge/test/admin_create_pin D9:78:2F:E3:1A:5C d4c33574f65b83cc8d214e545b89d049 94c5b5d4a6ad3497 88888888
 
+9. 测试 admin_delete_pin
+sudo ./bridge/test/admin_delete_pin D9:78:2F:E3:1A:5C d4c33574f65b83cc8d214e545b89d049 94c5b5d4a6ad3497 88888888
+
 ### BLE 相关用法
 1. void addDiscoverTask(int msg_id)
 添加扫描任务
@@ -214,11 +217,6 @@ sudo ./bridge/test/test_multi_ble_admin_unlock D9:78:2F:E3:1A:5C d4c33574f65b83c
 top显示, 从0.5上升到0.6,应该没明显的内存泄漏在代码中.
 
 
-
-
-
-
-
 7. Device connected error (device:/org/bluez/hci0/dev_D9_78_2F_E3_1A_5C): GDBus.Error:org.bluez.Error.Failed: Software caused nection abort
 报文显示, 是master主动发起的断开. 
 没有出错处理,所以程序自己不能运行了
@@ -227,7 +225,20 @@ top显示, 从0.5上升到0.6,应该没明显的内存泄漏在代码中.
 10627: 17 May 2020 08:29:37.611 * register_admin_notfication ready to connection D9:78:2F:E3:1A:5C
 Device connected error (device:/org/bluez/hci0/dev_D9_78_2F_E3_1A_5C): GDBus.Error:org.bluez.Error.Failed: Software caused connection abort
 
-
+8. (解决, 因为重复释放 request里面的内容, 而我在整体程序里面使用的原则是, 里面的内容, 是使用者释放的原则)
+4033: 24 May 2020 03:17:18.371 * AdminConnection_decryptNative responceLen 13
+4033: 24 May 2020 03:17:18.372 * ig_GetLockStatusResponse_decode err 2003
+4033: 24 May 2020 03:17:18.372  WAITING_DELETE_PIN_ERROR 
+4033: 24 May 2020 03:17:18.372 * releaseLockAminKey
+4033: 24 May 2020 03:17:18.372 * releaseLockPassword
+4033: 24 May 2020 03:17:20.549 * register_admin_notfication releaseAdminConnection success
+4033: 24 May 2020 03:17:20.554 * register_admin_notfication gattlib_adapter_close success
+4033: 24 May 2020 03:17:20.554 * saving ble TASK_BLE_ADMIN_UNLOCK data
+4033: 24 May 2020 03:17:20.554  delete pin request error
+4033: 24 May 2020 03:17:20.554 * lock end-------
+4033: 24 May 2020 03:17:20.555 * releaseLockAminKey
+corrupted double-linked list
+Aborted
 
 
 

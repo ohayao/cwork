@@ -64,3 +64,9 @@ add_executable(admin_create_pin ./admin_create_pin.c)
 target_link_libraries(admin_create_pin
   ${TEST_DEPENDENCIES}
 )
+
+
+add_executable(admin_delete_pin ./admin_delete_pin.c)
+target_link_libraries(admin_delete_pin
+  ${TEST_DEPENDENCIES}
+)

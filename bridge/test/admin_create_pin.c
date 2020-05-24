@@ -45,7 +45,7 @@ void saveTaskData(task_node_t *ptn)
             int create_pin_request_error = create_pin_result->create_pin_request_result;
             IgCreatePinResponse *create_pin_response = create_pin_result->cmd_response;
             
-            if (!create_pin_request_error)
+            if (create_pin_request_error)
             {
                 serverLog(LL_ERROR, "create pin request error");
             }
@@ -91,7 +91,7 @@ int hexStrToByte(const char* source, uint8_t* dest, int sourceLen)
 
 
 int testCreatePin(igm_lock_t *lock, IgCreatePinRequest *request) {
-    serverLog(LL_NOTICE,"get logs cmd ask invoker to release the lock.");
+    serverLog(LL_NOTICE,"create pin request cmd ask invoker to release the lock.");
       
     ble_admin_param_t *admin_param = (ble_admin_param_t *)malloc(sizeof(ble_admin_param_t));
     bleInitAdminParam(admin_param);
@@ -139,11 +139,19 @@ int testCreatePin(igm_lock_t *lock, IgCreatePinRequest *request) {
     }
 
     saveTaskData(tn);
+    ble_admin_result_t *result = (ble_admin_result_t *)ble_data->ble_result;
+    ig_CreatePinResponse_deinit(result->cmd_response);
+    free(result->cmd_response);
+    result->cmd_response = NULL;
     bleReleaseBleResult(ble_data);
     free(ble_data);
     ble_data = NULL;
     free(tn);
     tn = NULL;
+    // 一定要等到现在才能释放, 因为里面的内容, 是会
+    // 被复制, 然后使用
+    free(admin_param);
+    admin_param = NULL;
     serverLog(LL_NOTICE, "lock end-------");
     return 0;
 }
@@ -185,8 +193,12 @@ int main(int argc, char *argv[]) {
     memset(tmp_buff, 0, sizeof(tmp_buff));
     int pin_size = hexStrToByte(argv[4], tmp_buff, strlen(argv[4]));
     ig_CreatePinRequest_set_new_pin(&create_pin_request, tmp_buff, pin_size);
-    serverLog(LL_NOTICE, "lock cmd test go");
+    serverLog(LL_NOTICE, "test create lock cmd test go");
     int res = testCreatePin(lock, &create_pin_request);
+    serverLog(LL_NOTICE, "test create lock end");
+    // 为什么不需要这个, 因为我订立的协议是, 使用完, 立刻释放, 这已经被释放了.
+    // 在 writeCreatePinRequest 里面已经释放了
+    // ig_CreatePinRequest_deinit(&create_pin_request);
     releaseLock(&lock);
     return 0;
 }

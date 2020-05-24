@@ -136,6 +136,8 @@ int testGetLockStatus(igm_lock_t *lock) {
     ble_data = NULL;
     free(tn);
     tn = NULL;
+    free(admin_param);
+    admin_param = NULL;
     serverLog(LL_NOTICE, "lock end-------");
     return 0;
 }

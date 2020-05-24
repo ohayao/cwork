@@ -41,6 +41,12 @@ enum BLE_ADMIN_CREATEPINREQUEST_STATE {
   BLE_ADMIN_CREATEPINREQUEST_DONE = 22     // 完成
 };
 
+enum BLE_ADMIN_DELETEPINREQUEST_STATE {
+  BLE_ADMIN_DELETEPINREQUEST_REQUEST = 23, // 发送请求
+  BLE_ADMIN_DELETEPINREQUEST_RESULT = 24,  // 等待结果
+  BLE_ADMIN_DELETEPINREQUEST_DONE = 25     // 完成
+};
+
 enum BLE_ADMIN_LOCK_STATE {
   BLE_ADMIN_LOCK_REQUEST = 11, // 发送请求
   BLE_ADMIN_LOCK_RESULT = 12,  // 等待结果
@@ -68,6 +74,7 @@ typedef struct BLEAdminResult {
   int getlogs_result;
   int getlockstatus_result;
   int create_pin_request_result;
+  int delete_pin_request_result;
   size_t cmd_response_size;     // ****_response 就是相关的response的结构体
   void *cmd_response;     // 纯粹用来把相关的结构体,拷贝出去
 }ble_admin_result_t;
@@ -81,6 +88,7 @@ void setAdminResultCreatePinRequestErr(ble_admin_result_t *result, int err);
 void setAdminResultUnlockErr(ble_admin_result_t *result, int err);
 void setAdminResultLockErr(ble_admin_result_t *result, int err);
 void setAdminResultGetLogsErr(ble_admin_result_t *result, int err);
+void setAdminResultDeletePinRequestErr(ble_admin_result_t *result, int err);
 void setAdminResultCMDResponse(
       ble_admin_result_t *result, void *cmd_response, size_t cmd_response_size);
 void releaseAdminResultCMDResponse(ble_admin_result_t *result);
@@ -110,6 +118,10 @@ int getAdminGetLockStatusFsmTableLen();
 // create pin request
 fsm_table_t *getAdminCreatePinRequestFsmTable();
 int getAdminCreatePinRequestFsmTableLen();
+
+// delete pin request
+fsm_table_t *getAdminDeletePinRequestFsmTable();
+int getAdminDeletePinRequestFsmTableLen();
 
 // admin lock
 int getAdminLockFsmTableLen();
