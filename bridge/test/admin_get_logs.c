@@ -136,6 +136,9 @@ int testGetLogs(igm_lock_t *lock) {
     ble_admin_result_t *admin_get_logs_result = (ble_admin_result_t *)ble_data->ble_result;
     // 只是释放里面的 data
     ig_GetLogsResponse_deinit(admin_get_logs_result->cmd_response);
+    // 然后还是释放它自己本身
+    free(admin_get_logs_result->cmd_response);
+    admin_get_logs_result->cmd_response = NULL;
     releaseAdminResultCMDResponse(admin_get_logs_result);
     bleReleaseBleResult(ble_data);
     free(ble_data);

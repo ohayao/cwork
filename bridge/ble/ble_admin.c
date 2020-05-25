@@ -20,6 +20,8 @@
 #include "bridge/lock/messages/CreatePinResponse.h"
 #include "bridge/lock/messages/DeletePinRequest.h"
 #include "bridge/lock/messages/DeletePinResponse.h"
+#include "bridge/lock/messages/SetTimeRequest.h"
+#include "bridge/lock/messages/SetTimeResponse.h"
 
 static char admin_str[] = "5c3a659f-897e-45e1-b016-007107c96df6";
 
@@ -65,6 +67,16 @@ static int writeDeletePinRequest(void *arg);
 static int waitingDeletePinRequestResult(void *arg);
 static int handleDeletePinResponce(const uint8_t* data, int data_length,void* user_data);
 
+// get battery level
+static int writeGetBatteryLevelRequest(void *arg);
+static int waitingGetBatteryLevelResult(void *arg);
+static int handleGetBatteryLevelResponce(const uint8_t* data, int data_length,void* user_data);
+
+// set time request
+static int writeSetTimeRequest(void *arg);
+static int waitingSetTimeResult(void *arg);
+static int handleSetTimeResponce(const uint8_t* data, int data_length,void* user_data);
+
 static int write_unpair_request(void *arg);
 static int handle_unpair_responce(const uint8_t* data, int data_length,void* user_data);
 static int waiting_unpair_result(void *arg);
@@ -95,6 +107,14 @@ enum {
 
 enum {
   ADMIN_DELETE_PIN_REQUEST_SM_TABLE_LEN = 6
+};
+
+enum {
+  ADMIN_GET_BATTERY_LEVEL_SM_TABLE_LEN = 6
+};
+
+enum {
+  ADMIN_SET_TIME_SM_TABLE_LEN = 6
 };
 
 enum {
@@ -2384,6 +2404,577 @@ DELETE_PINREQUEST_RESPONCE_EXIT:
 }
 
 
+// ------------------------ get battery level -----------------------------
+
+fsm_table_t admin_get_battery_level_fsm_table[ADMIN_DELETE_PIN_REQUEST_SM_TABLE_LEN] = {
+  {BLE_ADMIN_BEGIN,         register_admin_notfication,   BLE_ADMIN_STEP1},
+  {BLE_ADMIN_STEP1,         waiting_admin_step1,          BLE_ADMIN_STEP2},
+  {BLE_ADMIN_STEP2,         write_admin_step2,            BLE_ADMIN_ESTABLISHED},
+  {BLE_ADMIN_ESTABLISHED,   waiting_admin_step3,          BLE_ADMIN_UNLOCK_REQUEST},
+  {BLE_ADMIN_GETBATTERYLEVEL_REQUEST,   writeGetBatteryLevelRequest,   BLE_ADMIN_GETBATTERYLEVEL_RESULT},
+  {BLE_ADMIN_GETBATTERYLEVEL_RESULT,  waitingGetBatteryLevelResult,        BLE_ADMIN_GETBATTERYLEVEL_DONE},
+};
+
+fsm_table_t *getAdminGetBatteryLevelFsmTable()
+{
+  return admin_get_battery_level_fsm_table;
+}
+
+int getAdminGetBatteryLevelFsmTableLen()
+{
+  return ADMIN_GET_BATTERY_LEVEL_SM_TABLE_LEN;
+}
+
+static int writeGetBatteryLevelRequest(void *arg)
+{
+  serverLog(LL_NOTICE, "writeCreatePinRequest start --------");
+  int ret = 0;
+  task_node_t *task_node = (task_node_t *)arg;
+  ble_data_t *ble_data = task_node->ble_data;
+  admin_connection_t *admin_connection = 
+                              (admin_connection_t *)ble_data->ble_connection;
+  IgDeletePinRequest *request = admin_connection->cmd_request;
+
+  srand(time(0));
+  int requestID = rand() % 2147483647;
+  time_t cur_timestamp = time(NULL);
+  size_t buf_size = 64;
+  size_t encode_size = 0;
+  uint8_t buf[buf_size];
+  int retvalLen;
+  uint8_t *retvalBytes = NULL;;
+  uint8_t *encryptPayloadBytes = NULL;
+	size_t encryptPayloadBytes_len;
+
+  IgDeletePinRequest delete_pin_request;
+  ig_DeletePinRequest_init(&delete_pin_request);
+  serverLog(LL_NOTICE, "requestID: %d", requestID);
+  ig_DeletePinRequest_set_operation_id(
+    &delete_pin_request, requestID);
+  ig_DeletePinRequest_set_password(
+    &delete_pin_request, admin_connection->lock->password, admin_connection->lock->password_size);
+  if (!request ||  !ig_DeletePinRequest_is_valid(request))
+  {
+    serverLog(LL_ERROR, "request NULL or request don't have pin");
+    goto DELETE_PIN_ERROR;
+  }
+
+  ig_DeletePinRequest_set_old_pin(
+    &delete_pin_request, request->old_pin, request->old_pin_size);
+  
+  IgSerializerError IgErr = ig_DeletePinRequest_encode(
+		&delete_pin_request, buf, buf_size, &encode_size);
+  if (IgErr)
+	{
+    serverLog(LL_ERROR, "ig_DeletePinRequest_encode err %d", IgErr);
+    goto DELETE_PIN_ERROR;
+	}
+  serverLog(LL_NOTICE, "ig_DeletePinRequest_encode success size:" );
+
+  retvalLen = AdminConnection_encryptNative(
+    admin_connection->lock->connectionID, buf, encode_size, &retvalBytes);
+  if (!retvalLen) 
+  {
+    serverLog(LL_ERROR, "failed in AdminConnection_encryptNative");
+    goto DELETE_PIN_ERROR;
+  }
+  serverLog(LL_NOTICE, "AdminConnection_encryptNative success" );
+  
+  if (!build_msg_payload(
+		&encryptPayloadBytes, &encryptPayloadBytes_len, retvalBytes, retvalLen))
+	{
+    serverLog(LL_ERROR, "failed in build_msg_payload");
+		goto DELETE_PIN_ERROR;
+	}
+  serverLog(LL_NOTICE, "build_msg_payload success");
+
+  ret = write_char_by_uuid_multi_atts(
+		admin_connection->gatt_connection, &admin_connection->admin_uuid, 
+    encryptPayloadBytes, encryptPayloadBytes_len);
+	if (ret != GATTLIB_SUCCESS) {
+    serverLog(LL_ERROR, "write_char_by_uuid_multi_atts failed in writing th packags");
+		goto DELETE_PIN_ERROR;
+	}
+  serverLog(LL_NOTICE, "write_char_by_uuid_multi_atts success");
+  
+  free(encryptPayloadBytes);
+  encryptPayloadBytes = NULL;
+  free(retvalBytes);
+  retvalBytes = NULL;
+  ig_DeletePinRequest_deinit(&delete_pin_request);
+  ig_DeletePinRequest_deinit(request);
+  admin_connection->admin_step = BLE_ADMIN_DELETEPINREQUEST_REQUEST;
+  return 0;
+
+// 出错处理
+DELETE_PIN_ERROR:
+  serverLog(LL_ERROR, "DELETE_PIN_ERROR");
+  ig_DeletePinRequest_deinit(&delete_pin_request);
+  if (encryptPayloadBytes)
+  {
+    free(encryptPayloadBytes);
+    encryptPayloadBytes = NULL;
+  }
+  if (retvalBytes)
+  {
+    free(retvalBytes);
+    retvalBytes = NULL;
+  }
+  setAdminResultDeletePinRequestErr(admin_connection->admin_result, 1);
+  bleSetBleResult(ble_data, admin_connection->admin_result, sizeof(ble_admin_result_t));
+  ig_DeletePinRequest_deinit(request);
+  ret = releaseAdminConnection(&admin_connection);
+  if (ret)
+  {
+    serverLog(LL_ERROR, 
+      "releaseAdminConnection error");
+    return ret;
+  }
+  serverLog(LL_NOTICE, 
+      "releaseAdminConnection success");
+
+  ret = gattlib_adapter_close(ble_data->adapter);
+  if (ret)
+  {
+    serverLog(LL_ERROR, "gattlib_adapter_close error ");
+    return ret;
+  }
+  serverLog(LL_NOTICE, 
+      "gattlib_adapter_close success");
+  return 1;
+}
+
+static int waitingGetBatteryLevelResult(void *arg)
+{
+  serverLog(LL_NOTICE, "waitingDeletePinRequestResult -------------------------------");
+  task_node_t *task_node = (task_node_t *)arg;
+  ble_data_t *ble_data = (ble_data_t *)(task_node->ble_data);
+  admin_connection_t *admin_connection = 
+                            (admin_connection_t *)ble_data->ble_connection;
+  IgDeletePinRequest *request = admin_connection->cmd_request;
+
+  serverLog(LL_NOTICE, "waitingDeletePinRequestResult new loop waiting");
+  g_main_loop_run(task_node->loop);
+  if (admin_connection->waiting_err || admin_connection->receive_err)
+    goto WAITING_DELETE_PIN_ERROR;
+  g_source_remove(task_node->timeout_id);
+  g_main_loop_unref(task_node->loop);
+  task_node->loop = NULL;
+
+  serverLog(LL_NOTICE, "waitingGetLockStatusResult exit task_node->loop");
+
+  releaseAdminConnectionData(admin_connection);
+  int ret = releaseAdminConnection(&admin_connection);
+  if (ret)
+  {
+    serverLog(LL_ERROR, "waitingGetLockStatusResult releaseAdminConnection error");
+    return ret;
+  }
+  ret = gattlib_adapter_close(ble_data->adapter);
+  if (ret)
+  {
+    serverLog(LL_ERROR, "gattlib_adapter_close error ");
+    return ret;
+  }
+  ble_data->adapter = NULL;
+  return 0;
+
+WAITING_DELETE_PIN_ERROR:
+  // Bug? corrupted double-linked list
+  // Aborted
+  serverLog(LL_ERROR, "WAITING_DELETE_PIN_ERROR ");
+  g_main_loop_unref(task_node->loop);
+  task_node->loop = NULL;
+  serverLog(LL_ERROR, "releaseAdminConnectionData ");
+  releaseAdminConnectionData(admin_connection);
+  serverLog(LL_ERROR, "setAdminResultDeletePinRequestErr ");
+  setAdminResultDeletePinRequestErr(admin_connection->admin_result, 1);
+  bleSetBleResult(ble_data, admin_connection->admin_result, sizeof(ble_admin_result_t));
+  serverLog(LL_ERROR, "ig_DeletePinRequest_deinit ");
+  ig_DeletePinRequest_deinit(request);
+  serverLog(LL_ERROR, "releaseAdminConnection ");
+  ret = releaseAdminConnection(&admin_connection);
+  if (ret)
+  {
+    serverLog(LL_ERROR, 
+      "register_admin_notfication releaseAdminConnection error");
+    return ret;
+  }
+  serverLog(LL_NOTICE, 
+      "register_admin_notfication releaseAdminConnection success");
+  serverLog(LL_ERROR, "gattlib_adapter_close ");
+  ret = gattlib_adapter_close(ble_data->adapter);
+  if (ret)
+  {
+    serverLog(LL_ERROR, "gattlib_adapter_close error ");
+    return ret;
+  }
+  serverLog(LL_NOTICE, 
+      "register_admin_notfication gattlib_adapter_close success");
+
+}
+
+static int handleGetBatteryLevelResponce(const uint8_t* data, int data_length,void* user_data)
+{
+  serverLog(LL_NOTICE, "handleDeletePinResponce--------------------------------");
+  task_node_t *task_node = (task_node_t *)user_data;
+  ble_data_t *ble_data = task_node->ble_data;
+  admin_connection_t *admin_connection = 
+                              (admin_connection_t *)ble_data->ble_connection;
+  int responceLen;
+  uint8_t *responceBytes = NULL;
+
+  save_message_data(data, data_length, user_data);
+
+  if (admin_connection->step_max_size == admin_connection->step_cur_size)
+  {
+    int ret;
+    serverLog(LL_NOTICE, "handleDeletePinResponce RECV step2 data finished");
+    admin_connection->admin_step = BLE_ADMIN_DELETEPINREQUEST_RESULT;
+
+    size_t messageLen = 
+      admin_connection->step_max_size - admin_connection->n_size_byte;
+    uint8_t *data_start = admin_connection->step_data + admin_connection->n_size_byte;
+    uint8_t messageBytes[messageLen];
+    memcpy(messageBytes, data_start, messageLen);
+    
+    responceLen = AdminConnection_decryptNative(
+      admin_connection->lock->connectionID, messageBytes, messageLen, &responceBytes);
+    if (!responceLen)
+    { 
+      serverLog(LL_ERROR, "AdminConnection_decryptNative error");
+      admin_connection->receive_err = 1;
+      goto DELETE_PINREQUEST_RESPONCE_EXIT;
+    }
+    serverLog(LL_NOTICE, "AdminConnection_decryptNative responceLen %d", responceLen);
+    
+    IgDeletePinResponse responce;
+    ig_DeletePinResponse_init(&responce);
+    IgSerializerError err = ig_DeletePinResponse_decode(
+      responceBytes, responceLen, &responce, 0
+    );
+    if (err)
+    {
+      serverLog(LL_NOTICE, "ig_GetLockStatusResponse_decode err %d", err);
+      admin_connection->receive_err = 1;
+      goto DELETE_PINREQUEST_RESPONCE_EXIT;
+    }
+
+    serverLog(LL_NOTICE, "has unlock response %d error %d",
+              responce.has_result, responce.result);
+    if (admin_connection->has_admin_result && responce.has_result)
+    {
+      serverLog(LL_NOTICE, "set admin result to success");
+      admin_connection->admin_result->create_pin_request_result = responce.result;
+    }
+    else {
+       admin_connection->admin_result->create_pin_request_result = responce.result;
+    }
+     // 返回参数给调用进程
+    serverLog(LL_NOTICE, "handle_step3_message bleSetBleResult to ble data");
+    setAdminResultCMDResponse(
+      admin_connection->admin_result, &responce, sizeof(IgDeletePinResponse));
+    bleSetBleResult(
+      ble_data, admin_connection->admin_result, sizeof(ble_admin_result_t));
+    
+    AdminConnection_endConnection((admin_connection->lock)->connectionID);
+
+    serverLog(LL_NOTICE, "AdminConnection_endConnection success");
+
+    serverLog(LL_NOTICE, "GetLogs_RESULT_EXIT--------------------------------");
+    
+DELETE_PINREQUEST_RESPONCE_EXIT:
+    if (responceBytes) free(responceBytes);
+    g_main_loop_quit(task_node->loop);
+  }
+}
+
+// ------------------------ get battery level -----------------------------
+
+fsm_table_t admin_set_time_fsm_table[ADMIN_SET_TIME_SM_TABLE_LEN] = {
+  {BLE_ADMIN_BEGIN,         register_admin_notfication,   BLE_ADMIN_STEP1},
+  {BLE_ADMIN_STEP1,         waiting_admin_step1,          BLE_ADMIN_STEP2},
+  {BLE_ADMIN_STEP2,         write_admin_step2,            BLE_ADMIN_ESTABLISHED},
+  {BLE_ADMIN_ESTABLISHED,   waiting_admin_step3,          BLE_ADMIN_SETTIME_REQUEST},
+  {BLE_ADMIN_SETTIME_REQUEST,   writeSetTimeRequest,   BLE_ADMIN_SETTIME_RESULT},
+  {BLE_ADMIN_SETTIME_RESULT,  waitingSetTimeResult,        BLE_ADMIN_SETTIME_DONE},
+};
+
+fsm_table_t *getAdminSetTimeFsmTable()
+{
+  return admin_set_time_fsm_table;
+}
+
+int getAdminSetTimeFsmTableLen()
+{
+  return ADMIN_SET_TIME_SM_TABLE_LEN;
+}
+
+static int writeSetTimeRequest(void *arg)
+{
+  serverLog(LL_NOTICE, "writeCreatePinRequest start --------");
+  int ret = 0;
+  task_node_t *task_node = (task_node_t *)arg;
+  ble_data_t *ble_data = task_node->ble_data;
+  admin_connection_t *admin_connection = 
+                              (admin_connection_t *)ble_data->ble_connection;
+  IgSetTimeRequest *request = admin_connection->cmd_request;
+
+  srand(time(0));
+  int requestID = rand() % 2147483647;
+  time_t cur_timestamp = time(NULL);
+  size_t buf_size = 64;
+  size_t encode_size = 0;
+  uint8_t buf[buf_size];
+  int retvalLen;
+  uint8_t *retvalBytes = NULL;;
+  uint8_t *encryptPayloadBytes = NULL;
+	size_t encryptPayloadBytes_len;
+
+  IgSetTimeRequest set_time_request;
+  ig_SetTimeRequest_init(&set_time_request);
+  serverLog(LL_NOTICE, "requestID: %d", requestID);
+  ig_SetTimeRequest_set_operation_id(
+    &set_time_request, requestID);
+  ig_SetTimeRequest_set_password(
+    &set_time_request, admin_connection->lock->password, admin_connection->lock->password_size);
+  
+  if (!request ||  !ig_SetTimeRequest_is_valid(request))
+  {
+    serverLog(LL_ERROR, "request NULL or request don't has_timestamp");
+    goto SET_TIME_ERROR;
+  }
+
+  ig_SetTimeRequest_set_timestamp(
+    &set_time_request, request->timestamp);
+  
+  IgSerializerError IgErr = ig_SetTimeRequest_encode(
+		&set_time_request, buf, buf_size, &encode_size);
+  if (IgErr)
+	{
+    serverLog(LL_ERROR, "ig_DeletePinRequest_encode err %d", IgErr);
+    goto SET_TIME_ERROR;
+	}
+  serverLog(LL_NOTICE, "ig_DeletePinRequest_encode success size:" );
+
+  retvalLen = AdminConnection_encryptNative(
+    admin_connection->lock->connectionID, buf, encode_size, &retvalBytes);
+  if (!retvalLen) 
+  {
+    serverLog(LL_ERROR, "failed in AdminConnection_encryptNative");
+    goto SET_TIME_ERROR;
+  }
+  serverLog(LL_NOTICE, "AdminConnection_encryptNative success" );
+  
+  if (!build_msg_payload(
+		&encryptPayloadBytes, &encryptPayloadBytes_len, retvalBytes, retvalLen))
+	{
+    serverLog(LL_ERROR, "failed in build_msg_payload");
+		goto SET_TIME_ERROR;
+	}
+  serverLog(LL_NOTICE, "build_msg_payload success");
+
+  ret = write_char_by_uuid_multi_atts(
+		admin_connection->gatt_connection, &admin_connection->admin_uuid, 
+    encryptPayloadBytes, encryptPayloadBytes_len);
+	if (ret != GATTLIB_SUCCESS) {
+    serverLog(LL_ERROR, "write_char_by_uuid_multi_atts failed in writing th packags");
+		goto SET_TIME_ERROR;
+	}
+  serverLog(LL_NOTICE, "write_char_by_uuid_multi_atts success");
+  
+  free(encryptPayloadBytes);
+  encryptPayloadBytes = NULL;
+  free(retvalBytes);
+  retvalBytes = NULL;
+  ig_SetTimeRequest_deinit(&set_time_request);
+  ig_SetTimeRequest_deinit(request);
+  admin_connection->admin_step = BLE_ADMIN_SETTIME_REQUEST;
+  return 0;
+
+// 出错处理
+SET_TIME_ERROR:
+  serverLog(LL_ERROR, "SET_TIME_ERROR");
+  ig_SetTimeRequest_deinit(&set_time_request);
+  if (encryptPayloadBytes)
+  {
+    free(encryptPayloadBytes);
+    encryptPayloadBytes = NULL;
+  }
+  if (retvalBytes)
+  {
+    free(retvalBytes);
+    retvalBytes = NULL;
+  }
+  setAdminResultSetTimeErr(admin_connection->admin_result, 1);
+  bleSetBleResult(ble_data, admin_connection->admin_result, sizeof(ble_admin_result_t));
+  ig_SetTimeRequest_deinit(request);
+  ret = releaseAdminConnection(&admin_connection);
+  if (ret)
+  {
+    serverLog(LL_ERROR, 
+      "releaseAdminConnection error");
+    return ret;
+  }
+  serverLog(LL_NOTICE, 
+      "releaseAdminConnection success");
+
+  ret = gattlib_adapter_close(ble_data->adapter);
+  if (ret)
+  {
+    serverLog(LL_ERROR, "gattlib_adapter_close error ");
+    return ret;
+  }
+  serverLog(LL_NOTICE, 
+      "gattlib_adapter_close success");
+  return 1;
+}
+
+static int waitingSetTimeResult(void *arg)
+{
+  serverLog(LL_NOTICE, "waitingSetTimeResult -------------------------------");
+  task_node_t *task_node = (task_node_t *)arg;
+  ble_data_t *ble_data = (ble_data_t *)(task_node->ble_data);
+  admin_connection_t *admin_connection = 
+                            (admin_connection_t *)ble_data->ble_connection;
+  IgSetTimeRequest *request = admin_connection->cmd_request;
+
+  serverLog(LL_NOTICE, "waitingDeletePinRequestResult new loop waiting");
+  g_main_loop_run(task_node->loop);
+  if (admin_connection->waiting_err || admin_connection->receive_err)
+    goto WAITING_SET_TIME_ERROR;
+  g_source_remove(task_node->timeout_id);
+  g_main_loop_unref(task_node->loop);
+  task_node->loop = NULL;
+
+  serverLog(LL_NOTICE, "waitingGetLockStatusResult exit task_node->loop");
+
+  releaseAdminConnectionData(admin_connection);
+  int ret = releaseAdminConnection(&admin_connection);
+  if (ret)
+  {
+    serverLog(LL_ERROR, "waitingGetLockStatusResult releaseAdminConnection error");
+    return ret;
+  }
+  ret = gattlib_adapter_close(ble_data->adapter);
+  if (ret)
+  {
+    serverLog(LL_ERROR, "gattlib_adapter_close error ");
+    return ret;
+  }
+  ble_data->adapter = NULL;
+  return 0;
+
+WAITING_SET_TIME_ERROR:
+  // Bug? corrupted double-linked list
+  // Aborted
+  serverLog(LL_ERROR, "WAITING_DELETE_PIN_ERROR ");
+  g_main_loop_unref(task_node->loop);
+  task_node->loop = NULL;
+  serverLog(LL_ERROR, "releaseAdminConnectionData ");
+  releaseAdminConnectionData(admin_connection);
+  serverLog(LL_ERROR, "setAdminResultDeletePinRequestErr ");
+  setAdminResultSetTimeErr(admin_connection->admin_result, 1);
+  bleSetBleResult(ble_data, admin_connection->admin_result, sizeof(ble_admin_result_t));
+  serverLog(LL_ERROR, "ig_DeletePinRequest_deinit ");
+  ig_SetTimeRequest_deinit(request);
+  serverLog(LL_ERROR, "releaseAdminConnection ");
+  ret = releaseAdminConnection(&admin_connection);
+  if (ret)
+  {
+    serverLog(LL_ERROR, 
+      "register_admin_notfication releaseAdminConnection error");
+    return ret;
+  }
+  serverLog(LL_NOTICE, 
+      "register_admin_notfication releaseAdminConnection success");
+  serverLog(LL_ERROR, "gattlib_adapter_close ");
+  ret = gattlib_adapter_close(ble_data->adapter);
+  if (ret)
+  {
+    serverLog(LL_ERROR, "gattlib_adapter_close error ");
+    return ret;
+  }
+  serverLog(LL_NOTICE, 
+      "register_admin_notfication gattlib_adapter_close success");
+
+}
+
+static int handleSetTimeResponce(const uint8_t* data, int data_length,void* user_data)
+{
+  serverLog(LL_NOTICE, "handleSetTimeResponce--------------------------------");
+  task_node_t *task_node = (task_node_t *)user_data;
+  ble_data_t *ble_data = task_node->ble_data;
+  admin_connection_t *admin_connection = 
+                              (admin_connection_t *)ble_data->ble_connection;
+  int responceLen;
+  uint8_t *responceBytes = NULL;
+
+  save_message_data(data, data_length, user_data);
+
+  if (admin_connection->step_max_size == admin_connection->step_cur_size)
+  {
+    int ret;
+    serverLog(LL_NOTICE, "handleSetTimeResponce RECV step2 data finished");
+    admin_connection->admin_step = BLE_ADMIN_SETTIME_RESULT;
+
+    size_t messageLen = 
+      admin_connection->step_max_size - admin_connection->n_size_byte;
+    uint8_t *data_start = admin_connection->step_data + admin_connection->n_size_byte;
+    uint8_t messageBytes[messageLen];
+    memcpy(messageBytes, data_start, messageLen);
+    
+    responceLen = AdminConnection_decryptNative(
+      admin_connection->lock->connectionID, messageBytes, messageLen, &responceBytes);
+    if (!responceLen)
+    { 
+      serverLog(LL_ERROR, "AdminConnection_decryptNative error");
+      admin_connection->receive_err = 1;
+      goto DELETE_PINREQUEST_RESPONCE_EXIT;
+    }
+    serverLog(LL_NOTICE, "AdminConnection_decryptNative responceLen %d", responceLen);
+    
+    IgSetTimeResponse responce;
+    ig_SetTimeResponse_init(&responce);
+    IgSerializerError err = ig_SetTimeResponse_decode(
+      responceBytes, responceLen, &responce, 0
+    );
+    if (err)
+    {
+      serverLog(LL_NOTICE, "ig_SetTimeResponse_decode err %d", err);
+      admin_connection->receive_err = 1;
+      goto SET_TIME_RESPONCE_EXIT;
+    }
+
+    serverLog(LL_NOTICE, "has unlock response %d error %d",
+              responce.has_result, responce.result);
+    if (admin_connection->has_admin_result && responce.has_result)
+    {
+      serverLog(LL_NOTICE, "set admin result to success");
+      admin_connection->admin_result->create_pin_request_result = responce.result;
+    }
+    else {
+       admin_connection->admin_result->create_pin_request_result = responce.result;
+    }
+     // 返回参数给调用进程
+    serverLog(LL_NOTICE, "handle_step3_message bleSetBleResult to ble data");
+    setAdminResultCMDResponse(
+      admin_connection->admin_result, &responce, sizeof(IgSetTimeResponse));
+    bleSetBleResult(
+      ble_data, admin_connection->admin_result, sizeof(ble_admin_result_t));
+    
+    AdminConnection_endConnection((admin_connection->lock)->connectionID);
+
+    serverLog(LL_NOTICE, "AdminConnection_endConnection success");
+
+    serverLog(LL_NOTICE, "GetLogs_RESULT_EXIT--------------------------------");
+    
+SET_TIME_RESPONCE_EXIT:
+    if (responceBytes) free(responceBytes);
+    g_main_loop_quit(task_node->loop);
+  }
+}
+
 //  ------------------------ unpair ------------------------
 
 
@@ -2690,6 +3281,12 @@ void setAdminResultCreatePinRequestErr(ble_admin_result_t *result, int err)
 void setAdminResultDeletePinRequestErr(ble_admin_result_t *result, int err)
 {
   result->delete_pin_request_result = err;
+  return;
+}
+
+void setAdminResultSetTimeErr(ble_admin_result_t *result, int err)
+{
+  result->set_time_result = err;
   return;
 }
 
