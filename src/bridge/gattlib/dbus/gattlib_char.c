@@ -220,7 +220,8 @@ static int read_gatt_characteristic(struct dbus_characteristic *dbus_characteris
 	GError *error = NULL;
 	int ret = GATTLIB_SUCCESS;
 
-#if BLUEZ_VERSION < BLUEZ_VERSIONS(5, 40)
+//#if BLUEZ_VERSION < BLUEZ_VERSIONS(5, 40)
+#if BLUEZ_VERSION < BLUEZ_VERSIONS(5, 35)
 	org_bluez_gatt_characteristic1_call_read_value_sync(
 		dbus_characteristic->gatt, &out_value, NULL, &error);
 #else
@@ -315,7 +316,8 @@ int gattlib_read_char_by_uuid_async(gatt_connection_t* connection, uuid_t* uuid,
 	GVariant *out_value;
 	GError *error = NULL;
 
-#if BLUEZ_VERSION < BLUEZ_VERSIONS(5, 40)
+//#if BLUEZ_VERSION < BLUEZ_VERSIONS(5, 40)
+#if BLUEZ_VERSION < BLUEZ_VERSIONS(5, 35)
 	org_bluez_gatt_characteristic1_call_read_value_sync(
 		dbus_characteristic.gatt, &out_value, NULL, &error);
 #else
@@ -350,7 +352,8 @@ static int write_char(struct dbus_characteristic *dbus_characteristic, const voi
 	GError *error = NULL;
 	int ret = GATTLIB_SUCCESS;
 
-#if BLUEZ_VERSION < BLUEZ_VERSIONS(5, 40)
+//#if BLUEZ_VERSION < BLUEZ_VERSIONS(5, 40)
+#if BLUEZ_VERSION < BLUEZ_VERSIONS(5, 35)
 	org_bluez_gatt_characteristic1_call_write_value_sync(dbus_characteristic->gatt, value, NULL, &error);
 #else
 	GVariantBuilder *variant_options = g_variant_builder_new(G_VARIANT_TYPE("a{sv}"));
