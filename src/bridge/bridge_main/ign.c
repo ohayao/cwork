@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
@@ -30,6 +31,7 @@
 #include <bridge/proto/ign.pb.h>
 #include <bridge/proto/pb_encode.h>
 #include <bridge/proto/pb_decode.h>
+
 static sysinfo_t g_sysif;
 
 //LIST_HEAD(waiting_task_head);
@@ -182,6 +184,7 @@ int HeartBeat(){
         size_t len=out.bytes_written;
         if(MQTTCLIENT_SUCCESS != (publish_result=MQTT_sendMessage(g_sysif.mqtt_c,PUB_TOPIC,1,buf,(int)len))){
             printf("SEND MQTT HB ERROR WITH CODE[%d]\n",publish_result);
+			serverLog(LL_ERROR, "MQTT_sendMessage err[%d], do reconnection.", publish_result);
 			int ret = 0;
 			do {
 				ret = Init_MQTT(&g_sysif.mqtt_c);
