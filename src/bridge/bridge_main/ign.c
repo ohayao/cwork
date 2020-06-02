@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
@@ -30,6 +31,7 @@
 #include <bridge/proto/ign.pb.h>
 #include <bridge/proto/pb_encode.h>
 #include <bridge/proto/pb_decode.h>
+
 static sysinfo_t g_sysif;
 
 //LIST_HEAD(waiting_task_head);
@@ -180,8 +182,13 @@ int HeartBeat(){
     pb_ostream_t out=pb_ostream_from_buffer(buf,sizeof(buf));
     if(pb_encode(&out,ign_MsgInfo_fields,&hb)){
         size_t len=out.bytes_written;
-        if((publish_result=MQTT_sendMessage(g_sysif.mqtt_c,PUB_TOPIC,1,buf,(int)len))!=MQTTCLIENT_SUCCESS){
+        if(MQTTCLIENT_SUCCESS != (publish_result=MQTT_sendMessage(g_sysif.mqtt_c,PUB_TOPIC,1,buf,(int)len))){
             printf("SEND MQTT HB ERROR WITH CODE[%d]\n",publish_result);
+			serverLog(LL_ERROR, "MQTT_sendMessage err[%d], do reconnection.", publish_result);
+			int ret = 0;
+			do {
+				ret = Init_MQTT(&g_sysif.mqtt_c);
+			} while (0 != ret);
         }else{
             printf("SEND MQTT HB SUCCESS\n");
         }
@@ -268,30 +275,35 @@ int BLEParing(void* tn){
     return 0;
 }
 
-
-int Init(void* tn) {
-    serverLog(LL_NOTICE, "Init mqtt Clients");
-
-    g_sysif.mqtt_c = MQTT_initClients(HOST, SUBSCRIBE_CLIENT_ID, 60, 1, CA_PATH, TRUST_STORE, PRIVATE_KEY, KEY_STORE);
-    if(NULL == g_sysif.mqtt_c) {
-    //if(NULL == g_sysif.mqtt_c) {
-        //goto GoExit;
+int Init_MQTT(MQTTClient* p_mqtt){
+    *p_mqtt = MQTT_initClients(HOST, SUBSCRIBE_CLIENT_ID, 60, 1, CA_PATH, TRUST_STORE, PRIVATE_KEY, KEY_STORE);
+    if(NULL == p_mqtt) {
         serverLog(LL_ERROR, "MQTT_initClients err, mqtt_c is NULL.");
         return -1;
     }
+	return 0;
+}
+
+int Init(void* tn) {
+    serverLog(LL_NOTICE, "Init mqtt Clients");
+	int ret = 0;
+	do {
+		ret = Init_MQTT(&g_sysif.mqtt_c);
+	} while (0 != ret);
+
     serverLog(LL_NOTICE, "init mqtt Clients success");
     
-    int rc = MQTTClient_subscribe(g_sysif.mqtt_c, SUB_TOPIC, 1);
-    if(MQTTCLIENT_SUCCESS != rc){
-        serverLog(LL_ERROR, "Subscribe [%s] error with code [%d].", SUB_TOPIC, rc);
+    ret = MQTTClient_subscribe(g_sysif.mqtt_c, SUB_TOPIC, 1);
+    if(MQTTCLIENT_SUCCESS != ret){
+        serverLog(LL_ERROR, "Subscribe [%s] error with code [%d].", SUB_TOPIC, ret);
         return -2;
     }
     serverLog(LL_NOTICE, "Subscribe [%s] success!!!", SUB_TOPIC);
     
 
-    rc = MQTTClient_subscribe(g_sysif.mqtt_c,PUB_WEBDEMO,1);
-	if(MQTTCLIENT_SUCCESS != rc){
-        serverLog(LL_ERROR, "Subscribe [%s] error with code [%d].", PUB_WEBDEMO, rc);
+    ret = MQTTClient_subscribe(g_sysif.mqtt_c, PUB_WEBDEMO, 1);
+	if(MQTTCLIENT_SUCCESS != ret){
+        serverLog(LL_ERROR, "Subscribe [%s] error with code [%d].", PUB_WEBDEMO, ret);
         return -3;
     }
     serverLog(LL_NOTICE, "Subscribe [%s] success!!!", PUB_WEBDEMO);
