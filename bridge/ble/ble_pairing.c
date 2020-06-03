@@ -3,7 +3,7 @@
 #include <bridge/bridge_main/log.h>
 #include <pthread.h>
 #include <unistd.h>
-#include <bridge/lock/messages/PairingStep1.h>
+#include "bridge/lock/messages/PairingStep1.h"
 #include <bridge/lock/messages/PairingStep2.h>
 #include <bridge/lock/messages/PairingStep3.h>
 #include <bridge/lock/messages/PairingStep4.h>

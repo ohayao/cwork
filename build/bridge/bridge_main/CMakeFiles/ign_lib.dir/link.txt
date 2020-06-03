@@ -1,0 +1,2 @@
+/usr/bin/ar qc libign_lib.a  CMakeFiles/ign_lib.dir/log.c.o CMakeFiles/ign_lib.dir/sysinfo.c.o CMakeFiles/ign_lib.dir/task_queue.c.o CMakeFiles/ign_lib.dir/mutex_helper.c.o CMakeFiles/ign_lib.dir/bleData.c.o CMakeFiles/ign_lib.dir/mqttData.c.o CMakeFiles/ign_lib.dir/task.c.o CMakeFiles/ign_lib.dir/thread_helper.c.o CMakeFiles/ign_lib.dir/wait_Ble.c.o CMakeFiles/ign_lib.dir/lock_list.c.o
+/usr/bin/ranlib libign_lib.a

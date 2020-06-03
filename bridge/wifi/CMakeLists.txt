@@ -1,0 +1,16 @@
+
+
+set(ALL_WIFI_HDRS)
+set(ALL_WIFI_SRCS)
+
+set(MQTT_DEPENDENCIES
+)
+
+file(GLOB_RECURSE ALL_WIFI_HDRS "*.h")
+file(GLOB_RECURSE ALL_WIFI_SRCS "*.c")
+
+add_library(ign_wifi
+  ${ALL_WIFI_HDRS} ${ALL_WIFI_SRCS}
+)
+
+

@@ -1,7 +1,7 @@
 #ifndef _BLE_OPERATION_H_
 #define _BLE_OPERATION_H_
 #include <stdint.h>
-#include <bridge/gattlib/gattlib.h>
+#include "bridge/gattlib/gattlib.h"
 #include <stdbool.h>
 
 int write_char_by_uuid_multi_atts (

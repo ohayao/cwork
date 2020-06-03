@@ -2930,7 +2930,7 @@ static int handleSetTimeResponce(const uint8_t* data, int data_length,void* user
     { 
       serverLog(LL_ERROR, "AdminConnection_decryptNative error");
       admin_connection->receive_err = 1;
-      goto DELETE_PINREQUEST_RESPONCE_EXIT;
+      goto SET_TIME_RESPONCE_EXIT;
     }
     serverLog(LL_NOTICE, "AdminConnection_decryptNative responceLen %d", responceLen);
     

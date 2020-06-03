@@ -10,6 +10,7 @@ set(TEST_DEPENDENCIES
   mqtt
   ign_proto
   ign_lib
+  ign_wifi
 )
 
 
@@ -68,5 +69,10 @@ target_link_libraries(admin_create_pin
 
 add_executable(admin_delete_pin ./admin_delete_pin.c)
 target_link_libraries(admin_delete_pin
+  ${TEST_DEPENDENCIES}
+)
+
+add_executable(write_wifi_info ./write_wifi_info.c)
+target_link_libraries(write_wifi_info
   ${TEST_DEPENDENCIES}
 )

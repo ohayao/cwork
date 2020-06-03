@@ -1,0 +1,2 @@
+/usr/bin/ar qc libign_proto.a  CMakeFiles/ign_proto.dir/ign.pb.c.o CMakeFiles/ign_proto.dir/pb_common.c.o CMakeFiles/ign_proto.dir/pb_decode.c.o CMakeFiles/ign_proto.dir/pb_encode.c.o
+/usr/bin/ranlib libign_proto.a

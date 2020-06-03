@@ -1,0 +1,2 @@
+/usr/bin/ar qc libign_wifi.a  CMakeFiles/ign_wifi.dir/wifi_info.c.o
+/usr/bin/ranlib libign_wifi.a
