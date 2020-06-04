@@ -276,7 +276,7 @@ int BLEParing(void* tn){
 }
 
 int Init_MQTT(MQTTClient* p_mqtt){
-    *p_mqtt = MQTT_initClients(HOST, SUBSCRIBE_CLIENT_ID, 60, 1, CA_PATH, TRUST_STORE, PRIVATE_KEY, KEY_STORE);
+    *p_mqtt = MQTT_initClients(HOST, g_sysif.mac, 60, 1, CA_PATH, TRUST_STORE, PRIVATE_KEY, KEY_STORE);
     if(NULL == p_mqtt) {
         serverLog(LL_ERROR, "MQTT_initClients err, mqtt_c is NULL.");
         return -1;
@@ -285,8 +285,15 @@ int Init_MQTT(MQTTClient* p_mqtt){
 }
 
 int Init(void* tn) {
-    serverLog(LL_NOTICE, "Init mqtt Clients");
+
 	int ret = 0;
+    ret = GetMacAddr(g_sysif.mac, sizeof(g_sysif.mac));
+    if(ret < 0) {
+        serverLog(LL_ERROR, "Init GetMacAddr err[%d].", ret);
+        return -1;
+    }
+    serverLog(LL_NOTICE, "Init Mac as Device ID[%s].", g_sysif.mac);
+
 	do {
 		ret = Init_MQTT(&g_sysif.mqtt_c);
 	} while (0 != ret);
