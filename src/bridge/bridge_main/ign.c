@@ -33,6 +33,8 @@
 #include <bridge/proto/pb_decode.h>
 
 static sysinfo_t g_sysif;
+static char TOPIC_SUB[32];
+static char TOPIC_PUB[32];
 
 //LIST_HEAD(waiting_task_head);
 //LIST_HEAD(doing_task_head);
@@ -182,7 +184,7 @@ int HeartBeat(){
     pb_ostream_t out=pb_ostream_from_buffer(buf,sizeof(buf));
     if(pb_encode(&out,ign_MsgInfo_fields,&hb)){
         size_t len=out.bytes_written;
-        if(MQTTCLIENT_SUCCESS != (publish_result=MQTT_sendMessage(g_sysif.mqtt_c,PUB_TOPIC,1,buf,(int)len))){
+        if(MQTTCLIENT_SUCCESS != (publish_result=MQTT_sendMessage(g_sysif.mqtt_c,TOPIC_PUB,1,buf,(int)len))){
             printf("SEND MQTT HB ERROR WITH CODE[%d]\n",publish_result);
 			serverLog(LL_ERROR, "MQTT_sendMessage err[%d], do reconnection.", publish_result);
 			int ret = 0;
@@ -232,7 +234,7 @@ int GetUserInfo(void* si) {
 	pb_ostream_t out=pb_ostream_from_buffer(buf,sizeof(buf));
 	if(pb_encode(&out,ign_MsgInfo_fields,&msg)){
 		size_t len=out.bytes_written;
-		if((pubResult=MQTT_sendMessage(g_sysif.mqtt_c,PUB_TOPIC,1,buf,(int)len))!=MQTTCLIENT_SUCCESS){
+		if((pubResult=MQTT_sendMessage(g_sysif.mqtt_c,TOPIC_PUB,1,buf,(int)len))!=MQTTCLIENT_SUCCESS){
 			printf("SEND MQTT [GET_USER_INFO] ERROR WITH CODE[%d]\n",pubResult);
 		}else{
 			printf("SEND MQTT [GET_USER_INFO] SUCCESS\n");
@@ -285,14 +287,17 @@ int Init_MQTT(MQTTClient* p_mqtt){
 }
 
 int Init(void* tn) {
-
 	int ret = 0;
     ret = GetMacAddr(g_sysif.mac, sizeof(g_sysif.mac));
     if(ret < 0) {
         serverLog(LL_ERROR, "Init GetMacAddr err[%d].", ret);
         return -1;
     }
-    serverLog(LL_NOTICE, "Init Mac as Device ID[%s].", g_sysif.mac);
+	memset(TOPIC_PUB, 0, sizeof(TOPIC_PUB));
+	memset(TOPIC_SUB, 0, sizeof(TOPIC_SUB));
+	snprintf(TOPIC_PUB, sizeof(TOPIC_PUB), "%s%s", PUB_TOPIC_PREFIX, g_sysif.mac);
+	snprintf(TOPIC_SUB, sizeof(TOPIC_SUB), "%s%s", SUB_TOPIC_PREFIX, g_sysif.mac);
+    serverLog(LL_NOTICE, "Init Mac as Device ID[%s], TOPIC_PUB[%s], TOPIC_SUB[%s].", g_sysif.mac, TOPIC_PUB, TOPIC_SUB);
 
 	do {
 		ret = Init_MQTT(&g_sysif.mqtt_c);
@@ -300,12 +305,13 @@ int Init(void* tn) {
 
     serverLog(LL_NOTICE, "init mqtt Clients success");
     
-    ret = MQTTClient_subscribe(g_sysif.mqtt_c, SUB_TOPIC, 1);
+	
+    ret = MQTTClient_subscribe(g_sysif.mqtt_c, TOPIC_SUB, 1);
     if(MQTTCLIENT_SUCCESS != ret){
-        serverLog(LL_ERROR, "Subscribe [%s] error with code [%d].", SUB_TOPIC, ret);
+        serverLog(LL_ERROR, "Subscribe [%s] error with code [%d].", TOPIC_SUB, ret);
         return -2;
     }
-    serverLog(LL_NOTICE, "Subscribe [%s] success!!!", SUB_TOPIC);
+    serverLog(LL_NOTICE, "Subscribe [%s] success!!!", TOPIC_SUB);
     
 
     ret = MQTTClient_subscribe(g_sysif.mqtt_c, PUB_WEBDEMO, 1);
