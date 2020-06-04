@@ -383,7 +383,7 @@ void WaitMQTT(sysinfo_t *si){
 				glock_index=0;
 				ign_MsgInfo imsg={};
 				pb_istream_t in=pb_istream_from_buffer(msg->payload,(size_t)msg->payloadlen);
-				imsg.server_data.lockEntries.funcs.decode=&get_server_event_data;
+				//imsg.server_data.lockEntries.funcs.decode=&get_server_event_data;
 				if(pb_decode(&in,ign_MsgInfo_fields,&imsg)){
 					switch(imsg.event_type){
 						case ign_EventType_HEARTBEAT:
@@ -402,7 +402,46 @@ void WaitMQTT(sysinfo_t *si){
 									printf("%02d bt_id=%s\n",i,glocks[i].bt_id);
 								}
 							}
-							MQTT_sendMessage(g_sysif.mqtt_c, SUB_WEBDEMO, 1, msg->payload, msg->payloadlen);
+
+       ign_MsgInfo tmsg={};
+       tmsg.event_type=ign_EventType_UPDATE_USER_INFO;
+       tmsg.has_bridge_data=true;
+       ign_BridgeEventData tbed={};
+       tbed.has_profile=true;
+       tbed.profile=Create_IgnBridgeProfile("IGN123456789");
+       tmsg.bridge_data=tbed;
+       ign_ServerEventData tsd={};
+       tsd.lockEntries_count=5;
+       int tl=0;
+       for(int i=0;i<5;i++){
+           if(strlen(imsg.server_data.lockEntries[i].bt_id)>0){
+               tl++;
+               strcpy(tsd.lockEntries[i].bt_id,imsg.server_data.lockEntries[i].bt_id);
+               strcpy(tsd.lockEntries[i].ekey.bytes,imsg.server_data.lockEntries[i].ekey.bytes);
+           }
+       }
+       tsd.lockEntries_count=tl;
+       tmsg.has_server_data=true;
+       tmsg.server_data=tsd;
+
+      
+       int pubResult;
+       uint8_t buf[1024];
+       memset(buf,0,sizeof(buf));
+       pb_ostream_t out=pb_ostream_from_buffer(buf,sizeof(buf));
+       if(pb_encode(&out,ign_MsgInfo_fields,&tmsg)){
+           size_t len=out.bytes_written;
+           if((pubResult=MQTT_sendMessage(g_sysif.mqtt_c,SUB_WEBDEMO,1,buf,(int)len))!=MQTTCLIENT_SUCCESS){
+               printf("TRANS TO WEB [UPDATE_USER_INFO] ERROR WITH CODE[%d]\n",pubResult);
+           }else{
+               printf("TRANS TO WEB [UPDATE_USER_INFO] SUCCESS\n");
+           }
+       }else{
+           printf("ENCODE UPDATEUSERINFO ERROR\n");
+       }
+
+
+							//MQTT_sendMessage(g_sysif.mqtt_c, SUB_WEBDEMO, 1, msg->payload, msg->payloadlen);
 							goto gomqttfree;
 							break;
 						case ign_EventType_NEW_JOB_NOTIFY:
