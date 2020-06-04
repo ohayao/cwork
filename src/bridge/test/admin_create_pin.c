@@ -40,22 +40,22 @@ void saveTaskData(task_node_t *ptn)
         {
         case TASK_BLE_ADMIN_CREATE_PIN_REQUEST:
         {
-            serverLog(LL_NOTICE, "saving ble TASK_BLE_ADMIN_UNLOCK data");
+            printf( "saving ble TASK_BLE_ADMIN_UNLOCK data");
             ble_admin_result_t *create_pin_result = (ble_admin_result_t *)ble_data->ble_result;
             int create_pin_request_error = create_pin_result->create_pin_request_result;
             IgCreatePinResponse *create_pin_response = create_pin_result->cmd_response;
             
             if (create_pin_request_error)
             {
-                serverLog(LL_ERROR, "create pin request error");
+                printf( "create pin request error");
             }
             else
             {
-                serverLog(LL_NOTICE, "create pin request success");
+                printf( "create pin request success");
                 if (create_pin_response->has_operation_id)
-                    serverLog(LL_NOTICE, "operation ID: %d", create_pin_response->operation_id);
+                    printf( "operation ID: %d", create_pin_response->operation_id);
                 if (create_pin_response->has_result)
-                    serverLog(LL_NOTICE, "result: %d", create_pin_response->result);
+                    printf( "result: %d", create_pin_response->result);
             }
             break;
         }
@@ -91,7 +91,7 @@ int hexStrToByte(const char* source, uint8_t* dest, int sourceLen)
 
 
 int testCreatePin(igm_lock_t *lock, IgCreatePinRequest *request) {
-    serverLog(LL_NOTICE,"create pin request cmd ask invoker to release the lock.");
+    printf("create pin request cmd ask invoker to release the lock.");
       
     ble_admin_param_t *admin_param = (ble_admin_param_t *)malloc(sizeof(ble_admin_param_t));
     bleInitAdminParam(admin_param);
@@ -122,7 +122,7 @@ int testCreatePin(igm_lock_t *lock, IgCreatePinRequest *request) {
 			int event_result = tn->task_sm_table[j].eventActFun(tn);
             if (event_result)
             {
-                serverLog(LL_ERROR, "%d step error", j);
+                printf("%d step error", j);
                 error = 1;
                 break;
             }
@@ -134,7 +134,7 @@ int testCreatePin(igm_lock_t *lock, IgCreatePinRequest *request) {
     }
     if (error)
     {
-        serverLog(LL_ERROR, "lock error");
+        printf("lock error");
         return error;
     }
 
@@ -152,34 +152,34 @@ int testCreatePin(igm_lock_t *lock, IgCreatePinRequest *request) {
     // 被复制, 然后使用
     free(admin_param);
     admin_param = NULL;
-    serverLog(LL_NOTICE, "lock end-------");
+    printf( "lock end-------");
     return 0;
 }
 
 int main(int argc, char *argv[]) {
     if (argc != 5) {
-      serverLog(LL_NOTICE, "%s <device_address> <admin_key> <passwd> <pin> \n", argv[0]);
+      printf("%s <device_address> <admin_key> <passwd> <pin> \n", argv[0]);
       return 1;
     }
-    serverLog(LL_NOTICE,"test ble create pin request ing to start.");
+    printf("test ble create pin request ing to start.");
     
-    serverLog(LL_NOTICE,"select the lock you want to unlock.");
+    printf("select the lock you want to unlock.");
     igm_lock_t *lock=NULL;
     getLock(&lock);
     initLock(lock);
     setLockAddr(lock, argv[1], strlen(argv[1]));
-    serverLog(LL_NOTICE, "setLockAddr success");
+    printf( "setLockAddr success");
 
     uint8_t tmp_buff[100];
     memset(tmp_buff, 0, sizeof(tmp_buff));
     int admin_len = hexStrToByte(argv[2], tmp_buff, strlen(argv[2]));
     setLockAdminKey(lock, tmp_buff, admin_len);
-    serverLog(LL_NOTICE, "setLockAdminKey success");
+    printf( "setLockAdminKey success");
 
     memset(tmp_buff, 0, sizeof(tmp_buff));
     int password_size = hexStrToByte(argv[3], tmp_buff, strlen(argv[3]));
     setLockPassword(lock, tmp_buff, password_size);
-    serverLog(LL_NOTICE, "setLockPassword success");
+    printf( "setLockPassword success");
 
     IgCreatePinRequest create_pin_request;
     ig_CreatePinRequest_init(&create_pin_request);
@@ -193,9 +193,9 @@ int main(int argc, char *argv[]) {
     memset(tmp_buff, 0, sizeof(tmp_buff));
     int pin_size = hexStrToByte(argv[4], tmp_buff, strlen(argv[4]));
     ig_CreatePinRequest_set_new_pin(&create_pin_request, tmp_buff, pin_size);
-    serverLog(LL_NOTICE, "test create lock cmd test go");
+    printf( "test create lock cmd test go");
     int res = testCreatePin(lock, &create_pin_request);
-    serverLog(LL_NOTICE, "test create lock end");
+    printf( "test create lock end");
     // 为什么不需要这个, 因为我订立的协议是, 使用完, 立刻释放, 这已经被释放了.
     // 在 writeCreatePinRequest 里面已经释放了
     // ig_CreatePinRequest_deinit(&create_pin_request);

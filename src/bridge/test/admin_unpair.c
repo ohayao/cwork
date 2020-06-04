@@ -32,7 +32,6 @@
 #include <ctype.h>
 sysinfo_t g_sysif;
 
-extern int WaitBtn(void *arg);
 ign_BridgeProfile Create_IgnBridgeProfile(char *bridgeID);
 void addPairingTask(igm_lock_t *lock, int msg_id);
 void addDiscoverTask(int msg_id);
@@ -128,39 +127,6 @@ ign_BridgeProfile Create_IgnBridgeProfile(char *bridgeID){
     return bp;
 }
 
-static int hbInterval=0;
-int HeartBeat(){
-    //send MQTT HB to Server
-    hbInterval++;
-    hbInterval=hbInterval%10;
-    if(hbInterval>0) return 0;
-    ign_MsgInfo hb={};
-    hb.event_type=ign_EventType_HEARTBEAT;
-    hb.time=get_ustime();
-    hb.msg_id=get_ustime();
-    ign_BridgeEventData bed={};
-    bed.has_profile=true;
-    bed.profile=Create_IgnBridgeProfile("abcdef");
-    hb.has_bridge_data=true;
-    hb.bridge_data=bed;
-
-
-    int publish_result;
-    uint8_t buf[1024];
-    memset(buf,0,sizeof(buf));
-    pb_ostream_t out=pb_ostream_from_buffer(buf,sizeof(buf));
-    if(pb_encode(&out,ign_MsgInfo_fields,&hb)){
-        size_t len=out.bytes_written;
-        if((publish_result=MQTT_sendMessage(g_sysif.mqtt_c,PUB_TOPIC,1,buf,(int)len))!=MQTTCLIENT_SUCCESS){
-            serverLog(LL_ERROR, "SEND MQTT HB ERROR WITH CODE[%d]", publish_result);
-        }else{
-            serverLog(LL_NOTICE, "SEND MQTT HB SUCCESS");
-        }
-    }else{
-        serverLog(LL_ERROR, "ENCODE MQTT HB ERROR");
-    }
-    return 0;
-}
 
 int GetUserInfo(void* si) {
 	//send request to server to get userinfo
@@ -195,38 +161,6 @@ int UnLock(void* tn) {
 
 int BLEParing(void* tn){
 	printf("BLEParing!\n");
-    return 0;
-}
-
-
-int Init(void* tn) {
-    serverLog(LL_NOTICE, "Init mqtt Clients");
-    g_sysif.mqtt_c = MQTT_initClients(HOST,SUBSCRIBE_CLIENT_ID,60,1,CA_PATH,TRUST_STORE,PRIVATE_KEY,KEY_STORE);
-    if(NULL == g_sysif.mqtt_c) {
-        //goto GoExit;
-        serverLog(LL_ERROR, "util_initClients err, mqtt_c is NULL.");
-        return 1;
-    }
-    serverLog(LL_NOTICE, "init mqtt Clients success");
-    
-    int rc = MQTTClient_subscribe(g_sysif.mqtt_c, SUB_TOPIC, 1);
-    if(MQTTCLIENT_SUCCESS != rc){
-        serverLog(LL_ERROR, "Subscribe [%s] error with code [%d].", SUB_TOPIC, rc);
-        return 1;
-    }
-    serverLog(LL_NOTICE, "Subscribe [%s] success!!!", SUB_TOPIC);
-    
-
-    rc = MQTTClient_subscribe(g_sysif.mqtt_c,PUB_WEBDEMO,1);
-    if(rc!=MQTTCLIENT_SUCCESS){
-        serverLog(LL_ERROR, "Subscribe [%s] error with code [%d].", PUB_WEBDEMO, rc);
-        return 1;
-    }
-    serverLog(LL_NOTICE, "Subscribe [%s] success!!!", PUB_WEBDEMO);
-
-
-    //InitBLE(si);
-    //InitBtn(si);
     return 0;
 }
 
@@ -310,49 +244,6 @@ int DoWebMsg(char *topic,void *payload){
     // addPairingTask(&lock, msg_id);
     return 0;
 }
-
-void WaitMQTT(void *arg){
-    sysinfo_t *si = (sysinfo_t *)arg;
-    while(1){
-        sleep(1);
-        char *topic = NULL;
-        int topicLen;
-        MQTTClient_message *msg = NULL;
-        int rc = MQTTClient_receive(si->mqtt_c, &topic, &topicLen, &msg, 1e3);
-        if (0 != rc) {
-            serverLog(LL_ERROR, "MQTTClient_receive msg error");
-            continue;
-        }
-        // serverLog(LL_NOTICE, "MQTTClient_receive msg success");
-        if (!msg)
-        {
-            HeartBeat();
-            continue;
-        }
-
-        if (strcmp(topic,PUB_WEBDEMO) == 0)
-        {
-            DoWebMsg(topic,msg->payload);;
-        }
-        serverLog(LL_NOTICE, "topic %s", topic);
-    }
-}
-
-
-
-int WaitBtn(void *arg){
-    //if btn
-    //add Init into doing_list
-    for(;;) {
-        sleep(1);
-        serverLog(LL_DEBUG, "waiting for Btn...");
-    }
-
-    return 0;
-}
-
-
-
 
 // 用法
 void visitScanResult(ble_data_t *ble_data)
@@ -719,23 +610,6 @@ int main(int argc, char *argv[]) {
     // Init(NULL);
     serverLog(LL_NOTICE,"test ble discover Ready to start.");
 
-    //daemon(1, 0);
-    // 有g_sysinfo,还需要这个吗?
-    // sysinfo_t *si = (sysinfo_t *)malloc(sizeof(sysinfo_t));
-    // sysinfoInit(si);
-    //Init for paring
-    /*int rc = Init(si);
-    if (0 != rc) {
-        GoExit(si);
-        return -1;
-    }*/
-
-    // pthread_t mqtt_thread = Thread_start(WaitMQTT, &g_sysif);
-    // serverLog(LL_NOTICE,"new thread to WaitMQTT[%u].", mqtt_thread);
-    // pthread_t ble_thread = Thread_start(WaitBLE, &g_sysif);
-    // serverLog(LL_NOTICE,"new thread to WaitMQTT[%u].", ble_thread);
-    // pthread_t bt_thread = Thread_start(WaitBtn, &g_sysif);
-    // serverLog(LL_NOTICE,"new thread to WaitMQTT[%u].", bt_thread);
     if (argc != 4) {
       serverLog(LL_NOTICE, "%s <device_address> <admin_key> <passwd> \n", argv[0]);
       return 1;

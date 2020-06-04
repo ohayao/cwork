@@ -40,7 +40,7 @@ static char TOPIC_PUB[32];
 //LIST_HEAD(doing_task_head);
 
 extern int WaitBtn(void *arg);
-ign_BridgeProfile Create_IgnBridgeProfile(char *bridgeID);
+ign_BridgeProfile Create_IgnBridgeProfile(sysinfo_t* ps);
 void addPairingTask(igm_lock_t *lock, int msg_id);
 void addDiscoverTask(int msg_id);
 void addAdminTask(igm_lock_t *lock, int msg_id);
@@ -118,18 +118,14 @@ int FSMHandle(task_node_t* tn) {
 	return 0;
 }
 
-ign_BridgeProfile Create_IgnBridgeProfile(char *bridgeID){
+ign_BridgeProfile Create_IgnBridgeProfile(sysinfo_t* ps){
     ign_BridgeProfile bp={};
     bp.os_info=ign_OSType_LINUX;
     char temp[100];
     memset(temp,0,sizeof(temp));
-    strcpy(temp,bridgeID);
-    bp.bt_id.size=strlen(temp);
+    bp.bt_id.size=snprintf(temp, sizeof(temp), "%s", ps->mac);
+    bp.mac_addr.size=bp.bt_id.size;
     memcpy(bp.bt_id.bytes,temp,strlen(temp));
-
-    memset(temp,0,sizeof(temp));
-    strcpy(temp,"mac_addr");
-    bp.mac_addr.size=strlen(temp);
     memcpy(bp.mac_addr.bytes,temp,strlen(temp));
 
     memset(temp,0,sizeof(temp));
@@ -174,7 +170,7 @@ int HeartBeat(){
     hb.msg_id=GetMsgID();//get_ustime();
     ign_BridgeEventData bed={};
     bed.has_profile=true;
-    bed.profile=Create_IgnBridgeProfile("IGN123456789");
+    bed.profile=Create_IgnBridgeProfile(&g_sysif);
     hb.has_bridge_data=true;
     hb.bridge_data=bed;
 
@@ -224,7 +220,7 @@ int GetUserInfo(void* si) {
 	msg.msg_id=GetMsgID();//get_ustime();
 	ign_BridgeEventData bed={};
 	bed.has_profile=true;
-	bed.profile=Create_IgnBridgeProfile((char*)si);
+	bed.profile=Create_IgnBridgeProfile(&g_sysif);
 	msg.has_bridge_data=true;
 	msg.bridge_data=bed;
 
@@ -391,7 +387,7 @@ void WaitMQTT(sysinfo_t *si){
 				//web simulator request
 				DoWebMsg(topic,msg->payload);
 			}else{
-				//decode msg
+				//from server msg
 				memset(glocks,0,sizeof(glocks));
 				glock_index=0;
 				ign_MsgInfo imsg={};
@@ -416,42 +412,41 @@ void WaitMQTT(sysinfo_t *si){
 								}
 							}
 
-       ign_MsgInfo tmsg={};
-       tmsg.event_type=ign_EventType_UPDATE_USER_INFO;
-       tmsg.has_bridge_data=true;
-       ign_BridgeEventData tbed={};
-       tbed.has_profile=true;
-       tbed.profile=Create_IgnBridgeProfile("IGN123456789");
-       tmsg.bridge_data=tbed;
-       ign_ServerEventData tsd={};
-       tsd.lockEntries_count=5;
-       int tl=0;
-       for(int i=0;i<5;i++){
-           if(strlen(imsg.server_data.lockEntries[i].bt_id)>0){
-               tl++;
-               strcpy(tsd.lockEntries[i].bt_id,imsg.server_data.lockEntries[i].bt_id);
-               strcpy(tsd.lockEntries[i].ekey.bytes,imsg.server_data.lockEntries[i].ekey.bytes);
-           }
-       }
-       tsd.lockEntries_count=tl;
-       tmsg.has_server_data=true;
-       tmsg.server_data=tsd;
+							ign_MsgInfo tmsg={};
+							tmsg.event_type=ign_EventType_UPDATE_USER_INFO;
+							tmsg.has_bridge_data=true;
+							ign_BridgeEventData tbed={};
+							tbed.has_profile=true;
+							tbed.profile=Create_IgnBridgeProfile(&g_sysif);
+							tmsg.bridge_data=tbed;
+							ign_ServerEventData tsd={};
+							tsd.lockEntries_count=5;
+							int tl=0;
+							for(int i=0;i<5;i++){
+								if(strlen(imsg.server_data.lockEntries[i].bt_id)>0){
+									tl++;
+									strcpy(tsd.lockEntries[i].bt_id,imsg.server_data.lockEntries[i].bt_id);
+									strcpy(tsd.lockEntries[i].ekey.bytes,imsg.server_data.lockEntries[i].ekey.bytes);
+								}
+							}
+							tsd.lockEntries_count=tl;
+							tmsg.has_server_data=true;
+							tmsg.server_data=tsd;
 
-      
-       int pubResult;
-       uint8_t buf[1024];
-       memset(buf,0,sizeof(buf));
-       pb_ostream_t out=pb_ostream_from_buffer(buf,sizeof(buf));
-       if(pb_encode(&out,ign_MsgInfo_fields,&tmsg)){
-           size_t len=out.bytes_written;
-           if((pubResult=MQTT_sendMessage(g_sysif.mqtt_c,SUB_WEBDEMO,1,buf,(int)len))!=MQTTCLIENT_SUCCESS){
-               printf("TRANS TO WEB [UPDATE_USER_INFO] ERROR WITH CODE[%d]\n",pubResult);
-           }else{
-               printf("TRANS TO WEB [UPDATE_USER_INFO] SUCCESS\n");
-           }
-       }else{
-           printf("ENCODE UPDATEUSERINFO ERROR\n");
-       }
+							int pubResult;
+							uint8_t buf[1024];
+							memset(buf,0,sizeof(buf));
+							pb_ostream_t out=pb_ostream_from_buffer(buf,sizeof(buf));
+							if(pb_encode(&out,ign_MsgInfo_fields,&tmsg)){
+								size_t len=out.bytes_written;
+								if((pubResult=MQTT_sendMessage(g_sysif.mqtt_c,SUB_WEBDEMO,1,buf,(int)len))!=MQTTCLIENT_SUCCESS){
+									printf("TRANS TO WEB [UPDATE_USER_INFO] ERROR WITH CODE[%d]\n",pubResult);
+								}else{
+									printf("TRANS TO WEB [UPDATE_USER_INFO] SUCCESS\n");
+								}
+							}else{
+								printf("ENCODE UPDATEUSERINFO ERROR\n");
+							}
 
 
 							//MQTT_sendMessage(g_sysif.mqtt_c, SUB_WEBDEMO, 1, msg->payload, msg->payloadlen);
@@ -472,7 +467,7 @@ void WaitMQTT(sysinfo_t *si){
 							char device_address[] = "E1:93:2A:A3:16:E7";
 							char admin_key[] = "8d29d572299deda54de78c16fcce1451"; 
 							char passwd[] = "35f1cfb6f8bee257";
-							
+
 							setLockAddr(&lock, device_address, strlen(device_address));
 							uint8_t tmp_buff[100];
 							memset(tmp_buff, 0, sizeof(tmp_buff));
@@ -498,19 +493,19 @@ void WaitMQTT(sysinfo_t *si){
 					ptn = FindTaskByMsgID(imsg.msg_id, &waiting_task_head);
 
 					if (NULL!=ptn) {//move task_node into doing_list task queue
-						printf("find task_node.msg_id[%u], current_state[%d].\n", ptn->msg_id, ptn->cur_state);
-						//MoveTask();
-						pthread_mutex_lock(g_sysif.mutex);
-						MoveTask(&ptn->list, &doing_task_head);
-						pthread_mutex_unlock(g_sysif.mutex);
-					}
-					else {//if not exist, add into task queue
-						printf("find ptn==NULL.\n");
-						pthread_mutex_lock(g_sysif.mutex);
-						InsertTask(&doing_task_head, imsg.msg_id, current_state, NULL, NULL);
-						pthread_mutex_unlock(g_sysif.mutex);
-					}
-					*/
+					printf("find task_node.msg_id[%u], current_state[%d].\n", ptn->msg_id, ptn->cur_state);
+				//MoveTask();
+				pthread_mutex_lock(g_sysif.mutex);
+				MoveTask(&ptn->list, &doing_task_head);
+				pthread_mutex_unlock(g_sysif.mutex);
+				}
+				else {//if not exist, add into task queue
+				printf("find ptn==NULL.\n");
+				pthread_mutex_lock(g_sysif.mutex);
+				InsertTask(&doing_task_head, imsg.msg_id, current_state, NULL, NULL);
+				pthread_mutex_unlock(g_sysif.mutex);
+				}
+					 */
 gomqttfree:            
 					MQTTClient_freeMessage(&msg);
 					MQTTClient_free(topic);
@@ -527,44 +522,44 @@ gomqttfree:
 }
 
 /*
-void WaitMQTT(void *arg){
-    sysinfo_t *si = (sysinfo_t *)arg;
-    while(1){
-        sleep(1);
-        char *topic = NULL;
-        int topicLen;
-        MQTTClient_message *msg = NULL;
-        int rc = MQTTClient_receive(si->mqtt_c, &topic, &topicLen, &msg, 1e3);
-        if (0 != rc) {
-            serverLog(LL_ERROR, "MQTTClient_receive msg error");
-            continue;
-        }
-        // serverLog(LL_NOTICE, "MQTTClient_receive msg success");
-        if (!msg)
-        {
-            HeartBeat();
-            continue;
-        }
+   void WaitMQTT(void *arg){
+   sysinfo_t *si = (sysinfo_t *)arg;
+   while(1){
+   sleep(1);
+   char *topic = NULL;
+   int topicLen;
+   MQTTClient_message *msg = NULL;
+   int rc = MQTTClient_receive(si->mqtt_c, &topic, &topicLen, &msg, 1e3);
+   if (0 != rc) {
+   serverLog(LL_ERROR, "MQTTClient_receive msg error");
+   continue;
+   }
+// serverLog(LL_NOTICE, "MQTTClient_receive msg success");
+if (!msg)
+{
+HeartBeat();
+continue;
+}
 
-        if (strcmp(topic,PUB_WEBDEMO) == 0)
-        {
-            DoWebMsg(topic,msg->payload);;
-        }
-        serverLog(LL_NOTICE, "topic %s", topic);
-    }
+if (strcmp(topic,PUB_WEBDEMO) == 0)
+{
+DoWebMsg(topic,msg->payload);;
+}
+serverLog(LL_NOTICE, "topic %s", topic);
+}
 }*/
 
 
 
 int WaitBtn(void *arg){
-    //if btn
-    //add Init into doing_list
-    for(;;) {
-        sleep(1);
-        serverLog(LL_DEBUG, "waiting for Btn...");
-    }
+	//if btn
+	//add Init into doing_list
+	for(;;) {
+		sleep(1);
+		serverLog(LL_DEBUG, "waiting for Btn...");
+	}
 
-    return 0;
+	return 0;
 }
 
 
