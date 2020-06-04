@@ -3,7 +3,7 @@
 #include <bridge/bridge_main/log.h>
 #include <pthread.h>
 #include <unistd.h>
-#include <bridge/lock/messages/PairingStep1.h>
+#include "bridge/lock/messages/PairingStep1.h"
 #include <bridge/lock/messages/PairingStep2.h>
 #include <bridge/lock/messages/PairingStep3.h>
 #include <bridge/lock/messages/PairingStep4.h>
@@ -338,15 +338,15 @@ int write_pairing_commit(void *arg)
     bleSetPairingResultPassword(
       pairing_connection->pairing_result, 1, step4->password, step4->password_size);
       serverLog(LL_NOTICE, "-------------------------step4.has_success ");
-			if (step4->has_password)
-			{
-					printf("step4.has_password: ");
-					for (int j = 0; j < step4->password_size;j++)
-					{
-							printf("%02x ", (step4->password)[j]);
-					}
-					printf("\n");
-			}
+			// if (step4->has_password)
+			// {
+			// 		printf("step4.has_password: ");
+			// 		for (int j = 0; j < step4->password_size;j++)
+			// 		{
+			// 				printf("%02x ", (step4->password)[j]);
+			// 		}
+			// 		printf("\n");
+			// }
 	}
 
   time_t current_time = time(NULL);
@@ -391,11 +391,11 @@ int write_pairing_commit(void *arg)
     bleSetPairingResultAdminKey(
       pairing_connection->pairing_result, 1, admin_key, key_len);
       serverLog(LL_NOTICE, "paired lock admin key:");
-      for (int j = 0; j < key_len; j++)
-      {
-          printf("%02x ", admin_key[j]);
-      }
-      printf("\n");
+      // for (int j = 0; j < key_len; j++)
+      // {
+      //     printf("%02x ", admin_key[j]);
+      // }
+      // printf("\n");
   }
 
   // 返回参数给调用进程
@@ -638,15 +638,6 @@ int register_pairing_notfication(void *arg)
                                       param->lock->addr, param->lock->addr_len);
   // char *adapter_name = NULL;
   // void *adapter = NULL;
-  ble_data->adapter_name = NULL;
-  ble_data->adapter = NULL;
-  ret = gattlib_adapter_open(ble_data->adapter_name, &(ble_data->adapter));
-  if (ret) {
-		serverLog(LL_ERROR, 
-      "ERROR: register_pairing_notfication Failed to open adapter.");
-		return 1;
-	}
-  serverLog(LL_NOTICE, "register_pairing_notfication Success to open adapter.." );
   serverLog(LL_NOTICE, "register_pairing_notfication ready to connection %s",
                                                               param->lock->addr);
   pairing_connection->gatt_connection = gattlib_connect(
@@ -734,7 +725,7 @@ int bleSetPairingParam(ble_pairing_param_t *pairing_param, igm_lock_t *lock)
 {
   bleReleaseParingParam(pairing_param);
   pairing_param->lock = calloc(sizeof(igm_lock_t), 1);
-  // lockCopy(pairing_param->lock, lock);
+  // copyLock(pairing_param->lock, lock);
   serverLog(LL_NOTICE, "bleSetPairingParam sizeof %d", sizeof(igm_lock_t));
   memcpy(pairing_param->lock, lock, sizeof(igm_lock_t));
   return 0;

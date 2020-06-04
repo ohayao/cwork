@@ -15,6 +15,9 @@ enum TASK_TYPE {
     TASK_BLE_ADMIN_UNPAIR = 4,
     TASK_BLE_ADMIN_UNLOCK = 5,
     TASK_BLE_ADMIN_LOCK = 6,
+    TASK_BLE_ADMIN_GETLOGS = 7,
+    TASK_BLE_ADMIN_GETLOCKSTATUS = 8,
+    TASK_BLE_ADMIN_CREATE_PIN_REQUEST = 9,
 };
 
 typedef struct TaskNode {
@@ -35,6 +38,7 @@ typedef struct TaskNode {
     fsm_table_t *task_sm_table; // 外部数据
     int sm_table_len;
     GMainLoop *loop;
+    guint timeout_id;
 }task_node_t;
 
 // 获取param长度

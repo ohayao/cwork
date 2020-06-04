@@ -43,7 +43,7 @@ void addPairingTask(igm_lock_t *lock, int msg_id);
 void addDiscoverTask(int msg_id);
 void addAdminTask(igm_lock_t *lock, int msg_id);
 void addAdminUnlockTask(igm_lock_t *lock);
-
+int Init_MQTT(MQTTClient* p_mqtt);
 
 int hexStrToByte(const char* source, uint8_t* dest, int sourceLen) {
     short i;
@@ -276,7 +276,7 @@ int BLEParing(void* tn){
 }
 
 int Init_MQTT(MQTTClient* p_mqtt){
-    *p_mqtt = MQTT_initClients(HOST, SUBSCRIBE_CLIENT_ID, 60, 1, CA_PATH, TRUST_STORE, PRIVATE_KEY, KEY_STORE);
+    *p_mqtt = MQTT_initClients(HOST, g_sysif.mac, 60, 1, CA_PATH, TRUST_STORE, PRIVATE_KEY, KEY_STORE);
     if(NULL == p_mqtt) {
         serverLog(LL_ERROR, "MQTT_initClients err, mqtt_c is NULL.");
         return -1;
@@ -285,8 +285,15 @@ int Init_MQTT(MQTTClient* p_mqtt){
 }
 
 int Init(void* tn) {
-    serverLog(LL_NOTICE, "Init mqtt Clients");
+
 	int ret = 0;
+    ret = GetMacAddr(g_sysif.mac, sizeof(g_sysif.mac));
+    if(ret < 0) {
+        serverLog(LL_ERROR, "Init GetMacAddr err[%d].", ret);
+        return -1;
+    }
+    serverLog(LL_NOTICE, "Init Mac as Device ID[%s].", g_sysif.mac);
+
 	do {
 		ret = Init_MQTT(&g_sysif.mqtt_c);
 	} while (0 != ret);
@@ -383,7 +390,7 @@ void WaitMQTT(sysinfo_t *si){
 				glock_index=0;
 				ign_MsgInfo imsg={};
 				pb_istream_t in=pb_istream_from_buffer(msg->payload,(size_t)msg->payloadlen);
-				imsg.server_data.lockEntries.funcs.decode=&get_server_event_data;
+				//imsg.server_data.lockEntries.funcs.decode=&get_server_event_data;
 				if(pb_decode(&in,ign_MsgInfo_fields,&imsg)){
 					switch(imsg.event_type){
 						case ign_EventType_HEARTBEAT:
@@ -402,7 +409,46 @@ void WaitMQTT(sysinfo_t *si){
 									printf("%02d bt_id=%s\n",i,glocks[i].bt_id);
 								}
 							}
-							MQTT_sendMessage(g_sysif.mqtt_c, SUB_WEBDEMO, 1, msg->payload, msg->payloadlen);
+
+       ign_MsgInfo tmsg={};
+       tmsg.event_type=ign_EventType_UPDATE_USER_INFO;
+       tmsg.has_bridge_data=true;
+       ign_BridgeEventData tbed={};
+       tbed.has_profile=true;
+       tbed.profile=Create_IgnBridgeProfile("IGN123456789");
+       tmsg.bridge_data=tbed;
+       ign_ServerEventData tsd={};
+       tsd.lockEntries_count=5;
+       int tl=0;
+       for(int i=0;i<5;i++){
+           if(strlen(imsg.server_data.lockEntries[i].bt_id)>0){
+               tl++;
+               strcpy(tsd.lockEntries[i].bt_id,imsg.server_data.lockEntries[i].bt_id);
+               strcpy(tsd.lockEntries[i].ekey.bytes,imsg.server_data.lockEntries[i].ekey.bytes);
+           }
+       }
+       tsd.lockEntries_count=tl;
+       tmsg.has_server_data=true;
+       tmsg.server_data=tsd;
+
+      
+       int pubResult;
+       uint8_t buf[1024];
+       memset(buf,0,sizeof(buf));
+       pb_ostream_t out=pb_ostream_from_buffer(buf,sizeof(buf));
+       if(pb_encode(&out,ign_MsgInfo_fields,&tmsg)){
+           size_t len=out.bytes_written;
+           if((pubResult=MQTT_sendMessage(g_sysif.mqtt_c,SUB_WEBDEMO,1,buf,(int)len))!=MQTTCLIENT_SUCCESS){
+               printf("TRANS TO WEB [UPDATE_USER_INFO] ERROR WITH CODE[%d]\n",pubResult);
+           }else{
+               printf("TRANS TO WEB [UPDATE_USER_INFO] SUCCESS\n");
+           }
+       }else{
+           printf("ENCODE UPDATEUSERINFO ERROR\n");
+       }
+
+
+							//MQTT_sendMessage(g_sysif.mqtt_c, SUB_WEBDEMO, 1, msg->payload, msg->payloadlen);
 							goto gomqttfree;
 							break;
 						case ign_EventType_NEW_JOB_NOTIFY:
@@ -416,12 +462,12 @@ void WaitMQTT(sysinfo_t *si){
 
 							// addDiscoverTask(1);
 							igm_lock_t lock;
-							lockInit(&lock);
+							initLock(&lock);
 							char device_address[] = "E1:93:2A:A3:16:E7";
 							char admin_key[] = "8d29d572299deda54de78c16fcce1451"; 
 							char passwd[] = "35f1cfb6f8bee257";
 							
-							lockSetAddr(&lock, device_address, strlen(device_address));
+							setLockAddr(&lock, device_address, strlen(device_address));
 							uint8_t tmp_buff[100];
 							memset(tmp_buff, 0, sizeof(tmp_buff));
 							int admin_len = hexStrToByte(admin_key, tmp_buff, strlen(admin_key));

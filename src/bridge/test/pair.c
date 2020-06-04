@@ -29,7 +29,6 @@
 #include <bridge/proto/ign.pb.h>
 #include <bridge/proto/pb_encode.h>
 #include <bridge/proto/pb_decode.h>
-#include <ctype.h>
 sysinfo_t g_sysif;
 
 extern int WaitBtn(void *arg);
@@ -37,11 +36,10 @@ ign_BridgeProfile Create_IgnBridgeProfile(char *bridgeID);
 void addPairingTask(igm_lock_t *lock, int msg_id);
 void addDiscoverTask(int msg_id);
 void addAdminTask(igm_lock_t *lock, int msg_id);
-void addAdminUnlockTask(igm_lock_t *lock, int msg_id);
 
 int FSMHandle(task_node_t* tn) {
     if(NULL == tn->task_sm_table) {
-        printf("sm_table is NULL.");
+        serverLog(LL_ERROR, "sm_table is NULL.");
         return -1;
     }
     // sizeof 在定义某数组的时候, sizeof 指针 返回整个数组的字节数
@@ -50,18 +48,17 @@ int FSMHandle(task_node_t* tn) {
     // 也就是只会返回 sm_table 当中某一项的大小
     // 所以我手动返回了长度.
 	unsigned int table_max_num = tn->sm_table_len;
-    printf( "table_max_num %d", table_max_num);
+    serverLog(LL_NOTICE, "table_max_num %d", table_max_num);
 	int flag = 0;
     // 这儿是遍历所有的状态.
 	for (int i = 0; i<table_max_num; i++) {
-        printf( "FSMHandle i %d ", i);
+        serverLog(LL_NOTICE, "FSMHandle i %d ", i);
 		if (tn->cur_state == tn->task_sm_table[i].cur_state) {
-            printf( "eventActFun begin---------------");
+            serverLog(LL_NOTICE, "eventActFun begin---------------");
             // 增加一个判断当前函数, 是否当前函数出错. 0 表示没问题
 			int event_result = tn->task_sm_table[i].eventActFun(tn);
             if (event_result)
             {
-
                 flag = 0;
                 break;
             }
@@ -70,18 +67,18 @@ int FSMHandle(task_node_t* tn) {
                 tn->cur_state = tn->task_sm_table[i].next_state;
                 flag = 1;
             }
-            printf( "eventActFun end-----------------");
+            serverLog(LL_NOTICE, "eventActFun end-----------------");
             
 		}
 	}
-    printf( "FSMHandle out for end-----------------");
+    serverLog(LL_NOTICE, "FSMHandle out for end-----------------");
     if (0 == flag) {
 		// do nothing
         // sm or cur_state err
-        printf("something wrogin int fsm, one of the event function error, state(%d) error.", tn->cur_state);
+        serverLog(LL_ERROR, "something wrogin int fsm, one of the event function error, state(%d) error.", tn->cur_state);
         return -1;
 	}
-    printf( "FSMHandle end");
+    serverLog(LL_NOTICE, "FSMHandle end");
     return 0;
 }
 
@@ -152,12 +149,12 @@ int HeartBeat(){
     if(pb_encode(&out,ign_MsgInfo_fields,&hb)){
         size_t len=out.bytes_written;
         if((publish_result=MQTT_sendMessage(g_sysif.mqtt_c,PUB_TOPIC,1,buf,(int)len))!=MQTTCLIENT_SUCCESS){
-            printf("SEND MQTT HB ERROR WITH CODE[%d]", publish_result);
+            serverLog(LL_ERROR, "SEND MQTT HB ERROR WITH CODE[%d]", publish_result);
         }else{
-            printf( "SEND MQTT HB SUCCESS");
+            serverLog(LL_NOTICE, "SEND MQTT HB SUCCESS");
         }
     }else{
-        printf("ENCODE MQTT HB ERROR");
+        serverLog(LL_ERROR, "ENCODE MQTT HB ERROR");
     }
     return 0;
 }
@@ -200,29 +197,29 @@ int BLEParing(void* tn){
 
 
 int Init(void* tn) {
-    printf( "Init mqtt Clients");
+    serverLog(LL_NOTICE, "Init mqtt Clients");
     g_sysif.mqtt_c = MQTT_initClients(HOST,SUBSCRIBE_CLIENT_ID,60,1,CA_PATH,TRUST_STORE,PRIVATE_KEY,KEY_STORE);
     if(NULL == g_sysif.mqtt_c) {
         //goto GoExit;
-        printf("MQTT_initClients err, mqtt_c is NULL.");
+        serverLog(LL_ERROR, "util_initClients err, mqtt_c is NULL.");
         return 1;
     }
-    printf( "init mqtt Clients success");
+    serverLog(LL_NOTICE, "init mqtt Clients success");
     
     int rc = MQTTClient_subscribe(g_sysif.mqtt_c, SUB_TOPIC, 1);
     if(MQTTCLIENT_SUCCESS != rc){
-        printf("Subscribe [%s] error with code [%d].", SUB_TOPIC, rc);
+        serverLog(LL_ERROR, "Subscribe [%s] error with code [%d].", SUB_TOPIC, rc);
         return 1;
     }
-    printf( "Subscribe [%s] success!!!", SUB_TOPIC);
+    serverLog(LL_NOTICE, "Subscribe [%s] success!!!", SUB_TOPIC);
     
 
     rc = MQTTClient_subscribe(g_sysif.mqtt_c,PUB_WEBDEMO,1);
     if(rc!=MQTTCLIENT_SUCCESS){
-        printf("Subscribe [%s] error with code [%d].", PUB_WEBDEMO, rc);
+        serverLog(LL_ERROR, "Subscribe [%s] error with code [%d].", PUB_WEBDEMO, rc);
         return 1;
     }
-    printf( "Subscribe [%s] success!!!", PUB_WEBDEMO);
+    serverLog(LL_NOTICE, "Subscribe [%s] success!!!", PUB_WEBDEMO);
 
 
     //InitBLE(si);
@@ -302,9 +299,9 @@ int DoWebMsg(char *topic,void *payload){
     printf("=============================================================\n");
     cJSON_Delete(root);
     int msg_id = rand() % 25532;
-    printf( "addDiscoverTask msg_id %d", msg_id);
+    serverLog(LL_NOTICE, "addDiscoverTask msg_id %d", msg_id);
     igm_lock_t lock;
-    lockSetName(&lock, "IGM303e31a5c", strlen("IGM303e31a5c"));
+    setLockName(&lock, "IGM303e31a5c", strlen("IGM303e31a5c"));
     // addPairingTask(&lock, msg_id);
     addAdminTask(&lock, msg_id);
     // addPairingTask(&lock, msg_id);
@@ -320,10 +317,10 @@ void WaitMQTT(void *arg){
         MQTTClient_message *msg = NULL;
         int rc = MQTTClient_receive(si->mqtt_c, &topic, &topicLen, &msg, 1e3);
         if (0 != rc) {
-            printf("MQTTClient_receive msg error");
+            serverLog(LL_ERROR, "MQTTClient_receive msg error");
             continue;
         }
-        // printf( "MQTTClient_receive msg success");
+        // serverLog(LL_NOTICE, "MQTTClient_receive msg success");
         if (!msg)
         {
             HeartBeat();
@@ -334,7 +331,7 @@ void WaitMQTT(void *arg){
         {
             DoWebMsg(topic,msg->payload);;
         }
-        printf( "topic %s", topic);
+        serverLog(LL_NOTICE, "topic %s", topic);
     }
 }
 
@@ -357,18 +354,18 @@ int WaitBtn(void *arg){
 // 用法
 void visitScanResult(ble_data_t *ble_data)
 {
-    printf( "6. after the task is finished, we can get the data like this.");
-    printf( "7. get the result point.");
+    serverLog(LL_NOTICE, "6. after the task is finished, we can get the data like this.");
+    serverLog(LL_NOTICE, "7. get the result point.");
     int num_of_result = bleGetNumsOfResult(ble_data);
     void *result = ble_data->ble_result;
     for (int j=0; j < num_of_result; j++)
     {
-        printf( "8. get the j:[%d] lock.", j);
+        serverLog(LL_NOTICE, "8. get the j:% lock.", j);
         igm_lock_t *lock = bleGetNResult(ble_data, j, sizeof(igm_lock_t));
-        printf( "name %s  addr: %s", lock->name, lock->addr);
+        serverLog(LL_NOTICE, "name %s  addr: %s", lock->name, lock->addr);
         // addPairingTask(lock);
     }
-    printf( "9. Release the ble data");
+    serverLog(LL_NOTICE, "9. Release the ble data");
     bleReleaseData(&ble_data);
 }
 
@@ -377,30 +374,30 @@ void visitScanResult(ble_data_t *ble_data)
 void addDiscoverTask(int msg_id)
 {
     // 设置需要的参数
-    printf( "Add Discover task");
-    printf( "1. set ble parameters");
+    serverLog(LL_NOTICE, "Add Discover task");
+    serverLog(LL_NOTICE, "1. set ble parameters");
     ble_discover_param_t discover_param;
-    printf( "1. set scan_timeout to 5");
+    serverLog(LL_NOTICE, "1. set scan_timeout to 5");
     discover_param.scan_timeout = 5;
-    printf( "2. set msg_id to 0(or anything you want)");
+    serverLog(LL_NOTICE, "2. set msg_id to 0(or anything you want)");
     // 把参数写入data, 当前有个问题就是, 使用完, 得访问的人记的释放.
-    printf( "3. alloc ble data datatype, ble_data is used to devliver parameters and get result data");
+    serverLog(LL_NOTICE, "3. alloc ble data datatype, ble_data is used to devliver parameters and get result data");
     ble_data_t *ble_data = calloc(sizeof(ble_data_t), 1);
-    printf( "3. init ble_data");
+    serverLog(LL_NOTICE, "3. init ble_data");
     bleInitData(ble_data);
-    printf( "3. set ble parametes to ble data");
+    serverLog(LL_NOTICE, "3. set ble parametes to ble data");
     bleSetBleParam(ble_data, &discover_param, sizeof(ble_discover_param_t));
     // 与记有多少个结果, 30个锁
-    printf( "3. init ble result memory, suppose the max num of locks is 30");
+    serverLog(LL_NOTICE, "3. init ble result memory, suppose the max num of locks is 30");
     bleInitResults(ble_data, 30, sizeof(igm_lock_t));
 
     // 插入系统的队列
-    printf( "4. used InsertBle2DFront to insert the task to system.");
+    serverLog(LL_NOTICE, "4. used InsertBle2DFront to insert the task to system.");
     InsertBle2DTail(msg_id, BLE_DISCOVER_BEGIN, 
         ble_data, sizeof(ble_data_t),
         getDiscoverFsmTable(), getDiscoverFsmTableLen(), TASK_BLE_DISCOVER
     );
-    printf( "5. Add Discover task.");
+    serverLog(LL_NOTICE, "5. Add Discover task.");
     return;
 }
 
@@ -413,13 +410,13 @@ igm_lock_t *checkLockIsDiscovered(igm_lock_t *lock)
         lock_nearby = findLockByName(lock->name);
         if (!lock_nearby)
         {
-            printf( "Pairing lock, not discover by the bridge, bridge scan first");
+            serverLog(LL_NOTICE, "Pairing lock, not discover by the bridge, bridge scan first");
             contnueDiscoverLock();
         }
     }
     if (!lock_nearby)
     {
-        printf( "Pairing lock, not discover by the bridge");
+        serverLog(LL_NOTICE, "Pairing lock, not discover by the bridge");
         return NULL;
     }
     return lock_nearby;
@@ -448,32 +445,32 @@ void addPairingTask(igm_lock_t *lock, int msg_id)
     // igm_lock_t *lock_nearby = checkLockIsDiscovered(lock);
     // if (!lock_nearby)
     // {
-    //     printf("can't not find lock nearby");
+    //     serverLog(LL_ERROR, "can't not find lock nearby");
     //     return;
     // }
     igm_lock_t *lock_nearby = lock;
     // 设置需要的参数
-    printf( "Add Pairing task");
-    printf( "1. set ble pairing parameters");
+    serverLog(LL_NOTICE, "Add Pairing task");
+    serverLog(LL_NOTICE, "1. set ble pairing parameters");
     ble_pairing_param_t *pairing_param = (ble_pairing_param_t *)calloc(sizeof(ble_pairing_param_t), 1);
-    printf( "1. set pairing param lock to name %s addr %s", lock_nearby->name, lock_nearby->addr);
+    serverLog(LL_NOTICE, "1. set pairing param lock to name %s addr %s", lock_nearby->name, lock_nearby->addr);
     bleSetPairingParam(pairing_param, lock_nearby);
-    printf( "2. set msg_id to 1(or anything you want)");
+    serverLog(LL_NOTICE, "2. set msg_id to 1(or anything you want)");
     // int msg_id = 1;
     // 把参数写入data, 当前有个问题就是, 使用完, 得访问的人记的释放.
-    printf( "3. alloc ble data datatype, ble_data is used to devliver parameters and get result data");
+    serverLog(LL_NOTICE, "3. alloc ble data datatype, ble_data is used to devliver parameters and get result data");
     ble_data_t *ble_data = calloc(sizeof(ble_data_t), 1);
-    printf( "3. init ble_data");
+    serverLog(LL_NOTICE, "3. init ble_data");
     bleInitData(ble_data);
-    printf( "3. set ble parametes to ble data");
+    serverLog(LL_NOTICE, "3. set ble parametes to ble data");
     bleSetBleParam(ble_data, pairing_param, sizeof(ble_pairing_param_t));
 
     // 插入系统的队列
-    printf( "4. used InsertBle2DFront to insert the task to system.");
+    serverLog(LL_NOTICE, "4. used InsertBle2DFront to insert the task to system.");
     InsertBle2DTail(msg_id, BLE_PAIRING_BEGIN, 
         ble_data, sizeof(ble_data_t),
         getPairingFsmTable(), getPairingFsmTableLen(), TASK_BLE_PAIRING);
-    printf( "5. Add Pairing task.");
+    serverLog(LL_NOTICE, "5. Add Pairing task.");
     return;
 }
 
@@ -488,110 +485,110 @@ void addAdminTask(igm_lock_t *lock, int msg_id)
     lock_nearby = checkLockIsPaired(lock_nearby);
     if (!lock_nearby)
     {
-        printf("can't not paired lock nearby");
+        serverLog(LL_ERROR, "can't not paired lock nearby");
         return;
     }
     // 设置需要的参数
-    printf( "Add Admin task");
-    printf( "1. set ble admin parameters");
+    serverLog(LL_NOTICE, "Add Admin task");
+    serverLog(LL_NOTICE, "1. set ble admin parameters");
     ble_admin_param_t *admin_param = (ble_admin_param_t *)calloc(sizeof(ble_admin_param_t), 1);
-    printf( "1. set pairing param lock to name %s addr %s", lock->name, lock->addr);
+    serverLog(LL_NOTICE, "1. set pairing param lock to name %s addr %s", lock->name, lock->addr);
     bleSetAdminParam(admin_param, lock);
     // 把参数写入data, 当前有个问题就是, 使用完, 得访问的人记的释放.
-    printf( "3. alloc ble data datatype, ble_data is used to devliver parameters and get result data");
+    serverLog(LL_NOTICE, "3. alloc ble data datatype, ble_data is used to devliver parameters and get result data");
     ble_data_t *ble_data = calloc(sizeof(ble_data_t), 1);
-    printf( "3. init ble_data");
+    serverLog(LL_NOTICE, "3. init ble_data");
     bleInitData(ble_data);
-    printf( "3. set ble parametes to ble data");
+    serverLog(LL_NOTICE, "3. set ble parametes to ble data");
     bleSetBleParam(ble_data, admin_param, sizeof(ble_admin_param_t));
 
     // 插入系统的队列
-    printf( "4. used InsertBle2DFront to insert the task to system.");
+    serverLog(LL_NOTICE, "4. used InsertBle2DFront to insert the task to system.");
     InsertBle2DFront(msg_id, BLE_PAIRING_BEGIN, 
         ble_data, sizeof(ble_data_t),
         getAdminFsmTable(), getAdminFsmTableLen(), TASK_BLE_ADMIN_CONNECTION);
-    printf( "5. Add admin task.");
+    serverLog(LL_NOTICE, "5. Add admin task.");
     return;
 }
 
 void addAdminUnpairTask(igm_lock_t *lock)
 {
     // 设置需要的参数
-    printf( "Add Admin Unpair task");
-    printf( "1. set ble admin unpair parameters");
+    serverLog(LL_NOTICE, "Add Admin Unpair task");
+    serverLog(LL_NOTICE, "1. set ble admin unpair parameters");
     ble_admin_param_t *admin_unpair_param = (ble_admin_param_t *)calloc(sizeof(ble_admin_param_t), 1);
-    printf( "1. set admin unpair param lock to name %s addr %s", lock->name, lock->addr);
+    serverLog(LL_NOTICE, "1. set admin unpair param lock to name %s addr %s", lock->name, lock->addr);
     bleSetAdminParam(admin_unpair_param, lock);
-    printf( "2. set msg_id to 3(or anything you want)");
+    serverLog(LL_NOTICE, "2. set msg_id to 3(or anything you want)");
     int msg_id = 3;
     // 把参数写入data, 当前有个问题就是, 使用完, 得访问的人记的释放.
-    printf( "3. alloc ble data datatype, ble_data is used to devliver parameters and get result data");
+    serverLog(LL_NOTICE, "3. alloc ble data datatype, ble_data is used to devliver parameters and get result data");
     ble_data_t *ble_data = calloc(sizeof(ble_data_t), 1);
-    printf( "3. init ble_data");
+    serverLog(LL_NOTICE, "3. init ble_data");
     bleInitData(ble_data);
-    printf( "3. set ble parametes to ble data");
+    serverLog(LL_NOTICE, "3. set ble parametes to ble data");
     bleSetBleParam(ble_data, admin_unpair_param, sizeof(ble_admin_param_t));
 
     // 插入系统的队列
-    printf( "4. used InsertBle2DFront to insert the task to system.");
+    serverLog(LL_NOTICE, "4. used InsertBle2DFront to insert the task to system.");
     InsertBle2DFront(msg_id, BLE_ADMIN_BEGIN, 
         ble_data, sizeof(ble_data_t),
         getAdminUnpairFsmTable(), getAdminUnpairFsmTableLen(), TASK_BLE_ADMIN_UNPAIR);
-    printf( "5. Add admin unpair task.");
+    serverLog(LL_NOTICE, "5. Add admin unpair task.");
     return;
 }
 
-void addAdminUnlockTask(igm_lock_t *lock, int msg_id)
+void addAdminUnlockTask(igm_lock_t *lock)
 {
     // 设置需要的参数
-    printf( "Add Admin Unlock task");
-    printf( "1. set ble admin Unlock parameters");
+    serverLog(LL_NOTICE, "Add Admin Unlock task");
+    serverLog(LL_NOTICE, "1. set ble admin Unlock parameters");
     ble_admin_param_t *admin_param = (ble_admin_param_t *)calloc(sizeof(ble_admin_param_t), 1);
-    printf( "1. set admin Unlock param lock to name %s addr %s", lock->name, lock->addr);
+    serverLog(LL_NOTICE, "1. set admin Unlock param lock to name %s addr %s", lock->name, lock->addr);
     bleSetAdminParam(admin_param, lock);
-    printf( "2. set msg_id to 4(or anything you want)");
-    // int msg_id = 4;
+    serverLog(LL_NOTICE, "2. set msg_id to 4(or anything you want)");
+    int msg_id = 4;
     // 把参数写入data, 当前有个问题就是, 使用完, 得访问的人记的释放.
-    printf( "3. alloc ble data datatype, ble_data is used to devliver parameters and get result data");
+    serverLog(LL_NOTICE, "3. alloc ble data datatype, ble_data is used to devliver parameters and get result data");
     ble_data_t *ble_data = calloc(sizeof(ble_data_t), 1);
-    printf( "3. init ble_data");
+    serverLog(LL_NOTICE, "3. init ble_data");
     bleInitData(ble_data);
-    printf( "3. set ble parametes to ble data");
+    serverLog(LL_NOTICE, "3. set ble parametes to ble data");
     bleSetBleParam(ble_data, admin_param, sizeof(ble_admin_param_t));
 
     // 插入系统的队列
-    printf( "4. used InsertBle2DFront to insert the task to system.");
+    serverLog(LL_NOTICE, "4. used InsertBle2DFront to insert the task to system.");
     InsertBle2DFront(msg_id, BLE_ADMIN_BEGIN, 
         ble_data, sizeof(ble_data_t),
         getAdminUnlockFsmTable(), getAdminUnlockFsmTableLen(), TASK_BLE_ADMIN_UNLOCK);
-    printf( "5. Add admin unlock task.");
+    serverLog(LL_NOTICE, "5. Add admin unlock task.");
     return;
 }
 
 void addAdminLockTask(igm_lock_t *lock)
 {
     // 设置需要的参数
-    printf( "Add Admin lock task");
-    printf( "1. set ble admin lock parameters");
+    serverLog(LL_NOTICE, "Add Admin lock task");
+    serverLog(LL_NOTICE, "1. set ble admin lock parameters");
     ble_admin_param_t *admin_param = (ble_admin_param_t *)calloc(sizeof(ble_admin_param_t), 1);
-    printf( "1. set admin lock param lock to name %s addr %s", lock->name, lock->addr);
+    serverLog(LL_NOTICE, "1. set admin lock param lock to name %s addr %s", lock->name, lock->addr);
     bleSetAdminParam(admin_param, lock);
-    printf( "2. set msg_id to 5(or anything you want)");
+    serverLog(LL_NOTICE, "2. set msg_id to 5(or anything you want)");
     int msg_id = 5;
     // 把参数写入data, 当前有个问题就是, 使用完, 得访问的人记的释放.
-    printf( "3. alloc ble data datatype, ble_data is used to devliver parameters and get result data");
+    serverLog(LL_NOTICE, "3. alloc ble data datatype, ble_data is used to devliver parameters and get result data");
     ble_data_t *ble_data = calloc(sizeof(ble_data_t), 1);
-    printf( "3. init ble_data");
+    serverLog(LL_NOTICE, "3. init ble_data");
     bleInitData(ble_data);
-    printf( "3. set ble parametes to ble data");
+    serverLog(LL_NOTICE, "3. set ble parametes to ble data");
     bleSetBleParam(ble_data, admin_param, sizeof(ble_admin_param_t));
 
     // 插入系统的队列
-    printf( "4. used InsertBle2DFront to insert the task to system.");
+    serverLog(LL_NOTICE, "4. used InsertBle2DFront to insert the task to system.");
     InsertBle2DFront(msg_id, BLE_ADMIN_BEGIN, 
         ble_data, sizeof(ble_data_t),
         getAdminLockFsmTable(), getAdminLockFsmTableLen(), TASK_BLE_ADMIN_LOCK);
-    printf( "5. Add admin unlock task.");
+    serverLog(LL_NOTICE, "5. Add admin unlock task.");
     return;
 }
 
@@ -607,18 +604,18 @@ void saveTaskData(task_node_t *ptn)
         {
         case TASK_BLE_DISCOVER:
         {
-            printf( "saving ble TASK_BLE_DISCOVER data");
+            serverLog(LL_NOTICE, "saving ble TASK_BLE_DISCOVER data");
             int num_of_result = bleGetNumsOfResult(ble_data);
             void *result = ble_data->ble_result;
             for (int j=0; j < num_of_result; j++)
             {
                 igm_lock_t *lock = bleGetNResult(ble_data, j, sizeof(igm_lock_t));
-                printf( "name %s  addr: %s", lock->name, lock->addr);
+                serverLog(LL_NOTICE, "name %s  addr: %s", lock->name, lock->addr);
                 insertLock(lock);
                 // test 需要, 
                 // if (!lock->paired)
                 // {
-                //     printf( "try to pair name %s  addr: %s", lock->name, lock->addr);
+                //     serverLog(LL_NOTICE, "try to pair name %s  addr: %s", lock->name, lock->addr);
                 //     addPairingTask(lock);
                 // }              
             }
@@ -626,17 +623,17 @@ void saveTaskData(task_node_t *ptn)
         }
         case TASK_BLE_PAIRING:
         {
-            printf( "saving ble TASK_BLE_PAIRING data");
+            serverLog(LL_NOTICE, "saving ble TASK_BLE_PAIRING data");
             ble_pairing_result_t *pairing_result = (ble_pairing_result_t *)ble_data->ble_result;
-            printf( "pairing_result:");
-            printf( "pairing success: %d", pairing_result->pairing_successed);
-            printf( "pairing admin_key:");
+            serverLog(LL_NOTICE, "pairing_result:");
+            serverLog(LL_NOTICE, "pairing success: %d", pairing_result->pairing_successed);
+            serverLog(LL_NOTICE, "pairing admin_key:");
             for (int j = 0; j < pairing_result->admin_key_len; j++)
             {
               printf("%02x", pairing_result->admin_key[j]);
             }
             printf("\n");
-            printf( "pairing password:");
+            serverLog(LL_NOTICE, "pairing password:");
             for (int j = 0; j < pairing_result->password_size; j++)
             {
               printf("%02x", pairing_result->password[j]);
@@ -648,7 +645,7 @@ void saveTaskData(task_node_t *ptn)
             // 添加任务, 纯属测试需要
             // if (lock && pairing_result->pairing_successed)
             // {
-            //     printf( "set name %s addr %s to paired", lock->name, lock->addr);
+            //     serverLog(LL_NOTICE, "set name %s addr %s to paired", lock->name, lock->addr);
             //     setLockPaired(lock);
             //     setLockAdminKey(lock, pairing_result->admin_key, pairing_result->admin_key_len);
             //     setLockPassword(lock, pairing_result->password, pairing_result->password_size);
@@ -661,25 +658,23 @@ void saveTaskData(task_node_t *ptn)
         }
         case TASK_BLE_ADMIN_CONNECTION:
         {
-            printf( "saving ble TASK_BLE_ADMIN_CONNECTION data");
+            serverLog(LL_NOTICE, "saving ble TASK_BLE_ADMIN_CONNECTION data");
         }
         case TASK_BLE_ADMIN_UNPAIR:
         {
-            printf( "saving ble TASK_BLE_ADMIN_UNPAIR data");
+            serverLog(LL_NOTICE, "saving ble TASK_BLE_ADMIN_UNPAIR data");
             ble_admin_result_t *admin_unpair_result = (ble_admin_result_t *)ble_data->ble_result;
             break;
         }
         case TASK_BLE_ADMIN_UNLOCK:
         {
-            printf( "saving ble TASK_BLE_ADMIN_UNLOCK data");
-            ble_admin_result_t *admin_unlock_result = (ble_admin_result_t *)ble_data->ble_result;
-            printf( "unlock_result:");
-            printf( "unlock error: %d 0 means unlock", admin_unlock_result->unlock_result);
+            serverLog(LL_NOTICE, "saving ble TASK_BLE_ADMIN_UNLOCK data");
+            ble_admin_result_t *admin_lock_result = (ble_admin_result_t *)ble_data->ble_result;
             break;
         }
         case TASK_BLE_ADMIN_LOCK:
         {
-            printf( "saving ble TASK_BLE_ADMIN_LOCK data");
+            serverLog(LL_NOTICE, "saving ble TASK_BLE_ADMIN_LOCK data");
             ble_admin_result_t *admin_lock_result = (ble_admin_result_t *)ble_data->ble_result;
             break;
         }
@@ -689,63 +684,45 @@ void saveTaskData(task_node_t *ptn)
     }
 }
 
-int hexStrToByte(const char* source, uint8_t* dest, int sourceLen)
-{
-    short i;
-    unsigned char highByte, lowByte;
-    
-    for (i = 0; i < sourceLen; i += 2)
-    {
-        highByte = toupper(source[i]);
-        lowByte  = toupper(source[i + 1]);
-        if (highByte > 0x39)
-            highByte -= 0x37;
-        else
-            highByte -= 0x30;
- 
-        if (lowByte > 0x39)
-            lowByte -= 0x37;
-        else
-            lowByte -= 0x30;
- 
-        dest[i / 2] = (highByte << 4) | lowByte;
-    }
-    return sourceLen /2 ;
-}
-
 int main(int argc, char *argv[]) {
     // Init(NULL);
-    printf("test ble discover Ready to start.");
-    if (argc != 4) {
-      printf( "%s <device_address> <admin_key> <passwd> \n", argv[0]);
+    serverLog(LL_NOTICE,"test ble discover Ready to start.");
+
+    //daemon(1, 0);
+    // 有g_sysinfo,还需要这个吗?
+    // sysinfo_t *si = (sysinfo_t *)malloc(sizeof(sysinfo_t));
+    // sysinfoInit(si);
+    //Init for paring
+    /*int rc = Init(si);
+    if (0 != rc) {
+        GoExit(si);
+        return -1;
+    }*/
+
+    // pthread_t mqtt_thread = Thread_start(WaitMQTT, &g_sysif);
+    // serverLog(LL_NOTICE,"new thread to WaitMQTT[%u].", mqtt_thread);
+    // pthread_t ble_thread = Thread_start(WaitBLE, &g_sysif);
+    // serverLog(LL_NOTICE,"new thread to WaitMQTT[%u].", ble_thread);
+    // pthread_t bt_thread = Thread_start(WaitBtn, &g_sysif);
+    // serverLog(LL_NOTICE,"new thread to WaitMQTT[%u].", bt_thread);
+    if (argc != 2) {
+      serverLog(LL_NOTICE, "%s <device_address>\n", argv[0]);
       return 1;
     }
 
     int msg_id = 1;
     // addDiscoverTask(1);
     igm_lock_t lock;
-    lockInit(&lock);
-    lockSetAddr(&lock, argv[1], strlen(argv[1]));
-    printf( "lockSetAddr");
-    uint8_t tmp_buff[100];
-    memset(tmp_buff, 0, sizeof(tmp_buff));
-    int admin_len = hexStrToByte(argv[2], tmp_buff, strlen(argv[2]));
-    setLockAdminKey(&lock, tmp_buff, admin_len);
-    printf( "setLockAdminKey");
-    memset(tmp_buff, 0, sizeof(tmp_buff));
-    int password_size = hexStrToByte(argv[3], tmp_buff, strlen(argv[3]));
-    setLockPassword(&lock, tmp_buff, password_size);
-    printf( "setLockPassword");
-    addAdminUnlockTask(&lock, msg_id);
-
+    setLockAddr(&lock, argv[1], strlen(argv[1]));
+    addPairingTask(&lock, msg_id);
     while(1) {
         //if empty, sleep(0.5);
         //do it , after set into waiting_list
         if (IsDEmpty()) {
-            printf("doing_task_head is empty, check Lock list.");
+            serverLog(LL_NOTICE,"doing_task_head is empty, check Lock list.");
             // 应该去检查waiting list
             printLockList();
-            printf("doing_task_head is empty, ready to sleep.");
+            serverLog(LL_NOTICE,"doing_task_head is empty, ready to sleep.");
             // sleep(1);
             break;
         } 
@@ -759,11 +736,11 @@ int main(int argc, char *argv[]) {
                 int ret = FSMHandle(ptn);
                 if(ret)
                 {
-                    printf( "one mission error");
+                    serverLog(LL_NOTICE, "one mission error");
                 }
                 else
                 {
-                    printf( "one mission finished, delete this task");
+                    serverLog(LL_NOTICE, "one mission finished, delete this task");
                 }
                 saveTaskData(ptn);
                 DeleteDTask(&ptn); // 自动置 ptn 为 NULL
@@ -771,7 +748,7 @@ int main(int argc, char *argv[]) {
                 task_node_t *tmp = NextDTask(ptn);
                 if (tmp)
                 {
-                    printf( "NextDTask not NULL");
+                    serverLog(LL_NOTICE, "NextDTask not NULL");
                 }
                 
                 ptn = tmp;

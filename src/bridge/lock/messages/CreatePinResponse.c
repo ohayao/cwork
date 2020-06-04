@@ -1,14 +1,14 @@
-#include "AdminConnectionStep1.h"
+#include "CreatePinResponse.h"
 #include "external/cbor/cbor.h"
 
-void ig_AdminConnectionStep1_init(IgAdminConnectionStep1 *obj)
+void ig_CreatePinResponse_init(IgCreatePinResponse *obj)
 {
-  memset(obj, 0, sizeof(IgAdminConnectionStep1));
+  memset(obj, 0, sizeof(IgCreatePinResponse));
 }
-IgSerializerError ig_AdminConnectionStep1_encode(IgAdminConnectionStep1 *obj,uint8_t *retval,uint32_t length,size_t *written_length)
+IgSerializerError ig_CreatePinResponse_encode(IgCreatePinResponse *obj,uint8_t *retval,uint32_t length,size_t *written_length)
 {
   
-  if(!ig_AdminConnectionStep1_is_valid(obj)) return IgSerializerErrorInvalidPayload;
+  if(!ig_CreatePinResponse_is_valid(obj)) return IgSerializerErrorInvalidPayload;
   
   CborEncoder encoder;
   CborEncoder map;
@@ -16,7 +16,7 @@ IgSerializerError ig_AdminConnectionStep1_encode(IgAdminConnectionStep1 *obj,uin
   
   //msg_id property + required properties
   size_t fields_size = 1 + 1;
-  
+  if(obj->has_operation_id) fields_size++;
   
   cbor_encoder_init(&encoder, retval, length, 0);
   err = cbor_encoder_create_map(&encoder, &map, fields_size);
@@ -25,15 +25,23 @@ IgSerializerError ig_AdminConnectionStep1_encode(IgAdminConnectionStep1 *obj,uin
   //add msg_id
   err = cbor_encode_uint(&map, 0);
   if(err) return (IgSerializerError) err;
-  err = cbor_encode_uint(&map, 6);
+  err = cbor_encode_uint(&map, 44);
   if(err) return (IgSerializerError) err;
   
   
-  err = cbor_encode_uint(&map, 11);
-  if(err) return (IgSerializerError) err;
-  err = cbor_encode_byte_string(&map, obj->nonce, obj->nonce_size);
-  if(err) return (IgSerializerError) err;
+      err = cbor_encode_uint(&map, 11);
+      if(err) return (IgSerializerError) err;
+      err = cbor_encode_uint(&map, obj->result);
+      if(err) return (IgSerializerError) err;
   
+  
+  
+  if(obj->has_operation_id){
+      err = cbor_encode_uint(&map, 100);
+      if(err) return (IgSerializerError) err;
+      err = cbor_encode_uint(&map, obj->operation_id);
+      if(err) return (IgSerializerError) err;
+  }
   
   err = cbor_encoder_close_container(&encoder, &map);
   if(err) return (IgSerializerError) err;
@@ -42,8 +50,7 @@ IgSerializerError ig_AdminConnectionStep1_encode(IgAdminConnectionStep1 *obj,uin
   
   return IgSerializerNoError;
 }
-IgSerializerError ig_AdminConnectionStep1_decode(
-  uint8_t *buf,size_t buf_size,IgAdminConnectionStep1 *retval,size_t index)
+IgSerializerError ig_CreatePinResponse_decode(uint8_t *buf,size_t buf_size,IgCreatePinResponse *retval,size_t index)
 {
   CborParser parser;
   CborValue it;
@@ -92,22 +99,29 @@ IgSerializerError ig_AdminConnectionStep1_decode(
             int64_t val;
             cbor_value_get_int64(&content, &val);
             //msgId value
-            if(val != 6) return IgSerializerErrorInvalidMsgIdValue;
+            if(val != 44) return IgSerializerErrorInvalidMsgIdValue;
             err = cbor_value_advance_fixed(&content);
             break;
           }
   
         case 11:
-            if(value_type == CborByteStringType){
-                size_t size;
-                err = cbor_value_get_string_length(&content, &size);
+            if(value_type == CborIntegerType){
+                uint64_t val;
+                cbor_value_get_uint64(&content, &val);
+                ig_CreatePinResponse_set_result(retval, (uint8_t) val);
+                err = cbor_value_advance_fixed(&content);
                 if(err) return (IgSerializerError) err;
+                break;
+            }
         
-                uint8_t *data_arr = malloc(size);
-                err = cbor_value_copy_byte_string(&content, data_arr, &size, &content);
+        
+        case 100:
+            if(value_type == CborIntegerType){
+                uint64_t val;
+                cbor_value_get_uint64(&content, &val);
+                ig_CreatePinResponse_set_operation_id(retval, (uint32_t) val);
+                err = cbor_value_advance_fixed(&content);
                 if(err) return (IgSerializerError) err;
-        
-                ig_AdminConnectionStep1_set_nonce_nocopy(retval, data_arr, size);
                 break;
             }
           default:
@@ -120,47 +134,25 @@ IgSerializerError ig_AdminConnectionStep1_decode(
   
   return (IgSerializerError) err;
 }
-uint32_t ig_AdminConnectionStep1_get_max_payload_in_bytes(IgAdminConnectionStep1 *obj)
+uint32_t ig_CreatePinResponse_get_max_payload_in_bytes(IgCreatePinResponse *obj)
 {
-  return 20 + obj->nonce_size; //13 + 7;
+  return 22; //13 + 9;
 }
-bool ig_AdminConnectionStep1_is_valid(IgAdminConnectionStep1 *obj)
+bool ig_CreatePinResponse_is_valid(IgCreatePinResponse *obj)
 {
-  return obj->has_nonce;
+  return obj->has_result;
 }
-void ig_AdminConnectionStep1_deinit(IgAdminConnectionStep1 *obj)
+void ig_CreatePinResponse_deinit(IgCreatePinResponse *obj)
 {
-  if(obj->has_nonce){
-      free(obj->nonce);
-      obj->nonce = NULL;
-  }
+  
 }
-size_t ig_AdminConnectionStep1_get_nonce_size(IgAdminConnectionStep1 *obj)
+void ig_CreatePinResponse_set_result(IgCreatePinResponse *obj,uint8_t result)
 {
-  return obj->nonce_size;
+  obj->result = result;
+  obj->has_result = true;
 }
-void ig_AdminConnectionStep1_set_nonce_nocopy(IgAdminConnectionStep1 *obj,uint8_t* nonce,size_t size)
+void ig_CreatePinResponse_set_operation_id(IgCreatePinResponse *obj,uint32_t operation_id)
 {
-  if(obj->nonce == nonce)
-      return;
-  if(obj->has_nonce){
-      free(obj->nonce);
-      obj->nonce = NULL;
-  }
-  obj->nonce = nonce;
-  obj->nonce_size = size;
-  obj->has_nonce = size > 0;
-}
-void ig_AdminConnectionStep1_set_nonce(IgAdminConnectionStep1 *obj,uint8_t* nonce,size_t size)
-{
-  if(obj->nonce == nonce)
-      return;
-  if(obj->has_nonce){
-      free(obj->nonce);
-      obj->nonce = NULL;
-  }
-  obj->nonce = malloc(size);
-  memcpy(obj->nonce, nonce, size);
-  obj->nonce_size = size;
-  obj->has_nonce = size > 0;
+  obj->operation_id = operation_id;
+  obj->has_operation_id = true;
 }

@@ -13,7 +13,6 @@ int main() {
 
     thread_type thr[10];
     for(int n = 0; n < 10; ++n)
-        //Thread_start(f, NULL);
         pthread_create(&thr[n], NULL, f, NULL);
     for(int n = 0; n < 10; ++n)
         pthread_join(thr[n], NULL);

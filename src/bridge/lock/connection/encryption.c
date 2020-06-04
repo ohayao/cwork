@@ -107,11 +107,11 @@ int32_t decryptData(uint8_t *dataIn, uint32_t dataInLen, uint8_t *dataOut,
     size_t ciphertextLen = decryptDataSize(dataInLen);
     uint8_t *tag = dataIn + ciphertextLen;
     size_t tagLen = kCcmTagLength;
-    serverLog(LL_NOTICE, "decryptData result %02x", ciphertext[0]);
+    // serverLog(LL_NOTICE, "decryptData result %02x", ciphertext[0]);
     int result = cf_ccm_decrypt(
         &cf_aes, &aes_ctx, ciphertext, ciphertextLen, kCcmInternalCounterLength, 
         NULL, 0, nonce, kNonceLength, tag, tagLen, dataOut);
-    serverLog(LL_NOTICE, "decryptData result %d", result);
+    // serverLog(LL_NOTICE, "decryptData result %d", result);
 //    Log_d(kTag, "decrypt result = %i", result);
     uint32_t bytesWritten = decryptDataSize(dataInLen);
     cf_aes_finish(&aes_ctx);
