@@ -27,6 +27,8 @@ INC:
 	return g_msg_id;
 }
 
+int Init_MQTT(MQTTClient* p_mqtt);
+
 // thread_type Thread_start(void* fn, void* parameter) {
 //     thread_type thread = 0;
 //     pthread_attr_t attr;

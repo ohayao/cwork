@@ -890,7 +890,7 @@ int main() {
         //if empty, sleep(0.5);
         //do it , after set into waiting_list
         if (IsDEmpty()) {
-            serverLog(LL_NOTICE,"doing_task_head is empty, check Lock list.");
+            //serverLog(LL_NOTICE,"doing_task_head is empty, check Lock list.");
             // 应该去检查waiting list
             printLockList();
             sleep(1);
