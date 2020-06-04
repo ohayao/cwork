@@ -1,7 +1,6 @@
 #ifndef __IGN__
 #define __IGN__
 
-
 #include <pthread.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -9,6 +8,13 @@
 #include <stdatomic.h>
 #include <time.h>
 #include <sys/time.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <sys/ioctl.h>
+#include <net/if.h> //for struct ifreq
+
+
 // #include "MQTTClient.h"
 
 
@@ -16,6 +22,31 @@ atomic_int g_msg_id;
 
 //LIST_HEAD(task_head);
 //INIT_LIST_HEAD(task_head);
+
+
+int GetMacAddr(char * mac, int len_limit) {
+    struct ifreq ifreq;
+    int sock;
+
+    if ((sock = socket (AF_INET, SOCK_STREAM, 0)) < 0) {
+        return -1;
+    }
+    strcpy (ifreq.ifr_name, "eth0");    //Currently, only get eth0
+    if (ioctl (sock, SIOCGIFHWADDR, &ifreq) < 0) {
+        return -2;
+    }
+    if (NULL == ifreq.ifr_hwaddr.sa_data) {
+        return -3;
+    }
+
+    return snprintf (mac, len_limit, "%X%X%X%X%X%X", 
+        (unsigned char) ifreq.ifr_hwaddr.sa_data[0], 
+        (unsigned char) ifreq.ifr_hwaddr.sa_data[1], 
+        (unsigned char) ifreq.ifr_hwaddr.sa_data[2], 
+        (unsigned char) ifreq.ifr_hwaddr.sa_data[3], 
+        (unsigned char) ifreq.ifr_hwaddr.sa_data[4], 
+        (unsigned char) ifreq.ifr_hwaddr.sa_data[5]);
+}
 
 
 unsigned int GetMsgID() {
