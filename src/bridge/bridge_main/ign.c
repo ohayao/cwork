@@ -43,7 +43,7 @@ void addPairingTask(igm_lock_t *lock, int msg_id);
 void addDiscoverTask(int msg_id);
 void addAdminTask(igm_lock_t *lock, int msg_id);
 void addAdminUnlockTask(igm_lock_t *lock);
-
+int Init_MQTT(MQTTClient* p_mqtt);
 
 int hexStrToByte(const char* source, uint8_t* dest, int sourceLen) {
     short i;
@@ -416,12 +416,12 @@ void WaitMQTT(sysinfo_t *si){
 
 							// addDiscoverTask(1);
 							igm_lock_t lock;
-							lockInit(&lock);
+							initLock(&lock);
 							char device_address[] = "E1:93:2A:A3:16:E7";
 							char admin_key[] = "8d29d572299deda54de78c16fcce1451"; 
 							char passwd[] = "35f1cfb6f8bee257";
 							
-							lockSetAddr(&lock, device_address, strlen(device_address));
+							setLockAddr(&lock, device_address, strlen(device_address));
 							uint8_t tmp_buff[100];
 							memset(tmp_buff, 0, sizeof(tmp_buff));
 							int admin_len = hexStrToByte(admin_key, tmp_buff, strlen(admin_key));

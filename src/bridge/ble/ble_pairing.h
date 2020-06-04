@@ -1,9 +1,9 @@
 #ifndef _BLE_PAIRING_H_
 #define _BLE_PAIRING_H_
 
-#include <bridge/gattlib/gattlib.h>
-#include <bridge/ble/lock.h>
-#include <bridge/bridge_main/fsm.h>
+#include "bridge/gattlib/gattlib.h"
+#include "bridge/ble/lock.h"
+#include "bridge/bridge_main/fsm.h"
 
 enum BLE_PAIRING_STATE {
   BLE_PAIRING_BEGIN = 0,     // 表示用户需要启动, 这是启动标识

@@ -128,9 +128,10 @@ int AdminConnection_decryptNative(
      connectionId, jMessage, messageLen, retBytes);
 }
 
-
 void AdminConnection_endConnection(int connectionId)
 {
   endConnection(connectionId);
 }
+
+
 

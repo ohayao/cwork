@@ -29,6 +29,7 @@
 #include <bridge/proto/ign.pb.h>
 #include <bridge/proto/pb_encode.h>
 #include <bridge/proto/pb_decode.h>
+#include <ctype.h>
 sysinfo_t g_sysif;
 
 extern int WaitBtn(void *arg);
@@ -36,6 +37,8 @@ ign_BridgeProfile Create_IgnBridgeProfile(char *bridgeID);
 void addPairingTask(igm_lock_t *lock, int msg_id);
 void addDiscoverTask(int msg_id);
 void addAdminTask(igm_lock_t *lock, int msg_id);
+void addAdminUnlockTask(igm_lock_t *lock, int msg_id);
+void addAdminUnpairTask(igm_lock_t *lock, int msg_id);
 
 int FSMHandle(task_node_t* tn) {
     if(NULL == tn->task_sm_table) {
@@ -201,7 +204,7 @@ int Init(void* tn) {
     g_sysif.mqtt_c = MQTT_initClients(HOST,SUBSCRIBE_CLIENT_ID,60,1,CA_PATH,TRUST_STORE,PRIVATE_KEY,KEY_STORE);
     if(NULL == g_sysif.mqtt_c) {
         //goto GoExit;
-        serverLog(LL_ERROR, "MQTT_initClients err, mqtt_c is NULL.");
+        serverLog(LL_ERROR, "util_initClients err, mqtt_c is NULL.");
         return 1;
     }
     serverLog(LL_NOTICE, "init mqtt Clients success");
@@ -301,7 +304,7 @@ int DoWebMsg(char *topic,void *payload){
     int msg_id = rand() % 25532;
     serverLog(LL_NOTICE, "addDiscoverTask msg_id %d", msg_id);
     igm_lock_t lock;
-    lockSetName(&lock, "IGM303e31a5c", strlen("IGM303e31a5c"));
+    setLockName(&lock, "IGM303e31a5c", strlen("IGM303e31a5c"));
     // addPairingTask(&lock, msg_id);
     addAdminTask(&lock, msg_id);
     // addPairingTask(&lock, msg_id);
@@ -442,13 +445,13 @@ igm_lock_t *checkLockIsPaired(igm_lock_t *lock)
 void addPairingTask(igm_lock_t *lock, int msg_id)
 {
 
-    igm_lock_t *lock_nearby = checkLockIsDiscovered(lock);
-    if (!lock_nearby)
-    {
-        serverLog(LL_ERROR, "can't not find lock nearby");
-        return;
-    }
-
+    // igm_lock_t *lock_nearby = checkLockIsDiscovered(lock);
+    // if (!lock_nearby)
+    // {
+    //     serverLog(LL_ERROR, "can't not find lock nearby");
+    //     return;
+    // }
+    igm_lock_t *lock_nearby = lock;
     // 设置需要的参数
     serverLog(LL_NOTICE, "Add Pairing task");
     serverLog(LL_NOTICE, "1. set ble pairing parameters");
@@ -511,7 +514,7 @@ void addAdminTask(igm_lock_t *lock, int msg_id)
     return;
 }
 
-void addAdminUnpairTask(igm_lock_t *lock)
+void addAdminUnpairTask(igm_lock_t *lock, int msg_id)
 {
     // 设置需要的参数
     serverLog(LL_NOTICE, "Add Admin Unpair task");
@@ -520,7 +523,7 @@ void addAdminUnpairTask(igm_lock_t *lock)
     serverLog(LL_NOTICE, "1. set admin unpair param lock to name %s addr %s", lock->name, lock->addr);
     bleSetAdminParam(admin_unpair_param, lock);
     serverLog(LL_NOTICE, "2. set msg_id to 3(or anything you want)");
-    int msg_id = 3;
+    // int msg_id = 3;
     // 把参数写入data, 当前有个问题就是, 使用完, 得访问的人记的释放.
     serverLog(LL_NOTICE, "3. alloc ble data datatype, ble_data is used to devliver parameters and get result data");
     ble_data_t *ble_data = calloc(sizeof(ble_data_t), 1);
@@ -538,7 +541,7 @@ void addAdminUnpairTask(igm_lock_t *lock)
     return;
 }
 
-void addAdminUnlockTask(igm_lock_t *lock)
+void addAdminUnlockTask(igm_lock_t *lock, int msg_id)
 {
     // 设置需要的参数
     serverLog(LL_NOTICE, "Add Admin Unlock task");
@@ -547,7 +550,7 @@ void addAdminUnlockTask(igm_lock_t *lock)
     serverLog(LL_NOTICE, "1. set admin Unlock param lock to name %s addr %s", lock->name, lock->addr);
     bleSetAdminParam(admin_param, lock);
     serverLog(LL_NOTICE, "2. set msg_id to 4(or anything you want)");
-    int msg_id = 4;
+    // int msg_id = 4;
     // 把参数写入data, 当前有个问题就是, 使用完, 得访问的人记的释放.
     serverLog(LL_NOTICE, "3. alloc ble data datatype, ble_data is used to devliver parameters and get result data");
     ble_data_t *ble_data = calloc(sizeof(ble_data_t), 1);
@@ -625,20 +628,35 @@ void saveTaskData(task_node_t *ptn)
         {
             serverLog(LL_NOTICE, "saving ble TASK_BLE_PAIRING data");
             ble_pairing_result_t *pairing_result = (ble_pairing_result_t *)ble_data->ble_result;
-            igm_lock_t *lock = findLockByAddr(pairing_result->addr);
+            serverLog(LL_NOTICE, "pairing_result:");
+            serverLog(LL_NOTICE, "pairing success: %d", pairing_result->pairing_successed);
+            serverLog(LL_NOTICE, "pairing admin_key:");
+            for (int j = 0; j < pairing_result->admin_key_len; j++)
+            {
+              printf("%02x", pairing_result->admin_key[j]);
+            }
+            printf("\n");
+            serverLog(LL_NOTICE, "pairing password:");
+            for (int j = 0; j < pairing_result->password_size; j++)
+            {
+              printf("%02x", pairing_result->password[j]);
+            }
+            printf("\n");
+            
+            // igm_lock_t *lock = findLockByAddr(pairing_result->addr);
             // 只有找到这把锁, 并且匹配成功, 成保存称为Paired
             // 添加任务, 纯属测试需要
-            if (lock && pairing_result->pairing_successed)
-            {
-                serverLog(LL_NOTICE, "set name %s addr %s to paired", lock->name, lock->addr);
-                setLockPaired(lock);
-                setLockAdminKey(lock, pairing_result->admin_key, pairing_result->admin_key_len);
-                setLockPassword(lock, pairing_result->password, pairing_result->password_size);
-                // addAdminTask(lock, 2);
-                // addAdminUnpairTask(lock);
-                // addAdminUnlockTask(lock);
-                // addAdminLockTask(lock);
-            }
+            // if (lock && pairing_result->pairing_successed)
+            // {
+            //     serverLog(LL_NOTICE, "set name %s addr %s to paired", lock->name, lock->addr);
+            //     setLockPaired(lock);
+            //     setLockAdminKey(lock, pairing_result->admin_key, pairing_result->admin_key_len);
+            //     setLockPassword(lock, pairing_result->password, pairing_result->password_size);
+            //     // addAdminTask(lock, 2);
+            //     // addAdminUnpairTask(lock);
+            //     // addAdminUnlockTask(lock);
+            //     // addAdminLockTask(lock);
+            // }
             break;
         }
         case TASK_BLE_ADMIN_CONNECTION:
@@ -649,12 +667,16 @@ void saveTaskData(task_node_t *ptn)
         {
             serverLog(LL_NOTICE, "saving ble TASK_BLE_ADMIN_UNPAIR data");
             ble_admin_result_t *admin_unpair_result = (ble_admin_result_t *)ble_data->ble_result;
+            serverLog(LL_NOTICE, "unpair_result:");
+            serverLog(LL_NOTICE, "unlock error: %d 0 means unlock", admin_unpair_result->unpair_result);
             break;
         }
         case TASK_BLE_ADMIN_UNLOCK:
         {
             serverLog(LL_NOTICE, "saving ble TASK_BLE_ADMIN_UNLOCK data");
-            ble_admin_result_t *admin_lock_result = (ble_admin_result_t *)ble_data->ble_result;
+            ble_admin_result_t *admin_unlock_result = (ble_admin_result_t *)ble_data->ble_result;
+            serverLog(LL_NOTICE, "unlock_result:");
+            serverLog(LL_NOTICE, "unlock error: %d 0 means unlock", admin_unlock_result->unlock_result);
             break;
         }
         case TASK_BLE_ADMIN_LOCK:
@@ -669,7 +691,31 @@ void saveTaskData(task_node_t *ptn)
     }
 }
 
-int main() {
+int hexStrToByte(const char* source, uint8_t* dest, int sourceLen)
+{
+    short i;
+    unsigned char highByte, lowByte;
+    
+    for (i = 0; i < sourceLen; i += 2)
+    {
+        highByte = toupper(source[i]);
+        lowByte  = toupper(source[i + 1]);
+        if (highByte > 0x39)
+            highByte -= 0x37;
+        else
+            highByte -= 0x30;
+ 
+        if (lowByte > 0x39)
+            lowByte -= 0x37;
+        else
+            lowByte -= 0x30;
+ 
+        dest[i / 2] = (highByte << 4) | lowByte;
+    }
+    return sourceLen /2 ;
+}
+
+int main(int argc, char *argv[]) {
     // Init(NULL);
     serverLog(LL_NOTICE,"test ble discover Ready to start.");
 
@@ -690,8 +736,28 @@ int main() {
     // serverLog(LL_NOTICE,"new thread to WaitMQTT[%u].", ble_thread);
     // pthread_t bt_thread = Thread_start(WaitBtn, &g_sysif);
     // serverLog(LL_NOTICE,"new thread to WaitMQTT[%u].", bt_thread);
+    if (argc != 4) {
+      serverLog(LL_NOTICE, "%s <device_address> <admin_key> <passwd> \n", argv[0]);
+      return 1;
+    }
+
     int msg_id = 1;
-    addDiscoverTask(msg_id);
+    // addDiscoverTask(1);
+    igm_lock_t lock;
+    initLock(&lock);
+    setLockAddr(&lock, argv[1], strlen(argv[1]));
+    serverLog(LL_NOTICE, "setLockAddr");
+    uint8_t tmp_buff[100];
+    memset(tmp_buff, 0, sizeof(tmp_buff));
+    int admin_len = hexStrToByte(argv[2], tmp_buff, strlen(argv[2]));
+    setLockAdminKey(&lock, tmp_buff, admin_len);
+    serverLog(LL_NOTICE, "setLockAdminKey");
+    memset(tmp_buff, 0, sizeof(tmp_buff));
+    int password_size = hexStrToByte(argv[3], tmp_buff, strlen(argv[3]));
+    setLockPassword(&lock, tmp_buff, password_size);
+    serverLog(LL_NOTICE, "setLockPassword");
+    // addAdminUnlockTask(&lock, msg_id);
+    addAdminUnpairTask(&lock, msg_id);
     while(1) {
         //if empty, sleep(0.5);
         //do it , after set into waiting_list
@@ -701,7 +767,6 @@ int main() {
             printLockList();
             serverLog(LL_NOTICE,"doing_task_head is empty, ready to sleep.");
             // sleep(1);
-            // 只是用于来扫描一次
             break;
         } 
         else {

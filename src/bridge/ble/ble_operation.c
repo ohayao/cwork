@@ -7,18 +7,18 @@ size_t resolve_payload_len(const size_t step_len)
 	return step_len>254 ? (step_len+3) : (step_len+1);
 }
 
-int x2d(int x)
-{
-  int ret = 0;
-  ret += (x %10);
-  x /= 10;
-  for (;x;){
-    ret += (x % 10) * 15;
-    x = x / 10;
-  }
-  printf("ret: %d", ret);
-  return ret;
-}
+// int x2d(int x)
+// {
+//   int ret = 0;
+//   ret += (x %10);
+//   x /= 10;
+//   for (;x;){
+//     ret += (x % 10) * 15;
+//     x = x / 10;
+//   }
+//   printf("ret: %d", ret);
+//   return ret;
+// }
 
 
 
@@ -58,7 +58,7 @@ int write_char_by_uuid_multi_atts (
 {
   int BLE_ATT_MAX_BYTES = 20;
 	int ret = GATTLIB_SUCCESS;
-	uint8_t *tmp_bytes[BLE_ATT_MAX_BYTES];
+	uint8_t tmp_bytes[BLE_ATT_MAX_BYTES];
 	size_t size_left;
 	int i;
 	for (i = 0; i < buffer_len; i += BLE_ATT_MAX_BYTES)
@@ -72,7 +72,7 @@ int write_char_by_uuid_multi_atts (
       serverLog(LL_ERROR, "write_char_by_uuid_multi_atts: gattlib_write_char_by_uuid failed in writint ");
 			return ret;
 		}
-    serverLog(LL_NOTICE, "write_char_by_uuid_multi_atts: gattlib_write_char_by_uuid success in writing");
+    // serverLog(LL_NOTICE, "write_char_by_uuid_multi_atts: gattlib_write_char_by_uuid success in writing");
 	}
 	return ret;
 }
