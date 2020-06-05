@@ -1,0 +1,18 @@
+* max_count:5
+ign.LockLog.bt_id max_size:100
+ign.LockLog.log_data max_size:1024 descriptorsize:DS_4
+
+ign.LockJob.bt_id max_size:100
+ign.LockJob.lock_cmd max_size:500
+
+ign.LockEntry.bt_id max_size:100
+ign.LockEntry.ekey max_size:100
+
+
+ign.BridgeProfile.bt_id max_size:100
+ign.BridgeProfile.mac_addr max_size:100
+ign.BridgeProfile.local_ip max_size:100
+ign.BridgeProfile.public_ip max_size:100
+ign.BridgeProfile.sys_statics max_size:100
+ign.BridgeProfile.wifi_ssid max_size:100
+ign.BridgeProfile.name max_size:100

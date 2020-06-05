@@ -3,7 +3,7 @@
 
 #ifndef PB_IGN_IGN_PB_H_INCLUDED
 #define PB_IGN_IGN_PB_H_INCLUDED
-#include "pb.h"
+#include "./pb.h"
 
 #if PB_PROTO_HEADER_VERSION != 40
 #error Regenerate this file with the current version of nanopb generator.
@@ -24,7 +24,8 @@ typedef enum _ign_EventType {
     ign_EventType_GET_JOBS = 6,
     ign_EventType_UPDATE_JOB = 7,
     ign_EventType_UPDATE_USER_INFO = 128,
-    ign_EventType_LOCK_JOB = 129
+    ign_EventType_LOCK_JOB = 129,
+    ign_EventType_NEW_JOB_NOTIFY = 130
 } ign_EventType;
 
 typedef enum _ign_OSType {
@@ -60,9 +61,10 @@ typedef struct _ign_LockEntry {
     ign_LockEntry_ekey_t ekey;
 } ign_LockEntry;
 
+typedef PB_BYTES_ARRAY_T(500) ign_LockJob_lock_cmd_t;
 typedef struct _ign_LockJob {
     char bt_id[100];
-    pb_callback_t lock_cmd;
+    ign_LockJob_lock_cmd_t lock_cmd;
 } ign_LockJob;
 
 typedef PB_BYTES_ARRAY_T(1024) ign_LockLog_log_data_t;
@@ -75,11 +77,13 @@ typedef struct _ign_BridgeEventData {
     bool has_profile;
     ign_BridgeProfile profile;
     pb_callback_t bt_ids;
-    pb_callback_t logs;
+    pb_size_t logs_count;
+    ign_LockLog logs[5];
 } ign_BridgeEventData;
 
 typedef struct _ign_ServerEventData {
-    pb_callback_t lockEntries;
+    pb_size_t lockEntries_count;
+    ign_LockEntry lockEntries[5];
     bool has_job;
     ign_LockJob job;
 } ign_ServerEventData;
@@ -97,8 +101,8 @@ typedef struct _ign_MsgInfo {
 
 /* Helper constants for enums */
 #define _ign_EventType_MIN ign_EventType_UNSPECIFIED
-#define _ign_EventType_MAX ign_EventType_LOCK_JOB
-#define _ign_EventType_ARRAYSIZE ((ign_EventType)(ign_EventType_LOCK_JOB+1))
+#define _ign_EventType_MAX ign_EventType_NEW_JOB_NOTIFY
+#define _ign_EventType_ARRAYSIZE ((ign_EventType)(ign_EventType_NEW_JOB_NOTIFY+1))
 
 #define _ign_OSType_MIN ign_OSType_UKNOWN
 #define _ign_OSType_MAX ign_OSType_RTOS
@@ -109,17 +113,17 @@ typedef struct _ign_MsgInfo {
 #define ign_MsgInfo_init_default                 {0, 0, _ign_EventType_MIN, false, ign_BridgeEventData_init_default, false, ign_ServerEventData_init_default}
 #define ign_BridgeProfile_init_default           {_ign_OSType_MIN, {0, {0}}, {0, {0}}, {0, {0}}, {0, {0}}, {0, {0}}, {0, {0}}, 0, 0, {0, {0}}}
 #define ign_LockLog_init_default                 {"", {0, {0}}}
-#define ign_BridgeEventData_init_default         {false, ign_BridgeProfile_init_default, {{NULL}, NULL}, {{NULL}, NULL}}
-#define ign_LockJob_init_default                 {"", {{NULL}, NULL}}
+#define ign_BridgeEventData_init_default         {false, ign_BridgeProfile_init_default, {{NULL}, NULL}, 0, {ign_LockLog_init_default, ign_LockLog_init_default, ign_LockLog_init_default, ign_LockLog_init_default, ign_LockLog_init_default}}
+#define ign_LockJob_init_default                 {"", {0, {0}}}
 #define ign_LockEntry_init_default               {"", {0, {0}}}
-#define ign_ServerEventData_init_default         {{{NULL}, NULL}, false, ign_LockJob_init_default}
+#define ign_ServerEventData_init_default         {0, {ign_LockEntry_init_default, ign_LockEntry_init_default, ign_LockEntry_init_default, ign_LockEntry_init_default, ign_LockEntry_init_default}, false, ign_LockJob_init_default}
 #define ign_MsgInfo_init_zero                    {0, 0, _ign_EventType_MIN, false, ign_BridgeEventData_init_zero, false, ign_ServerEventData_init_zero}
 #define ign_BridgeProfile_init_zero              {_ign_OSType_MIN, {0, {0}}, {0, {0}}, {0, {0}}, {0, {0}}, {0, {0}}, {0, {0}}, 0, 0, {0, {0}}}
 #define ign_LockLog_init_zero                    {"", {0, {0}}}
-#define ign_BridgeEventData_init_zero            {false, ign_BridgeProfile_init_zero, {{NULL}, NULL}, {{NULL}, NULL}}
-#define ign_LockJob_init_zero                    {"", {{NULL}, NULL}}
+#define ign_BridgeEventData_init_zero            {false, ign_BridgeProfile_init_zero, {{NULL}, NULL}, 0, {ign_LockLog_init_zero, ign_LockLog_init_zero, ign_LockLog_init_zero, ign_LockLog_init_zero, ign_LockLog_init_zero}}
+#define ign_LockJob_init_zero                    {"", {0, {0}}}
 #define ign_LockEntry_init_zero                  {"", {0, {0}}}
-#define ign_ServerEventData_init_zero            {{{NULL}, NULL}, false, ign_LockJob_init_zero}
+#define ign_ServerEventData_init_zero            {0, {ign_LockEntry_init_zero, ign_LockEntry_init_zero, ign_LockEntry_init_zero, ign_LockEntry_init_zero, ign_LockEntry_init_zero}, false, ign_LockJob_init_zero}
 
 /* Field tags (for use in manual encoding/decoding) */
 #define ign_BridgeProfile_os_info_tag            1
@@ -184,7 +188,7 @@ X(a, STATIC,   SINGULAR, BYTES,    log_data,          2)
 #define ign_BridgeEventData_FIELDLIST(X, a) \
 X(a, STATIC,   OPTIONAL, MESSAGE,  profile,           1) \
 X(a, CALLBACK, REPEATED, STRING,   bt_ids,            2) \
-X(a, CALLBACK, REPEATED, MESSAGE,  logs,              3)
+X(a, STATIC,   REPEATED, MESSAGE,  logs,              3)
 #define ign_BridgeEventData_CALLBACK pb_default_field_callback
 #define ign_BridgeEventData_DEFAULT NULL
 #define ign_BridgeEventData_profile_MSGTYPE ign_BridgeProfile
@@ -192,8 +196,8 @@ X(a, CALLBACK, REPEATED, MESSAGE,  logs,              3)
 
 #define ign_LockJob_FIELDLIST(X, a) \
 X(a, STATIC,   SINGULAR, STRING,   bt_id,             1) \
-X(a, CALLBACK, SINGULAR, BYTES,    lock_cmd,          2)
-#define ign_LockJob_CALLBACK pb_default_field_callback
+X(a, STATIC,   SINGULAR, BYTES,    lock_cmd,          2)
+#define ign_LockJob_CALLBACK NULL
 #define ign_LockJob_DEFAULT NULL
 
 #define ign_LockEntry_FIELDLIST(X, a) \
@@ -203,9 +207,9 @@ X(a, STATIC,   SINGULAR, BYTES,    ekey,              2)
 #define ign_LockEntry_DEFAULT NULL
 
 #define ign_ServerEventData_FIELDLIST(X, a) \
-X(a, CALLBACK, REPEATED, MESSAGE,  lockEntries,       1) \
+X(a, STATIC,   REPEATED, MESSAGE,  lockEntries,       1) \
 X(a, STATIC,   OPTIONAL, MESSAGE,  job,               2)
-#define ign_ServerEventData_CALLBACK pb_default_field_callback
+#define ign_ServerEventData_CALLBACK NULL
 #define ign_ServerEventData_DEFAULT NULL
 #define ign_ServerEventData_lockEntries_MSGTYPE ign_LockEntry
 #define ign_ServerEventData_job_MSGTYPE ign_LockJob
@@ -232,9 +236,9 @@ extern const pb_msgdesc_t ign_ServerEventData_msg;
 #define ign_BridgeProfile_size                   733
 #define ign_LockLog_size                         1128
 /* ign_BridgeEventData_size depends on runtime parameters */
-/* ign_LockJob_size depends on runtime parameters */
+#define ign_LockJob_size                         604
 #define ign_LockEntry_size                       203
-/* ign_ServerEventData_size depends on runtime parameters */
+#define ign_ServerEventData_size                 1637
 
 #ifdef __cplusplus
 } /* extern "C" */

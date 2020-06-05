@@ -1,1 +1,0 @@
-/usr/bin/cc -g   CMakeFiles/ign.dir/ign.c.o  -o ign  -Wl,-rpath,/home/andrew/Document/Project/网关/git/cwork/build/bridge/gattlib/dbus -lpthread ../ble/libble.a ../mqtt/libmqtt.a ../proto/libign_proto.a libign_lib.a -lpthread ../lock/liblock.a ../gattlib/dbus/libgattlib.so -lglib-2.0 -lgio-2.0 -lgobject-2.0 -lglib-2.0 -lgio-2.0 -lgobject-2.0 -lbluetooth -lpaho-mqtt3cs 

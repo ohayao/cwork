@@ -1,7 +1,0 @@
-# Hashes of file build rules.
-deb83c7dcbf80c73d200d736c83508ed ../bridge/gattlib/dbus/dbus-bluez-v5.48/org-bluez-adaptater1.c
-78dc510651b76215490cb17cc3f91000 ../bridge/gattlib/dbus/dbus-bluez-v5.48/org-bluez-battery1.c
-2d0280ea5cfde384c738a5f8764f1c9a ../bridge/gattlib/dbus/dbus-bluez-v5.48/org-bluez-device1.c
-2bf39cbe9921df36f9cf96c550330630 ../bridge/gattlib/dbus/dbus-bluez-v5.48/org-bluez-gattcharacteristic1.c
-dff93b082ea066c52745dd2090da20ea ../bridge/gattlib/dbus/dbus-bluez-v5.48/org-bluez-gattdescriptor1.c
-5729cf2820922429f274a2bd91f927e5 ../bridge/gattlib/dbus/dbus-bluez-v5.48/org-bluez-gattservice1.c

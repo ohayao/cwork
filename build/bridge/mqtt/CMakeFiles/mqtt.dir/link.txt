@@ -1,2 +1,0 @@
-/usr/bin/ar qc libmqtt.a  CMakeFiles/mqtt.dir/base64.c.o CMakeFiles/mqtt.dir/cJSON.c.o CMakeFiles/mqtt.dir/mqtt_util.c.o
-/usr/bin/ranlib libmqtt.a
