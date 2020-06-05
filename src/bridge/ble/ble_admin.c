@@ -1876,23 +1876,28 @@ static int writeCreatePinRequest(void *arg)
   ig_CreatePinRequest_set_password(
     &create_pin_request, request->password, request->password_size);
   // optionnal
-  if (!request->has_start_date)
+  if (request->has_start_date)
   {
     ig_CreatePinRequest_set_start_date(
       &create_pin_request, request->start_date
     );
   }
 
-  if (!request->has_end_date)
+  if (request->has_end_date)
   {
     ig_CreatePinRequest_set_end_date(
       &create_pin_request, request->end_date);
   }
 
-  if (!request->has_pin_type)
+  if (request->has_pin_type)
   {
     ig_CreatePinRequest_set_pin_type(
       &create_pin_request, request->end_date);
+  }
+  
+  if (request->has_operation_id)
+  {
+    ig_CreatePinRequest_set_operation_id(&create_pin_request, request->operation_id);
   }
   
   IgSerializerError IgErr = ig_CreatePinRequest_encode(
@@ -2175,6 +2180,11 @@ static int writeDeletePinRequest(void *arg)
 
   ig_DeletePinRequest_set_old_pin(
     &delete_pin_request, request->old_pin, request->old_pin_size);
+
+  if (request->has_operation_id)
+  {
+    ig_DeletePinRequest_set_operation_id(&delete_pin_request, request->operation_id);
+  }
   
   IgSerializerError IgErr = ig_DeletePinRequest_encode(
 		&delete_pin_request, buf, buf_size, &encode_size);
