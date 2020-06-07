@@ -297,14 +297,14 @@ void message_handler(
     case BLE_ADMIN_CREATEPINREQUEST_REQUEST:
     {
       serverLog(LL_NOTICE, 
-                          "BLE_ADMIN_CREATEPINREQUEST_REQUEST handleGetLockStatusResponce");
+                          "BLE_ADMIN_CREATEPINREQUEST_REQUEST handleCreatePinResponce");
       handleCreatePinResponce(data, data_length, user_data);
       break;
     }
     case BLE_ADMIN_DELETEPINREQUEST_REQUEST:
     {
       serverLog(LL_NOTICE, 
-                          "BLE_ADMIN_DELETEPINREQUEST_REQUEST handleGetLockStatusResponce");
+                          "BLE_ADMIN_DELETEPINREQUEST_REQUEST handleDeletePinResponce");
       handleDeletePinResponce(data, data_length, user_data);
       break;
     }
@@ -1840,7 +1840,7 @@ int getAdminCreatePinRequestFsmTableLen()
 
 static int writeCreatePinRequest(void *arg)
 {
-  serverLog(LL_NOTICE, "writeCreatePinRequest start --------");
+  serverLog(LL_NOTICE, "writeCreatePinRequest start -------------");
   int ret = 0;
   task_node_t *task_node = (task_node_t *)arg;
   ble_data_t *ble_data = task_node->ble_data;
@@ -1871,33 +1871,55 @@ static int writeCreatePinRequest(void *arg)
     serverLog(LL_ERROR, "request NULL or request don't have pin");
     goto PIN_REQUEST_ERROR;
   }
+  
+  
   ig_CreatePinRequest_set_new_pin(
     &create_pin_request, request->new_pin, request->new_pin_size);
+  serverLog(LL_NOTICE, "ig_CreatePinRequest_set_new_pin");
+  for (int j = 0; j < create_pin_request.new_pin_size; j++)
+  {
+    printf ("%d ", create_pin_request.new_pin[j]);
+  }
+  printf("\n");
+
   ig_CreatePinRequest_set_password(
     &create_pin_request, request->password, request->password_size);
+
+  serverLog(LL_NOTICE, "ig_CreatePinRequest_set_password");
+  for (int j = 0; j < create_pin_request.password_size; j++)
+  {
+    printf ("%x ", create_pin_request.password[j]);
+  }
+  printf("\n");
+
   // optionnal
   if (request->has_start_date)
   {
+    
     ig_CreatePinRequest_set_start_date(
       &create_pin_request, request->start_date
     );
+    serverLog(LL_NOTICE, "ig_CreatePinRequest_set_start_date %d", create_pin_request.start_date);
   }
 
   if (request->has_end_date)
   {
     ig_CreatePinRequest_set_end_date(
       &create_pin_request, request->end_date);
+    serverLog(LL_NOTICE, "ig_CreatePinRequest_set_end_date %d", create_pin_request.end_date);
   }
 
   if (request->has_pin_type)
   {
     ig_CreatePinRequest_set_pin_type(
-      &create_pin_request, request->end_date);
+      &create_pin_request, request->pin_type);
+    serverLog(LL_NOTICE, "ig_CreatePinRequest_set_pin_type %d", create_pin_request.pin_type);
   }
   
   if (request->has_operation_id)
   {
     ig_CreatePinRequest_set_operation_id(&create_pin_request, request->operation_id);
+    serverLog(LL_NOTICE, "ig_CreatePinRequest_set_operation_id %d", create_pin_request.operation_id);
   }
   
   IgSerializerError IgErr = ig_CreatePinRequest_encode(
@@ -1907,7 +1929,7 @@ static int writeCreatePinRequest(void *arg)
     serverLog(LL_ERROR, "ig_CreatePinRequest_encode err %d", IgErr);
     goto PIN_REQUEST_ERROR;
 	}
-  serverLog(LL_NOTICE, "ig_CreatePinRequest_encode success size:" );
+  serverLog(LL_NOTICE, "ig_CreatePinRequest_encode success size: %d", encode_size);
 
   retvalLen = AdminConnection_encryptNative(
     admin_connection->lock->connectionID, buf, encode_size, &retvalBytes);
@@ -2093,7 +2115,7 @@ static int handleCreatePinResponce(const uint8_t* data, int data_length,void* us
       goto PINREQUEST_RESPONCE_EXIT;
     }
 
-    serverLog(LL_NOTICE, "has unlock response %d error %d",
+    serverLog(LL_NOTICE, "has create pin result %d result %d",
               admin_create_pin_responce.has_result, admin_create_pin_responce.result);
     if (admin_connection->has_admin_result && admin_create_pin_responce.has_result)
     {
@@ -2146,7 +2168,7 @@ int getAdminDeletePinRequestFsmTableLen()
 
 static int writeDeletePinRequest(void *arg)
 {
-  serverLog(LL_NOTICE, "writeCreatePinRequest start --------");
+  serverLog(LL_NOTICE, "writeDeletePinRequest start --------");
   int ret = 0;
   task_node_t *task_node = (task_node_t *)arg;
   ble_data_t *ble_data = task_node->ble_data;
@@ -2193,7 +2215,7 @@ static int writeDeletePinRequest(void *arg)
     serverLog(LL_ERROR, "ig_DeletePinRequest_encode err %d", IgErr);
     goto DELETE_PIN_ERROR;
 	}
-  serverLog(LL_NOTICE, "ig_DeletePinRequest_encode success size:" );
+  serverLog(LL_NOTICE, "ig_DeletePinRequest_encode success size: %d", encode_size);
 
   retvalLen = AdminConnection_encryptNative(
     admin_connection->lock->connectionID, buf, encode_size, &retvalBytes);
@@ -2379,12 +2401,12 @@ static int handleDeletePinResponce(const uint8_t* data, int data_length,void* us
     );
     if (err)
     {
-      serverLog(LL_NOTICE, "ig_GetLockStatusResponse_decode err %d", err);
+      serverLog(LL_NOTICE, "ig_DeletePinResponse_decode err %d", err);
       admin_connection->receive_err = 1;
       goto DELETE_PINREQUEST_RESPONCE_EXIT;
     }
 
-    serverLog(LL_NOTICE, "has unlock response %d error %d",
+    serverLog(LL_NOTICE, "has delete pin has result %d result %d",
               responce.has_result, responce.result);
     if (admin_connection->has_admin_result && responce.has_result)
     {
@@ -2437,7 +2459,7 @@ int getAdminGetBatteryLevelFsmTableLen()
 
 static int writeGetBatteryLevelRequest(void *arg)
 {
-  serverLog(LL_NOTICE, "writeCreatePinRequest start --------");
+  serverLog(LL_NOTICE, "writeGetBatteryLevelRequest start --------");
   int ret = 0;
   task_node_t *task_node = (task_node_t *)arg;
   ble_data_t *ble_data = task_node->ble_data;
@@ -2722,7 +2744,7 @@ int getAdminSetTimeFsmTableLen()
 
 static int writeSetTimeRequest(void *arg)
 {
-  serverLog(LL_NOTICE, "writeCreatePinRequest start --------");
+  serverLog(LL_NOTICE, "writeSetTimeRequest start --------");
   int ret = 0;
   task_node_t *task_node = (task_node_t *)arg;
   ble_data_t *ble_data = task_node->ble_data;
