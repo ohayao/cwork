@@ -1,66 +1,62 @@
 #include "AdminUnlockRequest.h"
 #include "external/cbor/cbor.h"
 
-void ig_AdminUnlockRequest_init(IgAdminUnlockRequest *obj)
-{
-  memset(obj, 0, sizeof(IgAdminUnlockRequest));
+void ig_AdminUnlockRequest_init(IgAdminUnlockRequest *obj) {
+	memset(obj, 0, sizeof(IgAdminUnlockRequest));
 }
-IgSerializerError ig_AdminUnlockRequest_encode(IgAdminUnlockRequest *obj,uint8_t *retval,uint32_t length,size_t *written_length)
-{
-  
-  if(!ig_AdminUnlockRequest_is_valid(obj)) return IgSerializerErrorInvalidPayload;
-  
-  CborEncoder encoder;
-  CborEncoder map;
-  CborError err;
-  
-  //msg_id property + required properties
-  size_t fields_size = 1 + 1;
-  if(obj->has_timestamp) fields_size++;
-  if(obj->has_operation_id) fields_size++;
-  
-  cbor_encoder_init(&encoder, retval, length, 0);
-  err = cbor_encoder_create_map(&encoder, &map, fields_size);
-  if(err) return (IgSerializerError) err;
-  
-  //add msg_id
-  err = cbor_encode_uint(&map, 0);
-  if(err) return (IgSerializerError) err;
-  err = cbor_encode_uint(&map, 21);
-  if(err) return (IgSerializerError) err;
-  
-  
-      err = cbor_encode_uint(&map, 11);
-      if(err) return (IgSerializerError) err;
-      err = cbor_encode_byte_string(&map, obj->password, obj->password_size);
-      if(err) return (IgSerializerError) err;
-  
-  
-  
-  if(obj->has_timestamp){
-      err = cbor_encode_uint(&map, 12);
-      if(err) return (IgSerializerError) err;
-      err = cbor_encode_uint(&map, obj->timestamp);
-      if(err) return (IgSerializerError) err;
-  }
-  
-  
-  if(obj->has_operation_id){
-      err = cbor_encode_uint(&map, 100);
-      if(err) return (IgSerializerError) err;
-      err = cbor_encode_uint(&map, obj->operation_id);
-      if(err) return (IgSerializerError) err;
-  }
-  
-  err = cbor_encoder_close_container(&encoder, &map);
-  if(err) return (IgSerializerError) err;
-  
-  *written_length = cbor_encoder_get_buffer_size(&map, retval);
-  
-  return IgSerializerNoError;
+
+IgSerializerError ig_AdminUnlockRequest_encode(IgAdminUnlockRequest *obj, uint8_t *retval, uint32_t length, size_t *written_length) {
+
+	if(!ig_AdminUnlockRequest_is_valid(obj)) return IgSerializerErrorInvalidPayload;
+
+	CborEncoder encoder;
+	CborEncoder map;
+	CborError err;
+
+	//msg_id property + required properties
+	size_t fields_size = 1 + 1;
+	if(obj->has_timestamp) fields_size++;
+	if(obj->has_operation_id) fields_size++;
+
+	cbor_encoder_init(&encoder, retval, length, 0);
+	err = cbor_encoder_create_map(&encoder, &map, fields_size);
+	if(err) return (IgSerializerError) err;
+
+	//add msg_id
+	err = cbor_encode_uint(&map, 0);
+	if(err) return (IgSerializerError) err;
+	err = cbor_encode_uint(&map, 21);
+	if(err) return (IgSerializerError) err;
+
+
+	err = cbor_encode_uint(&map, 11);
+	if(err) return (IgSerializerError) err;
+	err = cbor_encode_byte_string(&map, obj->password, obj->password_size);
+	if(err) return (IgSerializerError) err;
+
+	if(obj->has_timestamp){
+		err = cbor_encode_uint(&map, 12);
+		if(err) return (IgSerializerError) err;
+		err = cbor_encode_uint(&map, obj->timestamp);
+		if(err) return (IgSerializerError) err;
+	}
+
+	if(obj->has_operation_id){
+		err = cbor_encode_uint(&map, 100);
+		if(err) return (IgSerializerError) err;
+		err = cbor_encode_uint(&map, obj->operation_id);
+		if(err) return (IgSerializerError) err;
+	}
+
+	err = cbor_encoder_close_container(&encoder, &map);
+	if(err) return (IgSerializerError) err;
+
+	*written_length = cbor_encoder_get_buffer_size(&map, retval);
+
+	return IgSerializerNoError;
 }
-IgSerializerError ig_AdminUnlockRequest_decode(uint8_t *buf,size_t buf_size,IgAdminUnlockRequest *retval,size_t index)
-{
+
+IgSerializerError ig_AdminUnlockRequest_decode(uint8_t *buf,size_t buf_size,IgAdminUnlockRequest *retval,size_t index) {
   CborParser parser;
   CborValue it;
   CborValue content;

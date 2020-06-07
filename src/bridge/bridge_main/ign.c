@@ -401,9 +401,10 @@ void WaitMQTT(sysinfo_t *si){
 							goto gomqttfree;
 							break;
 						case ign_EventType_GET_USER_INFO:
-							printf("RECV MQTT GETUSERINFO msg LEN=%d\n",msg->payloadlen);
-							printf("RECV msgid=%d,signal=%d\n",imsg.msg_id,imsg.bridge_data.profile.wifi_signal);
-							printf("RECV profile_bt_id=%s,bridege_name=%s\n",imsg.bridge_data.profile.bt_id.bytes,imsg.bridge_data.profile.name.bytes);
+							printf("RECV MQTT GETUSERINFO msg LENi[%d].\n", msg->payloadlen);
+							printf("RECV msgid[%d],signal[%d].\n", imsg.msg_id, imsg.bridge_data.profile.wifi_signal);
+							printf("RECV profile_bt_id[%s],bridege_name[%s].\n",
+								imsg.bridge_data.profile.bt_id.bytes, imsg.bridge_data.profile.name.bytes);
 							goto gomqttfree;
 							break;
 						case ign_EventType_UPDATE_USER_INFO:
@@ -454,15 +455,15 @@ void WaitMQTT(sysinfo_t *si){
 							goto gomqttfree;
 							break;
 						case ign_EventType_NEW_JOB_NOTIFY:
-							printf("RECV[NEW_JOB_NOTIFY]\n\tbt_id[%s]\tlock_cmd_size[%d]\tlock_cmd[%s]\n",
+							//@@@test
+							printf("RECV[NEW_JOB_NOTIFY]:bt_id[%s],lock_cmd_size[%d],lock_cmd[",
 								imsg.server_data.job.bt_id,
-								(int)imsg.server_data.job.lock_cmd.size,
-								imsg.server_data.job.lock_cmd.bytes);
+								(int)imsg.server_data.job.lock_cmd.size);
 							for(int i=0;i<imsg.server_data.job.lock_cmd.size;i++){
-								char b=(char)imsg.server_data.job.lock_cmd.bytes[i];
-								printf("job.lock_cmd[%x]",b);
+								printf("%x", imsg.server_data.job.lock_cmd.bytes[i]);
 							}
-							printf("\n");
+							printf("]\n");
+							//handle lock_cmd
 							//MQTT_sendMessage(g_sysif.mqtt_c,SUB_WEBDEMO,1,msg->payload,msg->payloadlen);
 
 							// addDiscoverTask(1);
@@ -498,17 +499,18 @@ void WaitMQTT(sysinfo_t *si){
 
 					if (NULL!=ptn) {//move task_node into doing_list task queue
 					printf("find task_node.msg_id[%u], current_state[%d].\n", ptn->msg_id, ptn->cur_state);
-				//MoveTask();
-				pthread_mutex_lock(g_sysif.mutex);
-				MoveTask(&ptn->list, &doing_task_head);
-				pthread_mutex_unlock(g_sysif.mutex);
-				}
-				else {//if not exist, add into task queue
-				printf("find ptn==NULL.\n");
-				pthread_mutex_lock(g_sysif.mutex);
-				InsertTask(&doing_task_head, imsg.msg_id, current_state, NULL, NULL);
-				pthread_mutex_unlock(g_sysif.mutex);
-				}
+
+					//MoveTask();
+					pthread_mutex_lock(g_sysif.mutex);
+					MoveTask(&ptn->list, &doing_task_head);
+					pthread_mutex_unlock(g_sysif.mutex);
+					}
+					else {//if not exist, add into task queue
+					printf("find ptn==NULL.\n");
+					pthread_mutex_lock(g_sysif.mutex);
+					InsertTask(&doing_task_head, imsg.msg_id, current_state, NULL, NULL);
+					pthread_mutex_unlock(g_sysif.mutex);
+					}
 					 */
 gomqttfree:            
 					MQTTClient_freeMessage(&msg);

@@ -29,53 +29,44 @@
 
 void saveTaskData(task_node_t *ptn)
 {
-    if (!ptn) return;
+	if (!ptn) return;
 
-    if(ptn->ble_data && ptn->ble_data_len)
-    {
-        ble_data_t *ble_data = ptn->ble_data;
-        int task_type = ptn->task_type;
-        switch (task_type)
-        {
-        case TASK_BLE_ADMIN_UNLOCK:
-        {
-            serverLog(LL_NOTICE, "saving ble TASK_BLE_ADMIN_UNLOCK data");
-            ble_admin_result_t *admin_unlock_result = (ble_admin_result_t *)ble_data->ble_result;
-            
-            int unlock_error = admin_unlock_result->unlock_result;
-            if (unlock_error)
-            {
-                serverLog(LL_ERROR, "unlock error");
-            }
-            else
-            {
-                serverLog(LL_ERROR, "unlock success");
-            }
-            serverLog(LL_NOTICE, "admin_unlock response");
-            IgAdminUnlockResponse *unlock_response = admin_unlock_result->cmd_response;
-            if (unlock_response->has_operation_id)
-            {
-                serverLog(LL_NOTICE, "admin_unlock operation id: %d", unlock_response->operation_id);
-            }
-            if (unlock_response->has_result)
-            {
-                serverLog(LL_NOTICE, "admin_unlock result %d", unlock_response->result);
-            }
-            break;
-        }
-        default:
-            break;
-        }
-    }
+	if(ptn->ble_data && ptn->ble_data_len) {
+		ble_data_t *ble_data = ptn->ble_data;
+		int task_type = ptn->task_type;
+		switch (task_type) {
+			case TASK_BLE_ADMIN_UNLOCK:
+				{
+					serverLog(LL_NOTICE, "saving ble TASK_BLE_ADMIN_UNLOCK data");
+					ble_admin_result_t *admin_unlock_result = (ble_admin_result_t *)ble_data->ble_result;
+
+					int unlock_error = admin_unlock_result->unlock_result;
+					if (unlock_error) {
+						serverLog(LL_ERROR, "unlock error");
+					} else {
+						serverLog(LL_ERROR, "unlock success");
+					}
+					serverLog(LL_NOTICE, "admin_unlock response");
+					IgAdminUnlockResponse *unlock_response = admin_unlock_result->cmd_response;
+					if (unlock_response->has_operation_id) {
+						serverLog(LL_NOTICE, "admin_unlock operation id[%d].", unlock_response->operation_id);
+					}
+					if (unlock_response->has_result) {
+						serverLog(LL_NOTICE, "admin_unlock result[%d].", unlock_response->result);
+					}
+					break;
+				}
+			default:
+				break;
+		}
+	}
 }
 
-int hexStrToByte(const char* source, uint8_t* dest, int sourceLen)
-{
+int hexStrToByte(const char* source, uint8_t* dest, int sourceLen) {
     short i;
     unsigned char highByte, lowByte;
     
-    for (i = 0; i < sourceLen; i += 2)
-    {
+    for (i = 0; i < sourceLen; i += 2) {
         highByte = toupper(source[i]);
         lowByte  = toupper(source[i + 1]);
         if (highByte > 0x39)
@@ -118,25 +109,20 @@ int testUnLock(igm_lock_t *lock) {
 
     tn->task_type = TASK_BLE_ADMIN_UNLOCK;
 
-    for (int j = 0; j < fsm_max_n; j++)
-    {
+    for (int j = 0; j < fsm_max_n; j++) {
         if (current_state == tn->task_sm_table[j].cur_state) {
             // 增加一个判断当前函数, 是否当前函数出错. 0 表示没问题
 			int event_result = tn->task_sm_table[j].eventActFun(tn);
-            if (event_result)
-            {
+            if (event_result) {
                 serverLog(LL_ERROR, "%d step error", j);
                 error = 1;
                 break;
-            }
-            else
-            {
+            } else {
                 current_state = tn->task_sm_table[j].next_state;
             }
 		}
     }
-    if (error)
-    {
+    if (error) {
         serverLog(LL_ERROR, "unlock error");
         return error;
     }

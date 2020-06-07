@@ -38,27 +38,23 @@ int _unlockDW()
 // -------------- doing list operation
 
 
-int IsDEmpty()
-{
+int IsDEmpty() {
 	int result;
-	_lockD();
+	//_lockD();
 	result = list_empty(&doing_task_head);
-	_unlockD();
+	//_unlockD();
 	return result;
 }
 
-task_node_t *GetDHeadNode()
-{
+task_node_t *GetDHeadNode() {
 	task_node_t *result;
-	if (IsDEmpty())
-	{
+	if (IsDEmpty()) {
 		return NULL;
 	}
-	_lockD();
+	//_lockD();
 	result = list_entry(doing_task_head.next, task_node_t, list);
-	_unlockD();
+	//_unlockD();
 	return result;
-
 }
 
 // task_node 是当前的 node
@@ -164,23 +160,21 @@ task_node_t *InsertDTaskTail(
 }
 
 task_node_t *InsertBle2DFront(
-		unsigned int msg_id, unsigned char cs, 
-		ble_data_t *ble_data, int ble_data_len, 
-		fsm_table_t *task_sm_table, int sm_table_len, int task_type)
+	unsigned int msg_id, unsigned char cs, 
+	ble_data_t *ble_data, int ble_data_len, 
+	fsm_table_t *task_sm_table, int sm_table_len, int task_type)
 {
 	return InsertDTaskFront(
-			msg_id, cs, NULL, 0, ble_data, ble_data_len, task_sm_table, sm_table_len, task_type
-			);
+		msg_id, cs, NULL, 0, ble_data, ble_data_len, task_sm_table, sm_table_len, task_type);
 }
 
 task_node_t *InsertBle2DTail(
-		unsigned int msg_id, unsigned char cs, 
-		ble_data_t *ble_data, int ble_data_len, 
-		fsm_table_t *task_sm_table, int sm_table_len, int task_type)
+	unsigned int msg_id, unsigned char cs, 
+	ble_data_t *ble_data, int ble_data_len, 
+	fsm_table_t *task_sm_table, int sm_table_len, int task_type)
 {
 	return InsertDTaskTail(
-			msg_id, cs, NULL, 0, ble_data, ble_data_len, task_sm_table, sm_table_len, task_type
-			);
+		msg_id, cs, NULL, 0, ble_data, ble_data_len, task_sm_table, sm_table_len, task_type);
 }
 
 void DeleteDTask(task_node_t **ptn)

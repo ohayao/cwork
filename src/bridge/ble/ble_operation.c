@@ -22,18 +22,14 @@ size_t resolve_payload_len(const size_t step_len)
 
 
 
-bool build_msg_payload(uint8_t **p_payloadBytes, 
-                      size_t *payload_len, uint8_t *stepBytes, size_t step_len)
-{
+bool build_msg_payload(uint8_t **p_payloadBytes, size_t *payload_len, uint8_t *stepBytes, size_t step_len) {
 	*payload_len = resolve_payload_len(step_len);
 	size_t n_byte_for_len = *payload_len - step_len;
 	(*p_payloadBytes) = (uint8_t *)malloc(*payload_len);
-	if (n_byte_for_len == 1)
-	{
+	if (n_byte_for_len == 1) {
 		(*p_payloadBytes)[0] = step_len;
 	}
-	else if (n_byte_for_len == 3)
-	{
+	else if (n_byte_for_len == 3) {
 		// 大端存储
 		uint8_t fst, sec;
 		sec = 254;
@@ -41,10 +37,8 @@ bool build_msg_payload(uint8_t **p_payloadBytes,
 		(*p_payloadBytes)[0] = fst;
 		(*p_payloadBytes)[1] = sec;
 		(*p_payloadBytes)[3] = 0xff;  
-	}
-	else
-	{
-    serverLog(LL_ERROR, "wrong n_byte_for_len, error");
+	} else {
+		serverLog(LL_ERROR, "wrong n_byte_for_len, error");
 		return false;
 	}
 	memcpy((*p_payloadBytes) + n_byte_for_len, stepBytes, step_len);

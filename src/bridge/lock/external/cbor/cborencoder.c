@@ -275,8 +275,7 @@ static inline CborError append_byte_to_buffer(CborEncoder *encoder, uint8_t byte
     return append_to_buffer(encoder, &byte, 1);
 }
 
-static inline CborError encode_number_no_update(CborEncoder *encoder, uint64_t ui, uint8_t shiftedMajorType)
-{
+static inline CborError encode_number_no_update(CborEncoder *encoder, uint64_t ui, uint8_t shiftedMajorType) {
     /* Little-endian would have been so much more convenient here:
      * We could just write at the beginning of buf but append_to_buffer
      * only the necessary bytes.
@@ -304,8 +303,7 @@ static inline CborError encode_number_no_update(CborEncoder *encoder, uint64_t u
     return append_to_buffer(encoder, bufstart, bufend - bufstart);
 }
 
-static inline CborError encode_number(CborEncoder *encoder, uint64_t ui, uint8_t shiftedMajorType)
-{
+static inline CborError encode_number(CborEncoder *encoder, uint64_t ui, uint8_t shiftedMajorType) {
     ++encoder->added;
     return encode_number_no_update(encoder, ui, shiftedMajorType);
 }
@@ -316,8 +314,7 @@ static inline CborError encode_number(CborEncoder *encoder, uint64_t ui, uint8_t
  *
  * \sa cbor_encode_negative_int, cbor_encode_int
  */
-CborError cbor_encode_uint(CborEncoder *encoder, uint64_t value)
-{
+CborError cbor_encode_uint(CborEncoder *encoder, uint64_t value) {
     return encode_number(encoder, value, UnsignedIntegerType << MajorTypeShift);
 }
 
