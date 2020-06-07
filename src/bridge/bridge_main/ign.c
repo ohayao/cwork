@@ -293,6 +293,7 @@ int Init(void* tn) {
 	memset(TOPIC_SUB, 0, sizeof(TOPIC_SUB));
 	snprintf(TOPIC_PUB, sizeof(TOPIC_PUB), "%s%s", PUB_TOPIC_PREFIX, g_sysif.mac);
 	snprintf(TOPIC_SUB, sizeof(TOPIC_SUB), "%s%s", SUB_TOPIC_PREFIX, g_sysif.mac);
+    printf("Init Mac as Device ID[%s], TOPIC_PUB[%s], TOPIC_SUB[%s].", g_sysif.mac, TOPIC_PUB, TOPIC_SUB);
     serverLog(LL_NOTICE, "Init Mac as Device ID[%s], TOPIC_PUB[%s], TOPIC_SUB[%s].", g_sysif.mac, TOPIC_PUB, TOPIC_SUB);
 
 	do {
@@ -453,10 +454,13 @@ void WaitMQTT(sysinfo_t *si){
 							goto gomqttfree;
 							break;
 						case ign_EventType_NEW_JOB_NOTIFY:
-							printf("RECV[NEW_JOB_NOTIFY]\n\tbt_id=%s\tlock_cmd_size=%d\tlock_cmd=%s\n",imsg.server_data.job.bt_id,(int)imsg.server_data.job.lock_cmd.size,imsg.server_data.job.lock_cmd.bytes);
+							printf("RECV[NEW_JOB_NOTIFY]\n\tbt_id[%s]\tlock_cmd_size[%d]\tlock_cmd[%s]\n",
+								imsg.server_data.job.bt_id,
+								(int)imsg.server_data.job.lock_cmd.size,
+								imsg.server_data.job.lock_cmd.bytes);
 							for(int i=0;i<imsg.server_data.job.lock_cmd.size;i++){
 								char b=(char)imsg.server_data.job.lock_cmd.bytes[i];
-								printf("%x",b);
+								printf("job.lock_cmd[%x]",b);
 							}
 							printf("\n");
 							//MQTT_sendMessage(g_sysif.mqtt_c,SUB_WEBDEMO,1,msg->payload,msg->payloadlen);

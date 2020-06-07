@@ -40,22 +40,22 @@ void saveTaskData(task_node_t *ptn)
         {
         case TASK_BLE_ADMIN_CREATE_PIN_REQUEST:
         {
-            printf( "saving ble TASK_BLE_ADMIN_UNLOCK data");
+            printf( "saving ble TASK_BLE_ADMIN_UNLOCK data.\n");
             ble_admin_result_t *result = (ble_admin_result_t *)ble_data->ble_result;
             int error = result->delete_pin_request_result;
             IgDeletePinResponse *response = result->cmd_response;
             
             if (error)
             {
-              printf("delete pin request error");
+              printf("delete pin request error.\n");
             }
             else
             {
-                printf( "delete pin request success");
+                printf( "delete pin request success.\n");
                 if (response->has_operation_id)
-                    printf( "operation ID: %d", response->operation_id);
+                    printf( "operation ID: [%d].\n", response->operation_id);
                 if (response->has_result)
-                    printf( "result: %d", response->result);
+                    printf( "result: [%d].\n", response->result);
             }
             break;
         }
@@ -91,7 +91,7 @@ int hexStrToByte(const char* source, uint8_t* dest, int sourceLen)
 
 
 int testDeletePin(igm_lock_t *lock, IgDeletePinRequest *request) {
-    printf("delete pin request cmd ask invoker to release the lock.");
+    printf("delete pin request cmd ask invoker to release the lock.\n");
       
     ble_admin_param_t *admin_param = (ble_admin_param_t *)malloc(sizeof(ble_admin_param_t));
     bleInitAdminParam(admin_param);
@@ -122,7 +122,7 @@ int testDeletePin(igm_lock_t *lock, IgDeletePinRequest *request) {
         int event_result = tn->task_sm_table[j].eventActFun(tn);
         if (event_result)
         {
-            printf("%d step error", j);
+            printf("[%d] step error.\n", j);
             error = 1;
             break;
         }
@@ -134,7 +134,7 @@ int testDeletePin(igm_lock_t *lock, IgDeletePinRequest *request) {
     }
     if (error)
     {
-        printf("lock error");
+        printf("lock error.\n");
         return error;
     }
 
@@ -150,34 +150,34 @@ int testDeletePin(igm_lock_t *lock, IgDeletePinRequest *request) {
     tn = NULL;
     free(admin_param);
     admin_param = NULL;
-    printf( "lock end-------");
+    printf( "lock end-------.\n");
     return 0;
 }
 
 int main(int argc, char *argv[]) {
     if (argc != 5) {
-      printf( "%s <device_address> <admin_key> <passwd> <pin> \n", argv[0]);
+      printf( "%s <device_address> <admin_key> <passwd> <pin>.\n", argv[0]);
       return 1;
     }
-    printf("test ble delete pin request to start.");
+    printf("test ble delete pin request to start.\n");
     
-    printf("select the lock you want to unlock.");
+    printf("select the lock you want to unlock.\n");
     igm_lock_t *lock=NULL;
     getLock(&lock);
     initLock(lock);
     setLockAddr(lock, argv[1], strlen(argv[1]));
-    printf( "setLockAddr success");
+    printf( "setLockAddr success.\n");
 
     uint8_t tmp_buff[100];
     memset(tmp_buff, 0, sizeof(tmp_buff));
     int admin_len = hexStrToByte(argv[2], tmp_buff, strlen(argv[2]));
     setLockAdminKey(lock, tmp_buff, admin_len);
-    printf( "setLockAdminKey success");
+    printf( "setLockAdminKey success.\n");
 
     memset(tmp_buff, 0, sizeof(tmp_buff));
     int password_size = hexStrToByte(argv[3], tmp_buff, strlen(argv[3]));
     setLockPassword(lock, tmp_buff, password_size);
-    printf( "setLockPassword success");
+    printf( "setLockPassword success,\n");
 
     // 创建一个变量
     IgDeletePinRequest delete_pin_request;
@@ -191,11 +191,17 @@ int main(int argc, char *argv[]) {
 
     // 设置旧的password
     memset(tmp_buff, 0, sizeof(tmp_buff));
-    int pin_size = hexStrToByte(
-      argv[4], tmp_buff, strlen(argv[4]));
+    //int pin_size = hexStrToByte(
+    //  argv[4], tmp_buff, strlen(argv[4]));
+	int pin_size = strlen(argv[4]);
+	for(int i=0;i<pin_size; i++) {
+		tmp_buff[i] = argv[4][i];
+	}
+	
     ig_DeletePinRequest_set_old_pin(
       &delete_pin_request, tmp_buff, pin_size);
-    printf( "delete pin reques cmd test go");
+    printf( "delete pin reques cmd test go.\n");
+	ig_DeletePinRequest_set_operation_id(&delete_pin_request, 1);
     int res = testDeletePin(lock, &delete_pin_request);
     // ig_DeletePinRequest_deinit(&delete_pin_request);
     releaseLock(&lock);
