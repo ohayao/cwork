@@ -170,6 +170,11 @@ connectionID 0                              // connectionID 是多少
 
 3. 
 
+### 测试实际锁
+
+1.  sudo ./bridge/test/scan 
+2.  sudo ./bridge/test/pair EB:7E:BA:AB:6B:8F
+3. 
   
 ### TODO List
 1. 当锁已经被paired, 当前会出错.

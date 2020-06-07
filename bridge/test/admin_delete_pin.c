@@ -191,8 +191,16 @@ int main(int argc, char *argv[]) {
 
     // 设置旧的password
     memset(tmp_buff, 0, sizeof(tmp_buff));
-    int pin_size = hexStrToByte(
-      argv[4], tmp_buff, strlen(argv[4]));
+    int pin_size = strlen(argv[4]);
+	for(int i=0;i<pin_size; i++) {
+		tmp_buff[i] = argv[4][i];
+	}
+    printf("pin is:[");
+	for(int k=0;k<pin_size;k++) {
+		printf("%d", tmp_buff[k]);
+	}
+	printf("]\n");
+    
     ig_DeletePinRequest_set_old_pin(
       &delete_pin_request, tmp_buff, pin_size);
     printf( "delete pin reques cmd test go");

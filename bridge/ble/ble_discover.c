@@ -72,7 +72,7 @@ void ble_discovered_device(
   // IGM303e31a5c
   regex_t regex;
   int reti;
-  reti = regcomp(&regex, "^IGM", 0);
+  reti = regcomp(&regex, "^IG", 0);
   // reti = regcomp(&regex, "^IGR", 0);
   if (reti) {
     serverLog(LL_ERROR, "Could not compile regex");
