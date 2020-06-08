@@ -8,6 +8,9 @@ ign.LockJob.lock_cmd max_size:500
 ign.LockEntry.bt_id max_size:100
 ign.LockEntry.ekey max_size:100
 
+ign.DemoLockJob.bt_id max_size:100
+ign.DemoLockJob.pin max_size:100
+
 
 ign.BridgeProfile.bt_id max_size:100
 ign.BridgeProfile.mac_addr max_size:100
