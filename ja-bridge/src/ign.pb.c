@@ -27,6 +27,10 @@ PB_BIND(ign_LockEntry, ign_LockEntry, AUTO)
 PB_BIND(ign_ServerEventData, ign_ServerEventData, 2)
 
 
+PB_BIND(ign_DemoLockJob, ign_DemoLockJob, AUTO)
+
+
+
 
 
 

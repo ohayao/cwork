@@ -1,5 +1,5 @@
-// version: 0.0.7
-// date: 08/05/2020
+// version: 0.0.8
+// date: 08/06/2020
 syntax = "proto3";
 package ign;
 //-----------------------------------------------
@@ -28,7 +28,7 @@ enum EventType {
   // Contains a job
   LOCK_JOB           = 129;
   // New job notification
-  NEW_JOB_NOTIFY     = 130; // 新加
+  NEW_JOB_NOTIFY     = 130;
 }
 message MsgInfo {
   uint32          msg_id      = 1;
@@ -92,7 +92,23 @@ message LockEntry {
 }
 message ServerEventData {
   // List of lock entries
-  repeated LockEntry lockEntries = 1;
+  repeated LockEntry lock_entries = 1;
   // Job belonging to a lock
-  LockJob            job         = 2;
+  LockJob            job          = 2;
+  DemoLockJob        demo_job     = 3;
+}
+// DEMO USE ONLY //
+enum DemoLockCommand {
+  UNSPECIFIED_DLC = 0;
+  UNLOCK      = 1;
+  LOCK        = 2;
+  CREATE_PIN  = 3;
+  DELETE_PIN  = 4;
+}
+// DEMO USE ONLY //
+message DemoLockJob {
+  string          bt_id  = 1;
+  DemoLockCommand op_cmd = 2;
+  // 4-8 digit pin (ascii)
+  bytes           pin    = 3;
 }
