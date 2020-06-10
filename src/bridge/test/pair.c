@@ -35,7 +35,6 @@ extern int WaitBtn(void *arg);
 ign_BridgeProfile Create_IgnBridgeProfile(char *bridgeID);
 void addPairingTask(igm_lock_t *lock, int msg_id);
 void addDiscoverTask(int msg_id);
-void addAdminTask(igm_lock_t *lock, int msg_id);
 
 int FSMHandle(task_node_t* tn) {
     if(NULL == tn->task_sm_table) {
@@ -210,38 +209,6 @@ static int FSM(MQTTClient_message *msg){
 //     return 0;
 // }
 
-//处理web端消息
-int DoWebMsg(char *topic,void *payload){
-    printf("=============================================================\n");
-    cJSON *root=NULL;
-    root=cJSON_Parse((char *)payload);
-    if(root==NULL){
-        cJSON_Delete(root);
-        return 0;
-    }
-    cJSON *cmd= cJSON_GetObjectItem(root,"cmd");
-    cJSON *bridgeId=cJSON_GetObjectItem(root,"bridge_id");
-    cJSON *value=cJSON_GetObjectItem(root,"value");
-    printf("recv CMD=%s,BRIDGEID=%s Value=%s\n",cmd->valuestring,bridgeId->valuestring,value->valuestring);
-    if(strcmp("getUserInfo",cmd->valuestring)==0){
-        GetUserInfo(bridgeId->valuestring);
-    }else if(strcmp("unlock",cmd->valuestring)==0){
-        char* lockID=value->valuestring;
-        UnLock(lockID);
-    }
-    printf("=============================================================\n");
-    cJSON_Delete(root);
-    int msg_id = rand() % 25532;
-    serverLog(LL_NOTICE, "addDiscoverTask msg_id %d", msg_id);
-    igm_lock_t lock;
-    setLockName(&lock, "IGM303e31a5c", strlen("IGM303e31a5c"));
-    // addPairingTask(&lock, msg_id);
-    addAdminTask(&lock, msg_id);
-    // addPairingTask(&lock, msg_id);
-    return 0;
-}
-
-
 
 // 用法
 void visitScanResult(ble_data_t *ble_data)
@@ -363,124 +330,6 @@ void addPairingTask(igm_lock_t *lock, int msg_id)
         ble_data, sizeof(ble_data_t),
         getPairingFsmTable(), getPairingFsmTableLen(), TASK_BLE_PAIRING);
     serverLog(LL_NOTICE, "5. Add Pairing task.");
-    return;
-}
-
-void addAdminTask(igm_lock_t *lock, int msg_id)
-{
-    igm_lock_t *lock_nearby  = checkLockIsDiscovered(lock);
-    if (!lock_nearby)
-    {
-        return;
-    }
-    
-    lock_nearby = checkLockIsPaired(lock_nearby);
-    if (!lock_nearby)
-    {
-        serverLog(LL_ERROR, "can't not paired lock nearby");
-        return;
-    }
-    // 设置需要的参数
-    serverLog(LL_NOTICE, "Add Admin task");
-    serverLog(LL_NOTICE, "1. set ble admin parameters");
-    ble_admin_param_t *admin_param = (ble_admin_param_t *)calloc(sizeof(ble_admin_param_t), 1);
-    serverLog(LL_NOTICE, "1. set pairing param lock to name %s addr %s", lock->name, lock->addr);
-    bleSetAdminParam(admin_param, lock);
-    // 把参数写入data, 当前有个问题就是, 使用完, 得访问的人记的释放.
-    serverLog(LL_NOTICE, "3. alloc ble data datatype, ble_data is used to devliver parameters and get result data");
-    ble_data_t *ble_data = calloc(sizeof(ble_data_t), 1);
-    serverLog(LL_NOTICE, "3. init ble_data");
-    bleInitData(ble_data);
-    serverLog(LL_NOTICE, "3. set ble parametes to ble data");
-    bleSetBleParam(ble_data, admin_param, sizeof(ble_admin_param_t));
-
-    // 插入系统的队列
-    serverLog(LL_NOTICE, "4. used InsertBle2DFront to insert the task to system.");
-    InsertBle2DFront(msg_id, BLE_PAIRING_BEGIN, 
-        ble_data, sizeof(ble_data_t),
-        getAdminFsmTable(), getAdminFsmTableLen(), TASK_BLE_ADMIN_CONNECTION);
-    serverLog(LL_NOTICE, "5. Add admin task.");
-    return;
-}
-
-void addAdminUnpairTask(igm_lock_t *lock)
-{
-    // 设置需要的参数
-    serverLog(LL_NOTICE, "Add Admin Unpair task");
-    serverLog(LL_NOTICE, "1. set ble admin unpair parameters");
-    ble_admin_param_t *admin_unpair_param = (ble_admin_param_t *)calloc(sizeof(ble_admin_param_t), 1);
-    serverLog(LL_NOTICE, "1. set admin unpair param lock to name %s addr %s", lock->name, lock->addr);
-    bleSetAdminParam(admin_unpair_param, lock);
-    serverLog(LL_NOTICE, "2. set msg_id to 3(or anything you want)");
-    int msg_id = 3;
-    // 把参数写入data, 当前有个问题就是, 使用完, 得访问的人记的释放.
-    serverLog(LL_NOTICE, "3. alloc ble data datatype, ble_data is used to devliver parameters and get result data");
-    ble_data_t *ble_data = calloc(sizeof(ble_data_t), 1);
-    serverLog(LL_NOTICE, "3. init ble_data");
-    bleInitData(ble_data);
-    serverLog(LL_NOTICE, "3. set ble parametes to ble data");
-    bleSetBleParam(ble_data, admin_unpair_param, sizeof(ble_admin_param_t));
-
-    // 插入系统的队列
-    serverLog(LL_NOTICE, "4. used InsertBle2DFront to insert the task to system.");
-    InsertBle2DFront(msg_id, BLE_ADMIN_BEGIN, 
-        ble_data, sizeof(ble_data_t),
-        getAdminUnpairFsmTable(), getAdminUnpairFsmTableLen(), TASK_BLE_ADMIN_UNPAIR);
-    serverLog(LL_NOTICE, "5. Add admin unpair task.");
-    return;
-}
-
-void addAdminUnlockTask(igm_lock_t *lock)
-{
-    // 设置需要的参数
-    serverLog(LL_NOTICE, "Add Admin Unlock task");
-    serverLog(LL_NOTICE, "1. set ble admin Unlock parameters");
-    ble_admin_param_t *admin_param = (ble_admin_param_t *)calloc(sizeof(ble_admin_param_t), 1);
-    serverLog(LL_NOTICE, "1. set admin Unlock param lock to name %s addr %s", lock->name, lock->addr);
-    bleSetAdminParam(admin_param, lock);
-    serverLog(LL_NOTICE, "2. set msg_id to 4(or anything you want)");
-    int msg_id = 4;
-    // 把参数写入data, 当前有个问题就是, 使用完, 得访问的人记的释放.
-    serverLog(LL_NOTICE, "3. alloc ble data datatype, ble_data is used to devliver parameters and get result data");
-    ble_data_t *ble_data = calloc(sizeof(ble_data_t), 1);
-    serverLog(LL_NOTICE, "3. init ble_data");
-    bleInitData(ble_data);
-    serverLog(LL_NOTICE, "3. set ble parametes to ble data");
-    bleSetBleParam(ble_data, admin_param, sizeof(ble_admin_param_t));
-
-    // 插入系统的队列
-    serverLog(LL_NOTICE, "4. used InsertBle2DFront to insert the task to system.");
-    InsertBle2DFront(msg_id, BLE_ADMIN_BEGIN, 
-        ble_data, sizeof(ble_data_t),
-        getAdminUnlockFsmTable(), getAdminUnlockFsmTableLen(), TASK_BLE_ADMIN_UNLOCK);
-    serverLog(LL_NOTICE, "5. Add admin unlock task.");
-    return;
-}
-
-void addAdminLockTask(igm_lock_t *lock)
-{
-    // 设置需要的参数
-    serverLog(LL_NOTICE, "Add Admin lock task");
-    serverLog(LL_NOTICE, "1. set ble admin lock parameters");
-    ble_admin_param_t *admin_param = (ble_admin_param_t *)calloc(sizeof(ble_admin_param_t), 1);
-    serverLog(LL_NOTICE, "1. set admin lock param lock to name %s addr %s", lock->name, lock->addr);
-    bleSetAdminParam(admin_param, lock);
-    serverLog(LL_NOTICE, "2. set msg_id to 5(or anything you want)");
-    int msg_id = 5;
-    // 把参数写入data, 当前有个问题就是, 使用完, 得访问的人记的释放.
-    serverLog(LL_NOTICE, "3. alloc ble data datatype, ble_data is used to devliver parameters and get result data");
-    ble_data_t *ble_data = calloc(sizeof(ble_data_t), 1);
-    serverLog(LL_NOTICE, "3. init ble_data");
-    bleInitData(ble_data);
-    serverLog(LL_NOTICE, "3. set ble parametes to ble data");
-    bleSetBleParam(ble_data, admin_param, sizeof(ble_admin_param_t));
-
-    // 插入系统的队列
-    serverLog(LL_NOTICE, "4. used InsertBle2DFront to insert the task to system.");
-    InsertBle2DFront(msg_id, BLE_ADMIN_BEGIN, 
-        ble_data, sizeof(ble_data_t),
-        getAdminLockFsmTable(), getAdminLockFsmTableLen(), TASK_BLE_ADMIN_LOCK);
-    serverLog(LL_NOTICE, "5. Add admin unlock task.");
     return;
 }
 

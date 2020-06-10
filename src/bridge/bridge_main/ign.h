@@ -14,6 +14,8 @@
 #include <sys/ioctl.h>
 #include <net/if.h> //for struct ifreq
 
+#include "bridge/gattlib/gattlib.h"
+#include "bridge/ble/ble_admin.h"
 
 // #include "MQTTClient.h"
 
@@ -60,6 +62,50 @@ INC:
 
 int Init_MQTT(MQTTClient* p_mqtt);
 
+int hexStrToByte(const char* source, uint8_t* dest, int sourceLen) {
+    short i;
+    unsigned char highByte, lowByte;
+    
+    for (i = 0; i < sourceLen; i += 2)
+    {
+        highByte = toupper(source[i]);
+        lowByte  = toupper(source[i + 1]);
+        if (highByte > 0x39)
+            highByte -= 0x37;
+        else
+            highByte -= 0x30;
+ 
+        if (lowByte > 0x39)
+            lowByte -= 0x37;
+        else
+            lowByte -= 0x30;
+ 
+        dest[i / 2] = (highByte << 4) | lowByte;
+    }
+    return sourceLen /2 ;
+}
+
+int create_gatt_connection(const char* addr, gatt_connection_t** gatt_connection, void** gatt_adapter) {
+	//blue connection
+	int ret = gattlib_adapter_open(addr, gatt_adapter);
+	if (ret) {
+		serverLog(LL_ERROR, "register_admin_notfication Failed to open adapter, ret[%d].", ret);
+		return -1;
+		//??goto ADMIN_ERROR_EXIT;
+	}
+
+	serverLog(LL_NOTICE, "register_admin_notfication ready to connection lock ble addr[%s]", addr);
+	//optimise this short connection to long!
+	//should use asyc connect interface
+	*gatt_connection = gattlib_connect(*gatt_adapter, addr, GATTLIB_CONNECTION_OPTIONS_LEGACY_DEFAULT);
+	if (NULL == gatt_connection) {
+		serverLog(LL_ERROR, "Fail to connect to the bluetooth device.");
+		return -2;
+		//goto ADMIN_ERROR_EXIT;
+	}
+	serverLog(LL_NOTICE, "Succeeded to connect to the bluetooth device." );
+	return 0;
+}
 // thread_type Thread_start(void* fn, void* parameter) {
 //     thread_type thread = 0;
 //     pthread_attr_t attr;

@@ -125,85 +125,83 @@ enum {
 
 typedef struct AdminConnection {
 	gatt_connection_t* gatt_connection;
-  igm_lock_t *lock;
-  size_t cmd_request_size;
-  void *cmd_request;
+	igm_lock_t *lock;
+	size_t cmd_request_size;
+	void *cmd_request;
 	enum BLE_ADMIN_STATE admin_step;
 	size_t step_max_size;
 	size_t  step_cur_size;
 	size_t n_size_byte;
 	uint8_t *step_data;
-  uuid_t admin_uuid;
-  int has_admin_result;
-  ble_admin_result_t *admin_result;
-  int waiting_err;
-  int receive_err;
+	uuid_t admin_uuid;
+	int has_admin_result;
+	ble_admin_result_t *admin_result;
+	int waiting_err;
+	int receive_err;
 }admin_connection_t;
 
-void initAdminConnection(admin_connection_t *admin_connection)
-{
-  memset(admin_connection, 0, sizeof(admin_connection_t));
+void initAdminConnection(admin_connection_t *admin_connection) {
+	memset(admin_connection, 0, sizeof(admin_connection_t));
 }
 
-void copyAdminConnectionRequest(admin_connection_t *admin_connection, void *cmd_request, size_t cmd_request_size)
-{
-  admin_connection->cmd_request = malloc(cmd_request_size);
-  memset(admin_connection->cmd_request, 0, cmd_request_size);
-  memcpy(admin_connection->cmd_request, cmd_request, cmd_request_size);
+void copyAdminConnectionRequest(admin_connection_t *admin_connection, void *cmd_request, size_t cmd_request_size) {
+	admin_connection->cmd_request = malloc(cmd_request_size);
+	memset(admin_connection->cmd_request, 0, cmd_request_size);
+	memcpy(admin_connection->cmd_request, cmd_request, cmd_request_size);
 }
 
 void releaseAdminConnectionData(admin_connection_t *admin_connection) {
-  if (!admin_connection) return;
-  if (admin_connection->step_max_size && admin_connection->step_data) {
-    admin_connection->step_max_size = 0;
-    admin_connection->n_size_byte = 0;
-    admin_connection->step_cur_size = 0;
-    free(admin_connection->step_data);
-    admin_connection->step_data = NULL;
-  }
+	if (!admin_connection) return;
+	if (admin_connection->step_max_size && admin_connection->step_data) {
+		admin_connection->step_max_size = 0;
+		admin_connection->n_size_byte = 0;
+		admin_connection->step_cur_size = 0;
+		free(admin_connection->step_data);
+		admin_connection->step_data = NULL;
+	}
 }
 
 int releaseAdminConnection(admin_connection_t **pp_admin_connection)
 {
-  admin_connection_t *admin_connection = *pp_admin_connection;
-  int ret;
-  if (admin_connection->cmd_request)
-  {
-    admin_connection->cmd_request_size = 0;
-    free(admin_connection->cmd_request);
-    admin_connection->cmd_request = NULL;
-  }
-  releaseLock(&admin_connection->lock);
-  bleReleaseAdminResult(&admin_connection->admin_result);
-  ret = gattlib_notification_stop(
-        admin_connection->gatt_connection, &admin_connection->admin_uuid);
-  if (ret != GATTLIB_SUCCESS)
-  {
-    serverLog(LL_ERROR, "clearAdminConnectionGattConenction gattlib_notification_stop error");
-    return ret;
-  }
-  ret = gattlib_disconnect(admin_connection->gatt_connection);
-  if (ret != GATTLIB_SUCCESS)
-  {
-    serverLog(LL_ERROR, " gattlib_disconnect error");
-    return ret;
-  }
-  admin_connection->gatt_connection = NULL;
-  free(*pp_admin_connection);
-  *pp_admin_connection = NULL;
-  return 0;
+	admin_connection_t *admin_connection = *pp_admin_connection;
+	int ret;
+	if (admin_connection->cmd_request)
+	{
+		admin_connection->cmd_request_size = 0;
+		free(admin_connection->cmd_request);
+		admin_connection->cmd_request = NULL;
+	}
+	releaseLock(&admin_connection->lock);
+	bleReleaseAdminResult(&admin_connection->admin_result);
+	ret = gattlib_notification_stop(
+			admin_connection->gatt_connection, &admin_connection->admin_uuid);
+	if (ret != GATTLIB_SUCCESS)
+	{
+		serverLog(LL_ERROR, "clearAdminConnectionGattConenction gattlib_notification_stop error");
+		return ret;
+	}
+	ret = gattlib_disconnect(admin_connection->gatt_connection);
+	if (ret != GATTLIB_SUCCESS)
+	{
+		serverLog(LL_ERROR, " gattlib_disconnect error");
+		return ret;
+	}
+	admin_connection->gatt_connection = NULL;
+	free(*pp_admin_connection);
+	*pp_admin_connection = NULL;
+	return 0;
 }
 
 static int clearAdminConnectionStepData(admin_connection_t *admin_connection)
 {
-  if (admin_connection->step_data && admin_connection->step_max_size)
-  {
-    admin_connection->step_max_size = 0;
-    admin_connection->step_cur_size = 0;
-    free(admin_connection->step_data);
-    admin_connection->step_data = NULL;
-  }
-  return 0;
+	if (admin_connection->step_data && admin_connection->step_max_size)
+	{
+		admin_connection->step_max_size = 0;
+		admin_connection->step_cur_size = 0;
+		free(admin_connection->step_data);
+		admin_connection->step_data = NULL;
+	}
+	return 0;
 }
 
 // --------------------------- waiting function -----------------------------
@@ -348,7 +346,7 @@ int register_admin_notfication(void *arg)
 
 	copyAdminConnectionRequest(admin_connection, param->cmd_request, param->cmd_request_size);
 	serverLog(LL_NOTICE, "register_admin_notfication release admin param");
-	bleReleaseAdminParam(&param);
+	//bleReleaseAdminParam(&param);
 
 	serverLog(LL_NOTICE, "register_admin_notfication apply for a ble_admin_result_t, need user to release");
 	admin_connection->has_admin_result = 1;
@@ -360,6 +358,7 @@ int register_admin_notfication(void *arg)
 	ble_data->adapter_name = NULL;
 	ble_data->adapter = NULL;
 
+	///*
 	ret = gattlib_adapter_open(ble_data->adapter_name, &(ble_data->adapter));
 	if (ret) {
 		serverLog(LL_ERROR, 
@@ -382,6 +381,7 @@ int register_admin_notfication(void *arg)
 		goto ADMIN_ERROR_EXIT;
 	}
 	serverLog(LL_NOTICE, "gattlib_string_to_uuid to admin_uuid success." );
+	//*/
 
 	gattlib_register_notification(admin_connection->gatt_connection, message_handler, arg);
 	ret = gattlib_notification_start(admin_connection->gatt_connection, &admin_connection->admin_uuid);
@@ -673,7 +673,7 @@ WAITING_STEP3_ERROR:
 	serverLog(LL_ERROR, "WAITING_STEP3_ERROR ");
 	g_main_loop_unref(task_node->loop);
 	task_node->loop = NULL;
-	releaseAdminConnectionData(admin_connection);
+	//releaseAdminConnectionData(admin_connection);
 	setAdminResultErr(admin_connection->admin_result, 1);
 	bleSetBleResult(ble_data, admin_connection->admin_result, sizeof(ble_admin_result_t));
 	int ret = releaseAdminConnection(&admin_connection);
@@ -1028,7 +1028,7 @@ static int write_unlock_request(void *arg) {
 		(admin_connection_t *)ble_data->ble_connection;
 	srand(time(0));
 	int requestID = rand() % 2147483647;
-	size_t buf_size = 32;
+	const size_t buf_size = 32;
 	size_t encode_size = 0;
 	uint8_t buf[buf_size];
 	int retvalLen;
@@ -1036,6 +1036,8 @@ static int write_unlock_request(void *arg) {
 	uint8_t *encryptPayloadBytes = NULL;
 	size_t encryptPayloadBytes_len;
 
+	//op_cmd & pin
+	//unlock
 	IgAdminUnlockRequest unlock_request;
 	ig_AdminUnlockRequest_init(&unlock_request);
 	ig_AdminUnlockRequest_set_operation_id(&unlock_request, requestID);
@@ -1055,8 +1057,18 @@ static int write_unlock_request(void *arg) {
 	}
 	printf("]\n");
 
+	//add
+	char* plockcmd = buf;//task_node->lock_cmd;
+	unsigned int lockcmd_size = encode_size;//task_node->lock_cmd_size; 
+	//@@@test
+	printf("@@@ lock_cmd size[%u], lock_cmd[", lockcmd_size);//task_node->lock_cmd_size);
+	for(int i=0; i<lockcmd_size; i++) {
+		printf("%x", plockcmd[i]);
+	}
+	printf("]\n");
+
 	retvalLen = AdminConnection_encryptNative(
-			admin_connection->lock->connectionID, buf, encode_size, &retvalBytes);
+			admin_connection->lock->connectionID, plockcmd, lockcmd_size, &retvalBytes);
 	if (!retvalLen) {
 		serverLog(LL_ERROR, "failed in AdminConnection_encryptNative");
 		goto UNLOCK_REQUEST_ERROR;
@@ -1088,13 +1100,13 @@ static int write_unlock_request(void *arg) {
 	encryptPayloadBytes = NULL;
 	free(retvalBytes);
 	retvalBytes = NULL;
-	ig_AdminUnlockRequest_deinit(&unlock_request);
+	//ig_AdminUnlockRequest_deinit(&unlock_request);
 	admin_connection->admin_step = BLE_ADMIN_UNLOCK_REQUEST;
 	return 0;
 
 UNLOCK_REQUEST_ERROR:
 	serverLog(LL_ERROR, "UNLOCK_REQUEST_ERROR");
-	ig_AdminUnlockRequest_deinit(&unlock_request);
+	//ig_AdminUnlockRequest_deinit(&unlock_request);
 	if (encryptPayloadBytes) {
 		free(encryptPayloadBytes);
 		encryptPayloadBytes = NULL;
@@ -1838,8 +1850,7 @@ static int writeCreatePinRequest(void *arg) {
 	IgCreatePinRequest create_pin_request;
 	ig_CreatePinRequest_init(&create_pin_request);
 	serverLog(LL_NOTICE, "requestID: %d", requestID);
-	ig_CreatePinRequest_set_operation_id(
-			&create_pin_request, requestID);
+	ig_CreatePinRequest_set_operation_id( &create_pin_request, requestID);
 	ig_CreatePinRequest_set_password(
 			&create_pin_request, admin_connection->lock->password, admin_connection->lock->password_size);
 	if (!request ||  !ig_CreatePinRequest_is_valid(request)) {
@@ -1852,7 +1863,7 @@ static int writeCreatePinRequest(void *arg) {
 	//@@@test
 	printf("ig_CreatePinRequest_set_new_pin:[");
 	for (int j = 0; j<create_pin_request.new_pin_size; j++) {
-		printf ("%d", create_pin_request.new_pin[j]);
+		printf ("%x", create_pin_request.new_pin[j]);
 	}
 	printf("]\n");
 

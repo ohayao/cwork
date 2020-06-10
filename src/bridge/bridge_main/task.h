@@ -27,6 +27,8 @@ typedef struct TaskNode {
     // void* lockinfo; // 外部数据?
 	//struct task_node *next;
 	unsigned int msg_id;
+	char* lock_cmd;
+	unsigned int lock_cmd_size;
     ble_data_t *ble_data; // 外部数据, 外部释放?
     int ble_data_len;
     mqtt_data_t *mqtt_data; // 外部数据, 外部释放?

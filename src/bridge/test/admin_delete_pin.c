@@ -65,30 +65,6 @@ void saveTaskData(task_node_t *ptn)
     }
 }
 
-int hexStrToByte(const char* source, uint8_t* dest, int sourceLen)
-{
-    short i;
-    unsigned char highByte, lowByte;
-    
-    for (i = 0; i < sourceLen; i += 2)
-    {
-        highByte = toupper(source[i]);
-        lowByte  = toupper(source[i + 1]);
-        if (highByte > 0x39)
-            highByte -= 0x37;
-        else
-            highByte -= 0x30;
- 
-        if (lowByte > 0x39)
-            lowByte -= 0x37;
-        else
-            lowByte -= 0x30;
- 
-        dest[i / 2] = (highByte << 4) | lowByte;
-    }
-    return sourceLen /2 ;
-}
-
 
 int testDeletePin(igm_lock_t *lock, IgDeletePinRequest *request) {
     printf("delete pin request cmd ask invoker to release the lock.\n");

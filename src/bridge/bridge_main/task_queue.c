@@ -80,13 +80,17 @@ task_node_t *NextDTask(task_node_t *task_node)
 task_node_t *InsertDTaskFront(
 		unsigned int msg_id, unsigned char cs, 
 		mqtt_data_t *mqtt_data, int mqtt_data_len,
-		ble_data_t *ble_data, int ble_data_len, 
+		ble_data_t *ble_data, int ble_data_len, char* lock_cmd, unsigned int lock_cmd_size, 
 		fsm_table_t *task_sm_table, int sm_table_len, int task_type)
 {
 	task_node_t *new_task = (task_node_t *)malloc(sizeof(task_node_t));
-	task_node_t *task_node = (task_node_t *)new_task;
 	new_task->msg_id = msg_id;
 	new_task->task_type = task_type;
+	
+	if (0 < lock_cmd_size && NULL != lock_cmd) {
+		new_task->lock_cmd = lock_cmd;
+		new_task->lock_cmd_size = lock_cmd_size;
+	}
 	// copy mqtt data
 	if (mqtt_data_len && mqtt_data)
 	{
@@ -125,7 +129,6 @@ task_node_t *InsertDTaskTail(
 		fsm_table_t *task_sm_table, int sm_table_len, int task_type)
 {
 	task_node_t *new_task = (task_node_t *)malloc(sizeof(task_node_t));
-	task_node_t *task_node = (task_node_t *)new_task;
 	new_task->msg_id = msg_id;
 	new_task->task_type = task_type;
 	// copy mqtt data
@@ -161,11 +164,11 @@ task_node_t *InsertDTaskTail(
 
 task_node_t *InsertBle2DFront(
 	unsigned int msg_id, unsigned char cs, 
-	ble_data_t *ble_data, int ble_data_len, 
+	ble_data_t *ble_data, int ble_data_len, char* lock_cmd, unsigned int lock_cmd_size,
 	fsm_table_t *task_sm_table, int sm_table_len, int task_type)
 {
 	return InsertDTaskFront(
-		msg_id, cs, NULL, 0, ble_data, ble_data_len, task_sm_table, sm_table_len, task_type);
+		msg_id, cs, NULL, 0, ble_data, ble_data_len, lock_cmd, lock_cmd_size, task_sm_table, sm_table_len, task_type);
 }
 
 task_node_t *InsertBle2DTail(

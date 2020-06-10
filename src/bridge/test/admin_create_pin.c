@@ -30,60 +30,36 @@
 
 void saveTaskData(task_node_t *ptn)
 {
-    if (!ptn) return;
+	if (!ptn) return;
 
-    if(ptn->ble_data && ptn->ble_data_len)
-    {
-        ble_data_t *ble_data = ptn->ble_data;
-        int task_type = ptn->task_type;
-        switch (task_type)
-        {
-        case TASK_BLE_ADMIN_CREATE_PIN_REQUEST:
-        {
-            printf( "saving ble TASK_BLE_ADMIN_CREATE_PIN_REQUEST data.\n");
-            ble_admin_result_t *create_pin_result = (ble_admin_result_t *)ble_data->ble_result;
-            int create_pin_request_error = create_pin_result->create_pin_request_result;
-            IgCreatePinResponse *create_pin_response = create_pin_result->cmd_response;
-            
-            if (create_pin_request_error) {
-                printf( "create pin request error[%d].\n", create_pin_request_error);
-            } else {
-                printf( "create pin request success.\n");
-                if (create_pin_response->has_operation_id)
-                    printf( "operation ID: [%d].\n", create_pin_response->operation_id);
-                if (create_pin_response->has_result)
-                    printf( "result: [%d].\n", create_pin_response->result);
-            }
-            break;
-        }
-        default:
-            break;
-        }
-    }
-}
+	if(ptn->ble_data && ptn->ble_data_len)
+	{
+		ble_data_t *ble_data = ptn->ble_data;
+		int task_type = ptn->task_type;
+		switch (task_type)
+		{
+			case TASK_BLE_ADMIN_CREATE_PIN_REQUEST:
+				{
+					printf( "saving ble TASK_BLE_ADMIN_CREATE_PIN_REQUEST data.\n");
+					ble_admin_result_t *create_pin_result = (ble_admin_result_t *)ble_data->ble_result;
+					int create_pin_request_error = create_pin_result->create_pin_request_result;
+					IgCreatePinResponse *create_pin_response = create_pin_result->cmd_response;
 
-int hexStrToByte(const char* source, uint8_t* dest, int sourceLen)
-{
-    short i;
-    unsigned char highByte, lowByte;
-    
-    for (i = 0; i < sourceLen; i += 2)
-    {
-        highByte = toupper(source[i]);
-        lowByte  = toupper(source[i + 1]);
-        if (highByte > 0x39)
-            highByte -= 0x37;
-        else
-            highByte -= 0x30;
- 
-        if (lowByte > 0x39)
-            lowByte -= 0x37;
-        else
-            lowByte -= 0x30;
- 
-        dest[i / 2] = (highByte << 4) | lowByte;
-    }
-    return sourceLen /2 ;
+					if (create_pin_request_error) {
+						printf( "create pin request error[%d].\n", create_pin_request_error);
+					} else {
+						printf( "create pin request success.\n");
+						if (create_pin_response->has_operation_id)
+							printf( "operation ID: [%d].\n", create_pin_response->operation_id);
+						if (create_pin_response->has_result)
+							printf( "result: [%d].\n", create_pin_response->result);
+					}
+					break;
+				}
+			default:
+				break;
+		}
+	}
 }
 
 
@@ -112,25 +88,20 @@ int testCreatePin(igm_lock_t *lock, IgCreatePinRequest *request) {
 
     tn->task_type = TASK_BLE_ADMIN_CREATE_PIN_REQUEST;
 
-    for (int j = 0; j < fsm_max_n; j++)
-    {
+    for (int j = 0; j < fsm_max_n; j++) {
         if (current_state == tn->task_sm_table[j].cur_state) {
             // 增加一个判断当前函数, 是否当前函数出错. 0 表示没问题
 			int event_result = tn->task_sm_table[j].eventActFun(tn);
-            if (event_result)
-            {
+            if (event_result) {
                 printf("%d step error.\n", j);
                 error = 1;
                 break;
-            }
-            else
-            {
+            } else {
                 current_state = tn->task_sm_table[j].next_state;
             }
 		}
     }
-    if (error)
-    {
+    if (error) {
         printf("lock error.\n");
         return error;
     }
@@ -206,12 +177,13 @@ int main(int argc, char *argv[]) {
 	*/
 	printf("pin is:[");
 	for(int k=0;k<pin_size;k++) {
-		printf("%d", tmp_buff[k]);
+		printf("%x", tmp_buff[k]);
 	}
 	printf("]\n");
 
     ig_CreatePinRequest_set_new_pin(&create_pin_request, tmp_buff, pin_size);
     printf( "test create lock cmd test go.\n");
+	printf( "set new_pin[%s]\n", create_pin_request.new_pin);
 	ig_CreatePinRequest_set_start_date(&create_pin_request, time(0));
 	ig_CreatePinRequest_set_end_date(&create_pin_request, time(0)+10000);
 	ig_CreatePinRequest_set_pin_type(&create_pin_request, 2);

@@ -31,6 +31,8 @@
 #include <bridge/proto/ign.pb.h>
 #include <bridge/proto/pb_encode.h>
 #include <bridge/proto/pb_decode.h>
+#include "bridge/lock/messages/CreatePinRequest.h"
+#include "bridge/lock/messages/DeletePinRequest.h"
 
 static sysinfo_t g_sysif;
 static char TOPIC_SUB[32];
@@ -41,34 +43,9 @@ static char TOPIC_PUB[32];
 
 extern int WaitBtn(void *arg);
 ign_BridgeProfile Create_IgnBridgeProfile(sysinfo_t* ps);
-void addPairingTask(igm_lock_t *lock, int msg_id);
 void addDiscoverTask(int msg_id);
-void addAdminTask(igm_lock_t *lock, int msg_id);
-void addAdminUnlockTask(igm_lock_t *lock);
+void addAdminDoLockTask(igm_lock_t *lock);
 int Init_MQTT(MQTTClient* p_mqtt);
-
-int hexStrToByte(const char* source, uint8_t* dest, int sourceLen) {
-    short i;
-    unsigned char highByte, lowByte;
-    
-    for (i = 0; i < sourceLen; i += 2)
-    {
-        highByte = toupper(source[i]);
-        lowByte  = toupper(source[i + 1]);
-        if (highByte > 0x39)
-            highByte -= 0x37;
-        else
-            highByte -= 0x30;
- 
-        if (lowByte > 0x39)
-            lowByte -= 0x37;
-        else
-            lowByte -= 0x30;
- 
-        dest[i / 2] = (highByte << 4) | lowByte;
-    }
-    return sourceLen /2 ;
-}
 
 int FSMHandle(task_node_t* tn) {
     if(NULL == tn->task_sm_table) {
@@ -199,7 +176,6 @@ int HeartBeat(){
 static ign_LockEntry glocks[5];
 static int glock_index=0;
 
-bool get_server_event_data(pb_istream_t *stream,const pb_field_t *field,void **arg);
 bool get_server_event_data(pb_istream_t *stream,const pb_field_t *field,void **arg){
     ign_LockEntry lock={};
     if(pb_decode(stream,ign_LockEntry_fields,&lock)){
@@ -282,6 +258,47 @@ int Init_MQTT(MQTTClient* p_mqtt){
 	return 0;
 }
 
+int Init_Ble(sysinfo_t* si) {
+	//demo	
+	char device_address[] = "E1:93:2A:A3:16:E7";
+	char admin_key[] = "8d29d572299deda54de78c16fcce1451"; 
+	char passwd[] = "35f1cfb6f8bee257";
+
+	LockInfo_t *li = (LockInfo_t*) malloc(sizeof(LockInfo_t));
+	if (NULL==li) {
+		return -1;
+	}
+
+	memset(li, 0, sizeof(LockInfo_t));
+	memcpy(li->lock_addr, device_address, strlen(device_address));
+	memcpy(li->lock_ekey, admin_key, strlen(admin_key));
+	memcpy(li->lock_passwd, passwd, strlen(passwd));
+
+	//@@@ need async connect!!!
+	/*
+	int ret = create_gatt_connection(li->lock_addr, &(li->gatt_connection), &(li->gatt_adapter));
+	if(ret) {
+		serverLog("create_gatt_connection err[%d].", ret);
+		return -2;
+	}
+	*/
+
+	/*??
+	static char admin_str[] = "5c3a659f-897e-45e1-b016-007107c96df6";
+	if ( gattlib_string_to_uuid( admin_str, strlen(admin_str), &(admin_connection->admin_uuid))<0) {
+		serverLog(LL_ERROR, "gattlib_string_to_uuid to admin_uuid fail");
+		//goto ADMIN_ERROR_EXIT;
+	}
+	serverLog(LL_NOTICE, "gattlib_string_to_uuid to admin_uuid success." );
+	*/
+
+	
+	si->lockinfo = (LockInfo_t**) malloc(sizeof(LockInfo_t*)*5);
+	si->lockinfo[0] = li;
+	si->lock_total = 1;
+	return 0;
+}
+
 int Init(void* tn) {
 	int ret = 0;
     ret = GetMacAddr(g_sysif.mac, sizeof(g_sysif.mac));
@@ -299,9 +316,7 @@ int Init(void* tn) {
 	do {
 		ret = Init_MQTT(&g_sysif.mqtt_c);
 	} while (0 != ret);
-
     serverLog(LL_NOTICE, "init mqtt Clients success");
-    
 	
     ret = MQTTClient_subscribe(g_sysif.mqtt_c, TOPIC_SUB, 1);
     if(MQTTCLIENT_SUCCESS != ret){
@@ -318,20 +333,15 @@ int Init(void* tn) {
     }
     serverLog(LL_NOTICE, "Subscribe [%s] success!!!", PUB_WEBDEMO);
 
-    //InitBLE(si);
+    ret = Init_Ble(&g_sysif);
+	if(ret) {
+        serverLog(LL_ERROR, "Init_Ble err[%d].", ret);
+		return -4;
+	}
     //InitBtn(si);
     return 0;
 }
 
-
-// void GoExit(sysinfo_t *si) {
-//     //BLE  
-//     //MQTT
-//     if(NULL != si->mqtt_c){
-//         MQTTClient_disconnect(si->mqtt_c, 0);
-//         MQTTClient_destroy(&si->mqtt_c);
-//     }
-// }
 
 //处理web端消息
 int DoWebMsg(char *topic,void *payload){
@@ -358,20 +368,142 @@ int DoWebMsg(char *topic,void *payload){
     printf("=============================================================\n");
     cJSON_Delete(root);
 
-	/*
-    int msg_id = GetMsgID();//rand() % 25532;
-    serverLog(LL_NOTICE, "addDiscoverTask msg_id %d", msg_id);
-    igm_lock_t lock;
-    lockSetName(&lock, "IGM303e31a5c", strlen("IGM303e31a5c"));
-    // addPairingTask(&lock, msg_id);
-    addAdminTask(&lock, msg_id);
-    // addPairingTask(&lock, msg_id);
-	*/
+    return 0;
+}
+
+int testCreatePin(igm_lock_t *lock, IgCreatePinRequest *request) {
+    printf("create pin request cmd ask invoker to release the lock.\n");
+      
+    ble_admin_param_t *admin_param = (ble_admin_param_t *)malloc(sizeof(ble_admin_param_t));
+    bleInitAdminParam(admin_param);
+    bleSetAdminParam(admin_param, lock);
+    bleSetAdminRequest(admin_param, request, sizeof(IgCreatePinRequest));
+
+    ble_data_t *ble_data = malloc(sizeof(ble_data_t));
+    bleInitData(ble_data);
+    bleSetBleParam(ble_data, admin_param, sizeof(ble_admin_param_t));
+
+    fsm_table_t *create_pin_fsm = getAdminCreatePinRequestFsmTable();
+    int fsm_max_n = getAdminCreatePinRequestFsmTableLen();
+    int current_state = BLE_ADMIN_BEGIN;
+    int error = 0;
+
+    task_node_t *tn = (task_node_t *)malloc(sizeof(task_node_t));
+    tn->ble_data = ble_data;
+
+    tn->sm_table_len = fsm_max_n;
+    tn->task_sm_table = create_pin_fsm;
+
+    tn->task_type = TASK_BLE_ADMIN_CREATE_PIN_REQUEST;
+
+    for (int j = 0; j < fsm_max_n; j++)
+    {
+        if (current_state == tn->task_sm_table[j].cur_state) {
+            // 增加一个判断当前函数, 是否当前函数出错. 0 表示没问题
+			int event_result = tn->task_sm_table[j].eventActFun(tn);
+            if (event_result)
+            {
+                printf("%d step error.\n", j);
+                error = 1;
+                break;
+            }
+            else
+            {
+                current_state = tn->task_sm_table[j].next_state;
+            }
+		}
+    }
+    if (error)
+    {
+        printf("lock error.\n");
+        return error;
+    }
+
+    //saveTaskData(tn);
+    ble_admin_result_t *result = (ble_admin_result_t *)ble_data->ble_result;
+    //ig_CreatePinResponse_deinit(result->cmd_response);
+    free(result->cmd_response);
+    result->cmd_response = NULL;
+    bleReleaseBleResult(ble_data);
+    free(ble_data);
+    ble_data = NULL;
+    free(tn);
+    tn = NULL;
+    // 一定要等到现在才能释放, 因为里面的内容, 是会
+    // 被复制, 然后使用
+    free(admin_param);
+    admin_param = NULL;
+    printf( "lock end-------\n");
+    return 0;
+}
+
+int testDeletePin(igm_lock_t *lock, IgDeletePinRequest *request) {
+    printf("delete pin request cmd ask invoker to release the lock.\n");
+      
+    ble_admin_param_t *admin_param = (ble_admin_param_t *)malloc(sizeof(ble_admin_param_t));
+    bleInitAdminParam(admin_param);
+    bleSetAdminParam(admin_param, lock);
+    bleSetAdminRequest(admin_param, request, sizeof(IgDeletePinRequest));
+
+    ble_data_t *ble_data = malloc(sizeof(ble_data_t));
+    bleInitData(ble_data);
+    bleSetBleParam(ble_data, admin_param, sizeof(ble_admin_param_t));
+
+    fsm_table_t *delete_pin_fsm = getAdminDeletePinRequestFsmTable();
+    int fsm_max_n = getAdminDeletePinRequestFsmTableLen();
+    int current_state = BLE_ADMIN_BEGIN;
+    int error = 0;
+
+    task_node_t *tn = (task_node_t *)malloc(sizeof(task_node_t));
+    tn->ble_data = ble_data;
+
+    tn->sm_table_len = fsm_max_n;
+    tn->task_sm_table = delete_pin_fsm;
+
+    tn->task_type = TASK_BLE_ADMIN_CREATE_PIN_REQUEST;
+
+    for (int j = 0; j < fsm_max_n; j++)
+    {
+      if (current_state == tn->task_sm_table[j].cur_state) {
+          // 增加一个判断当前函数, 是否当前函数出错. 0 表示没问题
+        int event_result = tn->task_sm_table[j].eventActFun(tn);
+        if (event_result)
+        {
+            printf("[%d] step error.\n", j);
+            error = 1;
+            break;
+        }
+        else
+        {
+            current_state = tn->task_sm_table[j].next_state;
+        }
+		}
+    }
+    if (error)
+    {
+        printf("lock error.\n");
+        return error;
+    }
+
+    //saveTaskData(tn);
+    ble_admin_result_t *result = (ble_admin_result_t *)ble_data->ble_result;
+    //ig_DeletePinResponse_deinit(result->cmd_response);
+    free(result->cmd_response);
+    result->cmd_response = NULL;
+    bleReleaseBleResult(ble_data);
+    free(ble_data);
+    ble_data = NULL;
+    free(tn);
+    tn = NULL;
+    free(admin_param);
+    admin_param = NULL;
+    printf( "lock end-------.\n");
     return 0;
 }
 
 
-void WaitMQTT(sysinfo_t *si){
+void WaitMQTT(sysinfo_t *si) {
+	printf("do Waiting MQTT...\n");
 	while(1){
 		//if (NULL == si->mqtt_c)
 		char *topic = NULL;
@@ -393,8 +525,8 @@ void WaitMQTT(sysinfo_t *si){
 				glock_index=0;
 				ign_MsgInfo imsg={};
 				pb_istream_t in=pb_istream_from_buffer(msg->payload,(size_t)msg->payloadlen);
-				//imsg.server_data.lockEntries.funcs.decode=&get_server_event_data;
-				if(pb_decode(&in,ign_MsgInfo_fields,&imsg)){
+				//imsg.server_data.lock_entries.funcs.decode=&get_server_event_data;
+				if(pb_decode(&in, ign_MsgInfo_fields, &imsg)){
 					switch(imsg.event_type){
 						case ign_EventType_HEARTBEAT:
 							printf("RECV MQTT HB msg\n");
@@ -422,16 +554,16 @@ void WaitMQTT(sysinfo_t *si){
 							tbed.profile=Create_IgnBridgeProfile(&g_sysif);
 							tmsg.bridge_data=tbed;
 							ign_ServerEventData tsd={};
-							tsd.lockEntries_count=5;
+							tsd.lock_entries_count = 5;
 							int tl=0;
 							for(int i=0;i<5;i++){
-								if(strlen(imsg.server_data.lockEntries[i].bt_id)>0){
+								if(strlen(imsg.server_data.lock_entries[i].bt_id)>0){
 									tl++;
-									strcpy(tsd.lockEntries[i].bt_id,imsg.server_data.lockEntries[i].bt_id);
-									strcpy(tsd.lockEntries[i].ekey.bytes,imsg.server_data.lockEntries[i].ekey.bytes);
+									strcpy(tsd.lock_entries[i].bt_id,imsg.server_data.lock_entries[i].bt_id);
+									strcpy(tsd.lock_entries[i].ekey.bytes,imsg.server_data.lock_entries[i].ekey.bytes);
 								}
 							}
-							tsd.lockEntries_count=tl;
+							tsd.lock_entries_count=tl;
 							tmsg.has_server_data=true;
 							tmsg.server_data=tsd;
 
@@ -450,7 +582,6 @@ void WaitMQTT(sysinfo_t *si){
 								printf("ENCODE UPDATEUSERINFO ERROR\n");
 							}
 
-
 							//MQTT_sendMessage(g_sysif.mqtt_c, SUB_WEBDEMO, 1, msg->payload, msg->payloadlen);
 							goto gomqttfree;
 							break;
@@ -462,27 +593,76 @@ void WaitMQTT(sysinfo_t *si){
 							for(int i=0;i<imsg.server_data.job.lock_cmd.size;i++){
 								printf("%x", imsg.server_data.job.lock_cmd.bytes[i]);
 							}
+							printf("]\nlock_entries_count[%u]:", imsg.server_data.lock_entries_count);
+							for(int j=0; j<imsg.server_data.lock_entries_count; j++) {
+								printf("[%d], bt_id[%s], ekey[", j, imsg.server_data.lock_entries[j].bt_id);
+								for(int k=0;k<imsg.server_data.lock_entries[j].ekey.size; k++) {
+									printf("%x", imsg.server_data.lock_entries[j].ekey.bytes[k]);
+								}
+								printf("]");
+							}
+							printf("\n");
+
+							printf("@@@demo_job.bt_id[%s], op_cmd[%d], pin[", 
+								imsg.server_data.demo_job.bt_id, imsg.server_data.demo_job.op_cmd);
+							for(int n=0;n<imsg.server_data.demo_job.pin.size; n++) {
+								printf("%x", imsg.server_data.demo_job.pin.bytes[n]);
+							}
 							printf("]\n");
 							//handle lock_cmd
 							//MQTT_sendMessage(g_sysif.mqtt_c,SUB_WEBDEMO,1,msg->payload,msg->payloadlen);
 
-							// addDiscoverTask(1);
-							igm_lock_t lock;
-							initLock(&lock);
-							char device_address[] = "E1:93:2A:A3:16:E7";
-							char admin_key[] = "8d29d572299deda54de78c16fcce1451"; 
-							char passwd[] = "35f1cfb6f8bee257";
+							igm_lock_t* lock = NULL;
+							getLock(&lock);
+							initLock(lock);
+							//char device_address[] = "E1:93:2A:A3:16:E7";
+							//char admin_key[] = "8d29d572299deda54de78c16fcce1451"; 
+							//char passwd[] = "35f1cfb6f8bee257";
 
-							setLockAddr(&lock, device_address, strlen(device_address));
+							char device_address[] = "FB:98:0C:E9:57:5D";
+							char admin_key[] = "182CFF90BCD2D53A856A4B9C15ECA771";
+							char passwd[] = "3A562F52A40D79C4";
+
+							setLockAddr(lock, device_address, strlen(device_address));
 							uint8_t tmp_buff[100];
 							memset(tmp_buff, 0, sizeof(tmp_buff));
 							int admin_len = hexStrToByte(admin_key, tmp_buff, strlen(admin_key));
-							setLockAdminKey(&lock, tmp_buff, admin_len);
+							setLockAdminKey(lock, tmp_buff, admin_len);
 							memset(tmp_buff, 0, sizeof(tmp_buff));
 							int password_size = hexStrToByte(passwd, tmp_buff, strlen(passwd));
-							setLockPassword(&lock, tmp_buff, password_size);
-							addAdminUnlockTask(&lock);
+							setLockPassword(lock, tmp_buff, password_size);
+							//setLockCmd(&lock, imsg.server_data.job.lock_cmd.bytes, imsg.server_data.job.lock_cmd.size);
 
+							if (ign_DemoLockCommand_CREATE_PIN == imsg.server_data.demo_job.op_cmd) {
+								IgCreatePinRequest create_pin_request;
+								ig_CreatePinRequest_init(&create_pin_request);
+								ig_CreatePinRequest_set_password(&create_pin_request, tmp_buff, password_size);
+								ig_CreatePinRequest_set_new_pin(&create_pin_request, imsg.server_data.demo_job.pin.bytes, imsg.server_data.demo_job.pin.size);
+								printf( "set new_pin[%s]\n", create_pin_request.new_pin);
+								ig_CreatePinRequest_set_start_date(&create_pin_request, time(0));
+								ig_CreatePinRequest_set_end_date(&create_pin_request, time(0)+10000);
+								ig_CreatePinRequest_set_pin_type(&create_pin_request, 2);
+								ig_CreatePinRequest_set_operation_id(&create_pin_request, 1);
+								int res = testCreatePin(lock, &create_pin_request);
+								printf( "create lock pin ret[%d].\n", res);
+								//releaseLock(&lock);
+							}
+							else if (ign_DemoLockCommand_DELETE_PIN == imsg.server_data.demo_job.op_cmd) {
+								IgDeletePinRequest delete_pin_request;
+								ig_DeletePinRequest_init(&delete_pin_request);
+								ig_DeletePinRequest_set_password( &delete_pin_request, tmp_buff, password_size);
+
+								ig_DeletePinRequest_set_old_pin(
+										&delete_pin_request, imsg.server_data.demo_job.pin.bytes, imsg.server_data.demo_job.pin.size);
+								printf( "set old_pin[%s]\n", delete_pin_request.old_pin);
+								ig_DeletePinRequest_set_operation_id(&delete_pin_request, 2);
+								int res = testDeletePin(lock, &delete_pin_request);
+								printf( "delete lock pin ret[%d].\n", res);
+							}
+							else if (ign_DemoLockCommand_UNLOCK == imsg.server_data.demo_job.op_cmd) {
+							// addDiscoverTask(1);
+							addAdminDoLockTask(lock);
+}
 							goto gomqttfree;
 							break;
 						default:
@@ -518,10 +698,8 @@ gomqttfree:
 				}else{
 					printf("MQTT MSG DECODE ERROR!!!!\n");
 				}
-			}
-
+			} 
 		} else {
-			//err log
 			HeartBeat();
 		}
 	}
@@ -642,129 +820,12 @@ igm_lock_t *checkLockIsDiscovered(igm_lock_t *lock)
     return lock_nearby;
 }
 
-igm_lock_t *checkLockIsPaired(igm_lock_t *lock)
-{
-    igm_lock_t *paired_lock;
-    int n_try_paired = 3;
-    int msg_id = 233;
-    while (n_try_paired--)
-    {
-        if (lock && lock->paired)
-        {
-            return lock;
-        }
-        addPairingTask(lock, msg_id);
-        sleep(1);
-    }
-    return NULL;
-}
-
-void addPairingTask(igm_lock_t *lock, int msg_id)
-{
-
-    igm_lock_t *lock_nearby = checkLockIsDiscovered(lock);
-    if (!lock_nearby)
-    {
-        serverLog(LL_ERROR, "can't not find lock nearby");
-        return;
-    }
-
-    // 设置需要的参数
-    serverLog(LL_NOTICE, "Add Pairing task");
-    serverLog(LL_NOTICE, "1. set ble pairing parameters");
-    ble_pairing_param_t *pairing_param = (ble_pairing_param_t *)calloc(sizeof(ble_pairing_param_t), 1);
-    serverLog(LL_NOTICE, "1. set pairing param lock to name %s addr %s", lock_nearby->name, lock_nearby->addr);
-    bleSetPairingParam(pairing_param, lock_nearby);
-    serverLog(LL_NOTICE, "2. set msg_id to 1(or anything you want)");
-    // int msg_id = 1;
-    // 把参数写入data, 当前有个问题就是, 使用完, 得访问的人记的释放.
-    serverLog(LL_NOTICE, "3. alloc ble data datatype, ble_data is used to devliver parameters and get result data");
-    ble_data_t *ble_data = calloc(sizeof(ble_data_t), 1);
-    serverLog(LL_NOTICE, "3. init ble_data");
-    bleInitData(ble_data);
-    serverLog(LL_NOTICE, "3. set ble parametes to ble data");
-    bleSetBleParam(ble_data, pairing_param, sizeof(ble_pairing_param_t));
-
-    // 插入系统的队列
-    serverLog(LL_NOTICE, "4. used InsertBle2DFront to insert the task to system.");
-    InsertBle2DTail(msg_id, BLE_PAIRING_BEGIN, 
-        ble_data, sizeof(ble_data_t),
-        getPairingFsmTable(), getPairingFsmTableLen(), TASK_BLE_PAIRING);
-    serverLog(LL_NOTICE, "5. Add Pairing task.");
-    return;
-}
-
-void addAdminTask(igm_lock_t *lock, int msg_id)
-{
-    igm_lock_t *lock_nearby  = checkLockIsDiscovered(lock);
-    if (!lock_nearby)
-    {
-        return;
-    }
-    
-    lock_nearby = checkLockIsPaired(lock_nearby);
-    if (!lock_nearby)
-    {
-        serverLog(LL_ERROR, "can't not paired lock nearby");
-        return;
-    }
-    // 设置需要的参数
-    serverLog(LL_NOTICE, "Add Admin task");
-    serverLog(LL_NOTICE, "1. set ble admin parameters");
-    ble_admin_param_t *admin_param = (ble_admin_param_t *)calloc(sizeof(ble_admin_param_t), 1);
-    serverLog(LL_NOTICE, "1. set pairing param lock to name %s addr %s", lock->name, lock->addr);
-    bleSetAdminParam(admin_param, lock);
-    // 把参数写入data, 当前有个问题就是, 使用完, 得访问的人记的释放.
-    serverLog(LL_NOTICE, "3. alloc ble data datatype, ble_data is used to devliver parameters and get result data");
-    ble_data_t *ble_data = calloc(sizeof(ble_data_t), 1);
-    serverLog(LL_NOTICE, "3. init ble_data");
-    bleInitData(ble_data);
-    serverLog(LL_NOTICE, "3. set ble parametes to ble data");
-    bleSetBleParam(ble_data, admin_param, sizeof(ble_admin_param_t));
-
-    // 插入系统的队列
-    serverLog(LL_NOTICE, "4. used InsertBle2DFront to insert the task to system.");
-    InsertBle2DFront(msg_id, BLE_PAIRING_BEGIN, 
-        ble_data, sizeof(ble_data_t),
-        getAdminFsmTable(), getAdminFsmTableLen(), TASK_BLE_ADMIN_CONNECTION);
-    serverLog(LL_NOTICE, "5. Add admin task.");
-    return;
-}
-
-void addAdminUnpairTask(igm_lock_t *lock)
-{
-    // 设置需要的参数
-    serverLog(LL_NOTICE, "Add Admin Unpair task");
-    serverLog(LL_NOTICE, "1. set ble admin unpair parameters");
-    ble_admin_param_t *admin_unpair_param = (ble_admin_param_t *)calloc(sizeof(ble_admin_param_t), 1);
-    serverLog(LL_NOTICE, "1. set admin unpair param lock to name %s addr %s", lock->name, lock->addr);
-    bleSetAdminParam(admin_unpair_param, lock);
-    serverLog(LL_NOTICE, "2. set msg_id to 3(or anything you want)");
-    int msg_id = 3;
-    // 把参数写入data, 当前有个问题就是, 使用完, 得访问的人记的释放.
-    serverLog(LL_NOTICE, "3. alloc ble data datatype, ble_data is used to devliver parameters and get result data");
-    ble_data_t *ble_data = calloc(sizeof(ble_data_t), 1);
-    serverLog(LL_NOTICE, "3. init ble_data");
-    bleInitData(ble_data);
-    serverLog(LL_NOTICE, "3. set ble parametes to ble data");
-    bleSetBleParam(ble_data, admin_unpair_param, sizeof(ble_admin_param_t));
-
-    // 插入系统的队列
-    serverLog(LL_NOTICE, "4. used InsertBle2DFront to insert the task to system.");
-    InsertBle2DFront(msg_id, BLE_ADMIN_BEGIN, 
-        ble_data, sizeof(ble_data_t),
-        getAdminUnpairFsmTable(), getAdminUnpairFsmTableLen(), TASK_BLE_ADMIN_UNPAIR);
-    serverLog(LL_NOTICE, "5. Add admin unpair task.");
-    return;
-}
-
-void addAdminUnlockTask(igm_lock_t *lock)
-{
+void addAdminDoLockTask(igm_lock_t *lock) {
     // 设置需要的参数
     serverLog(LL_NOTICE, "Add Admin Unlock task");
     serverLog(LL_NOTICE, "1. set ble admin Unlock parameters");
     ble_admin_param_t *admin_param = (ble_admin_param_t *)calloc(sizeof(ble_admin_param_t), 1);
-    serverLog(LL_NOTICE, "1. set admin Unlock param lock to name %s addr %s", lock->name, lock->addr);
+    serverLog(LL_NOTICE, "1. set admin Unlock param lock to name[%s] addr[%s]", lock->name, lock->addr);
     bleSetAdminParam(admin_param, lock);
     serverLog(LL_NOTICE, "2. set msg_id to 4(or anything you want)");
 	int msg_id = GetMsgID();
@@ -779,35 +840,8 @@ void addAdminUnlockTask(igm_lock_t *lock)
     // 插入系统的队列
     serverLog(LL_NOTICE, "4. used InsertBle2DFront to insert the task to system.");
     InsertBle2DFront(msg_id, BLE_ADMIN_BEGIN, 
-        ble_data, sizeof(ble_data_t),
+        ble_data, sizeof(ble_data_t), lock->lock_cmd, lock->lock_cmd_size,
         getAdminUnlockFsmTable(), getAdminUnlockFsmTableLen(), TASK_BLE_ADMIN_UNLOCK);
-    serverLog(LL_NOTICE, "5. Add admin unlock task.");
-    return;
-}
-
-void addAdminLockTask(igm_lock_t *lock)
-{
-    // 设置需要的参数
-    serverLog(LL_NOTICE, "Add Admin lock task");
-    serverLog(LL_NOTICE, "1. set ble admin lock parameters");
-    ble_admin_param_t *admin_param = (ble_admin_param_t *)calloc(sizeof(ble_admin_param_t), 1);
-    serverLog(LL_NOTICE, "1. set admin lock param lock to name %s addr %s", lock->name, lock->addr);
-    bleSetAdminParam(admin_param, lock);
-    serverLog(LL_NOTICE, "2. set msg_id to 5(or anything you want)");
-    int msg_id = 5;
-    // 把参数写入data, 当前有个问题就是, 使用完, 得访问的人记的释放.
-    serverLog(LL_NOTICE, "3. alloc ble data datatype, ble_data is used to devliver parameters and get result data");
-    ble_data_t *ble_data = calloc(sizeof(ble_data_t), 1);
-    serverLog(LL_NOTICE, "3. init ble_data");
-    bleInitData(ble_data);
-    serverLog(LL_NOTICE, "3. set ble parametes to ble data");
-    bleSetBleParam(ble_data, admin_param, sizeof(ble_admin_param_t));
-
-    // 插入系统的队列
-    serverLog(LL_NOTICE, "4. used InsertBle2DFront to insert the task to system.");
-    InsertBle2DFront(msg_id, BLE_ADMIN_BEGIN, 
-        ble_data, sizeof(ble_data_t),
-        getAdminLockFsmTable(), getAdminLockFsmTableLen(), TASK_BLE_ADMIN_LOCK);
     serverLog(LL_NOTICE, "5. Add admin unlock task.");
     return;
 }
@@ -856,7 +890,6 @@ void saveTaskData(task_node_t *ptn)
                 setLockPassword(lock, pairing_result->password, pairing_result->password_size);
                 // addAdminTask(lock, 2);
                 // addAdminUnpairTask(lock);
-                // addAdminUnlockTask(lock);
                 // addAdminLockTask(lock);
             }
             break;
@@ -957,7 +990,7 @@ int main() {
                 // TODO, 当任务完成,需要怎么处理?
                 int ret = FSMHandle(ptn);
                 if(ret) {
-                    serverLog(LL_NOTICE, "one mission error");
+                    serverLog(LL_NOTICE, "one mission error[%d].", ret);
                 } else {
                     serverLog(LL_NOTICE, "one mission finished, delete this task");
                 }
