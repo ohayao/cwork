@@ -16,6 +16,7 @@
 #include "pb_decode.h"
 #include "ign.pb.h"
 #include "cJSON.h"
+#include "../../src/bridge/https_client/https.h"
 
 //临时定义发布和订阅的TOPIC
 #define PUB_TOPIC "igh/dev/IGN123456789"
@@ -29,6 +30,41 @@ LIST_HEAD(waiting_task_head);
 LIST_HEAD(doing_task_head);
  
 sysinfo_t g_sysif;
+
+int download_ca();
+int download_ca(){
+    char *url;
+    char data[1024], response[4096];
+    int  i, ret, size;
+
+    printf("=====>>>>>Step1. Get User login token\n");
+    HTTP_INFO hi1;
+    http_init(&hi1, TRUE);
+    url = "https://tkm70zar9f.execute-api.ap-southeast-1.amazonaws.com/development/login";
+    sprintf(data,"{\"email\":\"cs.lim+bridge@igloohome.co\",\"password\":\"igloohome\"}");
+    ret = http_post(&hi1, url, data, response, sizeof(response));
+    http_close(&hi1);
+    if(ret!=200) return -1;
+    char userToken[2048];
+    memset(userToken,0,sizeof(userToken));
+    strncpy(userToken,response+16,strlen(response)-18);
+    printf("UserToken=[%s]\n",userToken);
+    printf("=====>>>>>Step2. Get Bridge token\n");
+    memset(data,0,sizeof(data));
+    memset(response,0,sizeof(response));
+    HTTP_INFO hi2;
+    url="https://tkm70zar9f.execute-api.ap-southeast-1.amazonaws.com/development/token";
+    ret=http_get_with_auth(&hi2,url,userToken,response,sizeof(response));
+    http_close(&hi2);
+    if(ret!=200) return -2;
+    char biridgeToken[2048];
+    memset(biridgeToken,0,sizeof(biridgeToken));
+    strncpy(biridgeToken,response+18,strlen(response)-20);
+    printf("BirdgeTOken=[%s]\n",biridgeToken);
+    printf("=====>>>>>Step3. Download CA \n");
+    printf("======================TODO================\n");
+    return 0;
+}
 
 int DoWebMsg(char *topic,void *payload);
 
@@ -337,16 +373,16 @@ void WaitMQTT(sysinfo_t *si){
        tbed.profile=Create_IgnBridgeProfile("IGN123456789");
        tmsg.bridge_data=tbed;
        ign_ServerEventData tsd={};
-       tsd.lockEntries_count=5;
+       tsd.lock_entries_count=5;
        int tl=0;
        for(int i=0;i<5;i++){
-           if(strlen(imsg.server_data.lockEntries[i].bt_id)>0){
+           if(strlen(imsg.server_data.lock_entries[i].bt_id)>0){
                tl++;
-               strcpy(tsd.lockEntries[i].bt_id,imsg.server_data.lockEntries[i].bt_id);
-               strcpy(tsd.lockEntries[i].ekey.bytes,imsg.server_data.lockEntries[i].ekey.bytes);
+               strcpy(tsd.lock_entries[i].bt_id,imsg.server_data.lock_entries[i].bt_id);
+               strcpy(tsd.lock_entries[i].ekey.bytes,imsg.server_data.lock_entries[i].ekey.bytes);
            }
        }
-       tsd.lockEntries_count=tl;
+       tsd.lock_entries_count=tl;
        tmsg.has_server_data=true;
        tmsg.server_data=tsd;
 
@@ -472,6 +508,7 @@ int WaitBtn(sysinfo_t *si){
 }
 
 int main() {
+    download_ca();
     serverLog(LL_NOTICE,"Ready to start.");
     //daemon(1, 0);
     //sysinfo_t *si = malloc(sizeof(sysinfo_t));
