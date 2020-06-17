@@ -19,8 +19,8 @@
 #include "../../src/bridge/https_client/https.h"
 
 //临时定义发布和订阅的TOPIC
-#define PUB_TOPIC "igh/dev/IGN123456789"
-#define SUB_TOPIC "igh/srv/IGN123456789"
+#define PUB_TOPIC "igh/dev/DCA63210C7DA"
+#define SUB_TOPIC "igh/srv/DCA63210C7DA"
 
 //定义订阅和发布web端TOPIC
 #define SUB_WEBDEMO "/WEBSOCKET_DEMO_SUB"
@@ -30,6 +30,27 @@ LIST_HEAD(waiting_task_head);
 LIST_HEAD(doing_task_head);
  
 sysinfo_t g_sysif;
+
+char* get_file_content(char *path);
+void write_file_content(char *path,char *content);
+
+char* get_file_content(char *path){
+    char* buf;
+    FILE *csr=fopen(path,"r");
+    fseek(csr,0,SEEK_END);
+    int len=ftell(csr);
+    buf=(char*)malloc(len+1);
+    rewind(csr);
+    fread(buf,1,len,csr);
+    buf[len]=0;
+    fclose(csr);
+    return buf;
+}
+void write_file_content(char *path,char *content){
+    FILE *csr=fopen(path,"w");
+    fwrite(content,sizeof(char),strlen(content),csr);
+    fclose(csr);
+}
 
 int download_ca();
 int download_ca(){
@@ -62,7 +83,26 @@ int download_ca(){
     strncpy(biridgeToken,response+18,strlen(response)-20);
     printf("BirdgeTOken=[%s]\n",biridgeToken);
     printf("=====>>>>>Step3. Download CA \n");
-    printf("======================TODO================\n");
+    char* localCSR=get_file_content("/root/project/gomvc_blog/ign/webign.csr");
+    memset(data,0,sizeof(data));
+    memset(response,0,sizeof(response));
+    HTTP_INFO hi3;
+    url="https://tkm70zar9f.execute-api.ap-southeast-1.amazonaws.com/development/devices/bridge/DCA63210C7DA";
+    cJSON *root;
+    root=cJSON_CreateObject();
+    cJSON_AddStringToObject(root,"csr",localCSR);
+    char *sdata=cJSON_PrintUnformatted(root);
+    cJSON_Delete(root);
+    printf("________________Request Body Content\n%s\n",sdata);
+    ret=http_post_with_auth(&hi3,url,biridgeToken,sdata,response,sizeof(response));
+    if(ret!=200) return -3;
+    root=cJSON_Parse(response);
+    if(root==NULL) return -4;
+    cJSON *pem=cJSON_GetObjectItem(root,"pem");
+    printf("pem=%s\n",pem->valuestring);
+    write_file_content("./test_test_test_test.csr",pem->valuestring);
+    cJSON_Delete(root);
+    printf("=====>>>>>DOWNLOAD-CSR Over!!!!!\n");
     return 0;
 }
 
@@ -287,7 +327,7 @@ int HeartBeat(){
     hb.msg_id=get_ustime();
     ign_BridgeEventData bed={};
     bed.has_profile=true;
-    bed.profile=Create_IgnBridgeProfile("IGN123456789");
+    bed.profile=Create_IgnBridgeProfile("DCA63210C7DA");
     hb.has_bridge_data=true;
     hb.bridge_data=bed;
 
@@ -370,7 +410,7 @@ void WaitMQTT(sysinfo_t *si){
        tmsg.has_bridge_data=true;
        ign_BridgeEventData tbed={};
        tbed.has_profile=true;
-       tbed.profile=Create_IgnBridgeProfile("IGN123456789");
+       tbed.profile=Create_IgnBridgeProfile("DCA63210C7DA");
        tmsg.bridge_data=tbed;
        ign_ServerEventData tsd={};
        tsd.lock_entries_count=5;
@@ -508,7 +548,8 @@ int WaitBtn(sysinfo_t *si){
 }
 
 int main() {
-    download_ca();
+    int res=download_ca();
+    printf("download_ca res=%d\n",res);
     serverLog(LL_NOTICE,"Ready to start.");
     //daemon(1, 0);
     //sysinfo_t *si = malloc(sizeof(sysinfo_t));
