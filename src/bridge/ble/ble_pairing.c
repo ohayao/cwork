@@ -113,8 +113,7 @@ int pairing_err_result_return(void *arg)
   serverLog(LL_NOTICE, 
     "write_pairing_commit bleSetBleResult to ble data");
   
-  bleSetBleResult(
-    ble_data, pairing_connection->pairing_result, sizeof(ble_pairing_result_t));
+  bleSetBleResult( ble_data, pairing_connection->pairing_result);
 }
 
 int pairing_success_result_return(void *arg)
@@ -126,8 +125,7 @@ int pairing_success_result_return(void *arg)
   // 返回参数给调用进程
   serverLog(LL_NOTICE, 
     "write_pairing_commit bleSetBleResult to ble data");
-  bleSetBleResult(
-    ble_data, pairing_connection->pairing_result, sizeof(ble_pairing_result_t));
+  bleSetBleResult( ble_data, pairing_connection->pairing_result);
 }
 
 int save_message_data(const uint8_t* data, int data_length, void* user_data)
