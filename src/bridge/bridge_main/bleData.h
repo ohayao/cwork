@@ -31,7 +31,7 @@ int bleGetBleResult(ble_data_t *data, void *result);
 
 // 设置单个结果可以,问题是有些是多次多个结果
 int bleReleaseBleResult(ble_data_t *data);
-int bleSetBleResult(ble_data_t *data, void *ble_result, int ble_result_len);
+int bleSetBleResult(ble_data_t *data, void *ble_result);
 
 // 所以有这个每次放入一个,但是要首先设置一个长度, 然后再一个一个放进去
 int bleInitResults(ble_data_t *data, int n_results, int size_of_result);
