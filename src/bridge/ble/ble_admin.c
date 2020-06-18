@@ -1538,18 +1538,6 @@ static int writeGetLockStatusRequest(void *arg) {
 	retvalBytes = NULL;
 	ig_GetLockStatusRequest_deinit(&getlockstatus_request);
 	admin_connection->admin_step = BLE_ADMIN_GETLOCKSTATUS_REQUEST;
-
-	ret = releaseAdminConnection(&admin_connection);
-	if (ret) {
-		serverLog(LL_ERROR, "waiting_unlock_result releaseAdminConnection error");
-		return ret;
-	}
-	ret = gattlib_adapter_close(ble_data->adapter);
-	if (ret) {
-		serverLog(LL_ERROR, "gattlib_adapter_close error ");
-		return ret;
-	}
-	ble_data->adapter = NULL;
 	return 0;
 
 GETLOCKSTATUS_REQUEST_ERROR:
