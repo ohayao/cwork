@@ -151,6 +151,9 @@ sudo ./bridge/test/admin_create_pin D9:78:2F:E3:1A:5C d4c33574f65b83cc8d214e545b
 9. 测试 admin_delete_pin
 sudo ./bridge/test/admin_delete_pin D9:78:2F:E3:1A:5C d4c33574f65b83cc8d214e545b89d049 94c5b5d4a6ad3497 88888888
 
+10.测试 admin_get_battery_level
+sudo ./bridge/test/admin_get_battery_level D9:78:2F:E3:1A:5C d4c33574f65b83cc8d214e545b89d049 94c5b5d4a6ad3497
+
 ### BLE 相关用法
 1. void addDiscoverTask(int msg_id)
 添加扫描任务

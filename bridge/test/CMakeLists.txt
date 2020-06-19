@@ -81,3 +81,8 @@ add_executable(write_wifi_info ./write_wifi_info.c)
 target_link_libraries(write_wifi_info
   ${TEST_DEPENDENCIES}
 )
+
+add_executable(admin_get_battery_level ./admin_get_battery_level.c)
+target_link_libraries(admin_get_battery_level
+  ${TEST_DEPENDENCIES}
+)

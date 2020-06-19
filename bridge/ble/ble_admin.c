@@ -22,6 +22,8 @@
 #include "bridge/lock/messages/DeletePinResponse.h"
 #include "bridge/lock/messages/SetTimeRequest.h"
 #include "bridge/lock/messages/SetTimeResponse.h"
+#include "bridge/lock/messages/GetBatteryLevelRequest.h"
+#include "bridge/lock/messages/GetBatteryLevelResponse.h"
 
 static char admin_str[] = "5c3a659f-897e-45e1-b016-007107c96df6";
 
@@ -307,6 +309,13 @@ void message_handler(
       serverLog(LL_NOTICE, 
                           "BLE_ADMIN_DELETEPINREQUEST_REQUEST handleDeletePinResponce");
       handleDeletePinResponce(data, data_length, user_data);
+      break;
+    }
+    case BLE_ADMIN_GETBATTERYLEVEL_REQUEST:
+    {
+      serverLog(LL_NOTICE, 
+                          "BLE_ADMIN_GETBATTERYLEVEL_REQUEST handleGetBatteryLevelResponce");
+      handleGetBatteryLevelResponce(data, data_length, user_data);
       break;
     }
     default:
@@ -685,6 +694,7 @@ static int waiting_admin_step3(void *arg)
     goto WAITING_STEP3_ERROR;
   serverLog(LL_NOTICE, "waiting_admin_step3 end loop waiting");
   admin_connection->admin_step = BLE_ADMIN_DONE;
+  serverLog(LL_NOTICE, "waiting_admin_step3 success return");
   return 0;
 WAITING_STEP3_ERROR:
   serverLog(LL_ERROR, "WAITING_STEP3_ERROR ");
@@ -2440,7 +2450,7 @@ fsm_table_t admin_get_battery_level_fsm_table[ADMIN_DELETE_PIN_REQUEST_SM_TABLE_
   {BLE_ADMIN_BEGIN,         register_admin_notfication,   BLE_ADMIN_STEP1},
   {BLE_ADMIN_STEP1,         waiting_admin_step1,          BLE_ADMIN_STEP2},
   {BLE_ADMIN_STEP2,         write_admin_step2,            BLE_ADMIN_ESTABLISHED},
-  {BLE_ADMIN_ESTABLISHED,   waiting_admin_step3,          BLE_ADMIN_UNLOCK_REQUEST},
+  {BLE_ADMIN_ESTABLISHED,   waiting_admin_step3,          BLE_ADMIN_GETBATTERYLEVEL_REQUEST},
   {BLE_ADMIN_GETBATTERYLEVEL_REQUEST,   writeGetBatteryLevelRequest,   BLE_ADMIN_GETBATTERYLEVEL_RESULT},
   {BLE_ADMIN_GETBATTERYLEVEL_RESULT,  waitingGetBatteryLevelResult,        BLE_ADMIN_GETBATTERYLEVEL_DONE},
 };
@@ -2463,7 +2473,6 @@ static int writeGetBatteryLevelRequest(void *arg)
   ble_data_t *ble_data = task_node->ble_data;
   admin_connection_t *admin_connection = 
                               (admin_connection_t *)ble_data->ble_connection;
-  IgDeletePinRequest *request = admin_connection->cmd_request;
 
   srand(time(0));
   int requestID = rand() % 2147483647;
@@ -2476,45 +2485,42 @@ static int writeGetBatteryLevelRequest(void *arg)
   uint8_t *encryptPayloadBytes = NULL;
 	size_t encryptPayloadBytes_len;
 
-  IgDeletePinRequest delete_pin_request;
-  ig_DeletePinRequest_init(&delete_pin_request);
+  IgGetBatteryLevelRequest request;
+  ig_GetBatteryLevelRequest_init(&request);
   serverLog(LL_NOTICE, "requestID: %d", requestID);
-  ig_DeletePinRequest_set_operation_id(
-    &delete_pin_request, requestID);
-  ig_DeletePinRequest_set_password(
-    &delete_pin_request, admin_connection->lock->password, admin_connection->lock->password_size);
-  if (!request ||  !ig_DeletePinRequest_is_valid(request))
+  ig_GetBatteryLevelRequest_set_operation_id(
+    &request, requestID);
+  ig_GetBatteryLevelRequest_set_password(
+    &request, admin_connection->lock->password, admin_connection->lock->password_size);
+  if (!ig_GetBatteryLevelRequest_is_valid(&request))
   {
-    serverLog(LL_ERROR, "request NULL or request don't have pin");
-    goto DELETE_PIN_ERROR;
+    serverLog(LL_ERROR, "request invalid");
+    goto GET_BATTERY_ERROR;
   }
-
-  ig_DeletePinRequest_set_old_pin(
-    &delete_pin_request, request->old_pin, request->old_pin_size);
   
-  IgSerializerError IgErr = ig_DeletePinRequest_encode(
-		&delete_pin_request, buf, buf_size, &encode_size);
+  IgSerializerError IgErr = ig_GetBatteryLevelRequest_encode(
+		&request, buf, buf_size, &encode_size);
   if (IgErr)
 	{
-    serverLog(LL_ERROR, "ig_DeletePinRequest_encode err %d", IgErr);
-    goto DELETE_PIN_ERROR;
+    serverLog(LL_ERROR, "ig_GetBatteryLevelRequest_encode err %d", IgErr);
+    goto GET_BATTERY_ERROR;
 	}
-  serverLog(LL_NOTICE, "ig_DeletePinRequest_encode success size:" );
+  serverLog(LL_NOTICE, "ig_GetBatteryLevelRequest_encode success size: %d", encode_size);
 
   retvalLen = AdminConnection_encryptNative(
     admin_connection->lock->connectionID, buf, encode_size, &retvalBytes);
   if (!retvalLen) 
   {
     serverLog(LL_ERROR, "failed in AdminConnection_encryptNative");
-    goto DELETE_PIN_ERROR;
+    goto GET_BATTERY_ERROR;
   }
-  serverLog(LL_NOTICE, "AdminConnection_encryptNative success" );
+  serverLog(LL_NOTICE, "AdminConnection_encryptNative success, %d", retvalLen );
   
   if (!build_msg_payload(
 		&encryptPayloadBytes, &encryptPayloadBytes_len, retvalBytes, retvalLen))
 	{
     serverLog(LL_ERROR, "failed in build_msg_payload");
-		goto DELETE_PIN_ERROR;
+		goto GET_BATTERY_ERROR;
 	}
   serverLog(LL_NOTICE, "build_msg_payload success");
 
@@ -2523,7 +2529,7 @@ static int writeGetBatteryLevelRequest(void *arg)
     encryptPayloadBytes, encryptPayloadBytes_len);
 	if (ret != GATTLIB_SUCCESS) {
     serverLog(LL_ERROR, "write_char_by_uuid_multi_atts failed in writing th packags");
-		goto DELETE_PIN_ERROR;
+		goto GET_BATTERY_ERROR;
 	}
   serverLog(LL_NOTICE, "write_char_by_uuid_multi_atts success");
   
@@ -2531,15 +2537,14 @@ static int writeGetBatteryLevelRequest(void *arg)
   encryptPayloadBytes = NULL;
   free(retvalBytes);
   retvalBytes = NULL;
-  ig_DeletePinRequest_deinit(&delete_pin_request);
-  ig_DeletePinRequest_deinit(request);
-  admin_connection->admin_step = BLE_ADMIN_DELETEPINREQUEST_REQUEST;
+  ig_GetBatteryLevelRequest_deinit(&request);
+  admin_connection->admin_step = BLE_ADMIN_GETBATTERYLEVEL_REQUEST;
   return 0;
 
 // 出错处理
-DELETE_PIN_ERROR:
+GET_BATTERY_ERROR:
   serverLog(LL_ERROR, "DELETE_PIN_ERROR");
-  ig_DeletePinRequest_deinit(&delete_pin_request);
+  ig_GetBatteryLevelRequest_deinit(&request);
   if (encryptPayloadBytes)
   {
     free(encryptPayloadBytes);
@@ -2552,7 +2557,6 @@ DELETE_PIN_ERROR:
   }
   setAdminResultDeletePinRequestErr(admin_connection->admin_result, 1);
   bleSetBleResult(ble_data, admin_connection->admin_result, sizeof(ble_admin_result_t));
-  ig_DeletePinRequest_deinit(request);
   ret = releaseAdminConnection(&admin_connection);
   if (ret)
   {
@@ -2646,7 +2650,7 @@ WAITING_DELETE_PIN_ERROR:
 
 static int handleGetBatteryLevelResponce(const uint8_t* data, int data_length,void* user_data)
 {
-  serverLog(LL_NOTICE, "handleDeletePinResponce--------------------------------");
+  serverLog(LL_NOTICE, "handleGetBatteryLevelResponce--------------------------------");
   task_node_t *task_node = (task_node_t *)user_data;
   ble_data_t *ble_data = task_node->ble_data;
   admin_connection_t *admin_connection = 
@@ -2659,7 +2663,7 @@ static int handleGetBatteryLevelResponce(const uint8_t* data, int data_length,vo
   if (admin_connection->step_max_size == admin_connection->step_cur_size)
   {
     int ret;
-    serverLog(LL_NOTICE, "handleDeletePinResponce RECV step2 data finished");
+    serverLog(LL_NOTICE, "handleGetBatteryLevelResponce RECV step2 data finished");
     admin_connection->admin_step = BLE_ADMIN_DELETEPINREQUEST_RESULT;
 
     size_t messageLen = 
@@ -2678,9 +2682,9 @@ static int handleGetBatteryLevelResponce(const uint8_t* data, int data_length,vo
     }
     serverLog(LL_NOTICE, "AdminConnection_decryptNative responceLen %d", responceLen);
     
-    IgDeletePinResponse responce;
-    ig_DeletePinResponse_init(&responce);
-    IgSerializerError err = ig_DeletePinResponse_decode(
+    IgGetBatteryLevelResponse responce;
+    ig_GetBatteryLevelResponse_init(&responce);
+    IgSerializerError err = ig_GetBatteryLevelResponse_decode(
       responceBytes, responceLen, &responce, 0
     );
     if (err)
@@ -2690,7 +2694,7 @@ static int handleGetBatteryLevelResponce(const uint8_t* data, int data_length,vo
       goto DELETE_PINREQUEST_RESPONCE_EXIT;
     }
 
-    serverLog(LL_NOTICE, "has unlock response %d error %d",
+    serverLog(LL_NOTICE, "has get battery level response %d error %d",
               responce.has_result, responce.result);
     if (admin_connection->has_admin_result && responce.has_result)
     {
