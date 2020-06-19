@@ -72,6 +72,11 @@ target_link_libraries(admin_delete_pin
   ${TEST_DEPENDENCIES}
 )
 
+add_executable(wifi_func ./wifi_func.c)
+target_link_libraries(wifi_func
+  ${TEST_DEPENDENCIES}
+)
+
 add_executable(write_wifi_info ./write_wifi_info.c)
 target_link_libraries(write_wifi_info
   ${TEST_DEPENDENCIES}

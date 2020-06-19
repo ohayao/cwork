@@ -1,7 +1,7 @@
 #include <stdio.h>
 
 #include "bridge/gattlib/gattlib.h"
-#include "bridge/wifi/wifi_info.h"
+#include "bridge/wifi/SeWifiInfoRequest.h"
 #include "bridge/bridge_main/log.h"
 #include "bridge/ble/lock.h"
 #include "bridge/ble/ble_operation.h"
@@ -22,7 +22,7 @@ int main(int argc, char *argv[])
   uuid_t wifi_inf_uuid;
   uint8_t *payloadBytes = NULL;
   size_t payload_len = 0;
-  igm_wifi_info_t wifi_info;
+  SetWIFIInfoRequest wifi_info;
 
   getLock(&lock);
   initLock(lock);
@@ -45,10 +45,10 @@ int main(int argc, char *argv[])
   }
   serverLog(LL_NOTICE, "gattlib_string_to_uuid to pairing_uuid success." );
 
-  setWifiInfoSSID(&wifi_info, argv[2], strlen(argv[2]));
-  serverLog(LL_NOTICE, "setWifiInfoSSID success." );
-  setWifiInfoPassword(&wifi_info, argv[3], strlen(argv[3]));
-  serverLog(LL_NOTICE, "setWifiInfoPassword success." );
+  setWifiInfoRequestSSID(&wifi_info, argv[2], strlen(argv[2]));
+  serverLog(LL_NOTICE, "setWifiInfoRequestSSID success." );
+  setWifiInfoRequestPassword(&wifi_info, argv[3], strlen(argv[3]));
+  serverLog(LL_NOTICE, "setWifiInfoRequestPassword success." );
 
   payloadBytes = (uint8_t *)&wifi_info;
   payload_len = sizeof(wifi_info);
@@ -62,7 +62,7 @@ int main(int argc, char *argv[])
 	}
   serverLog(LL_ERROR, "write_char_by_uuid_multi_atts success");
 
-  deinitWifiInfo(&wifi_info);
+  deinitWifiInfoRequest(&wifi_info);
   releaseLock(&lock);
   return 0;
 }

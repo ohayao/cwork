@@ -59,6 +59,7 @@ IgSerializerError ig_AdminLockRequest_encode(IgAdminLockRequest *obj,uint8_t *re
   
   return IgSerializerNoError;
 }
+
 IgSerializerError ig_AdminLockRequest_decode(uint8_t *buf,size_t buf_size,IgAdminLockRequest *retval,size_t index)
 {
   CborParser parser;
@@ -108,7 +109,8 @@ IgSerializerError ig_AdminLockRequest_decode(uint8_t *buf,size_t buf_size,IgAdmi
             int64_t val;
             cbor_value_get_int64(&content, &val);
             //msgId value
-            if(val != 51) return IgSerializerErrorInvalidMsgIdValue;
+            // 和 Admin Lock request一致, 后面再改
+            if(val != 51) return 2003;
             err = cbor_value_advance_fixed(&content);
             break;
           }

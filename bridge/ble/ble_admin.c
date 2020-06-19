@@ -167,6 +167,7 @@ void releaseAdminConnectionData(admin_connection_t *admin_connection)
 
 int releaseAdminConnection(admin_connection_t **pp_admin_connection)
 {
+  serverLog(LL_NOTICE, "releaseAdminConnection");
   admin_connection_t *admin_connection = *pp_admin_connection;
   int ret;
   if (admin_connection->cmd_request)
@@ -218,7 +219,7 @@ static gboolean stop_main_loop_func(gpointer data)
   task_node_t *task_node = (task_node_t *)data;
   ble_data_t *ble_data = task_node->ble_data;
   admin_connection_t *admin_connection = 
-                              (admin_connection_t *)ble_data->ble_connection;
+            (admin_connection_t *)ble_data->ble_connection;
   admin_connection->waiting_err = 1;
   g_source_remove(task_node->timeout_id);
 	g_main_loop_quit(task_node->loop);
@@ -1444,7 +1445,7 @@ static int waitingGetLogsResult(void *arg)
   return 0;
 
 WAITING_GETLOGS_ERROR:
-  serverLog(LL_ERROR, "WAITING_UNLOCK_ERROR ");
+  serverLog(LL_ERROR, "WAITING_GETLOGS_ERROR ");
   g_main_loop_unref(task_node->loop);
   task_node->loop = NULL;
   releaseAdminConnectionData(admin_connection);
@@ -1577,28 +1578,30 @@ static int writeGetLockStatusRequest(void *arg)
   srand(time(0));
   int requestID = rand() % 2147483647;
   time_t cur_timestamp = time(NULL);
-  size_t buf_size = 32;
+  size_t buf_size = 64;
   size_t encode_size = 0;
   uint8_t buf[buf_size];
-  int retvalLen;
+  int retvalLen = 0;
   uint8_t *retvalBytes = NULL;
   uint8_t *encryptPayloadBytes = NULL;
-	size_t encryptPayloadBytes_len;
+	size_t encryptPayloadBytes_len = 0;
 
-  IgGetLockStatusRequest getlockstatus_request;
-  ig_GetLockStatusRequest_init(&getlockstatus_request);
-  ig_GetLockStatusRequest_set_operation_id(&getlockstatus_request, requestID);
+  IgGetLockStatusRequest request;
+  ig_GetLockStatusRequest_init(&request);
+  ig_GetLockStatusRequest_set_operation_id(&request, requestID);
   ig_GetLockStatusRequest_set_password(
-    &getlockstatus_request, admin_connection->lock->password, admin_connection->lock->password_size);
+    &request, 
+    admin_connection->lock->password, 
+    admin_connection->lock->password_size);
 
   IgSerializerError IgErr = ig_GetLockStatusRequest_encode(
-		&getlockstatus_request, buf, buf_size, &encode_size);
+		&request, buf, buf_size, &encode_size);
   if (IgErr)
 	{
     serverLog(LL_ERROR, "ig_GetLockStatusRequest_encode err");
     goto GETLOCKSTATUS_REQUEST_ERROR;
 	}
-  serverLog(LL_NOTICE, "ig_GetLockStatusRequest_encode success size:" );
+  serverLog(LL_NOTICE, "ig_GetLockStatusRequest_encode success size: %d",  encode_size);
 
   retvalLen = AdminConnection_encryptNative(
     admin_connection->lock->connectionID, buf, encode_size, &retvalBytes);
@@ -1607,6 +1610,7 @@ static int writeGetLockStatusRequest(void *arg)
     serverLog(LL_ERROR, "failed in AdminConnection_encryptNative");
     goto GETLOCKSTATUS_REQUEST_ERROR;
   }
+  serverLog(LL_NOTICE, "AdminConnection_encryptNative, success, retvalLen %d", retvalLen);
   
   if (!build_msg_payload(
 		&encryptPayloadBytes, &encryptPayloadBytes_len, retvalBytes, retvalLen))
@@ -1614,7 +1618,7 @@ static int writeGetLockStatusRequest(void *arg)
     serverLog(LL_ERROR, "failed in build_msg_payload");
 		goto GETLOCKSTATUS_REQUEST_ERROR;
 	}
-  serverLog(LL_NOTICE, "build_msg_payload success");
+  serverLog(LL_NOTICE, "build_msg_payload success, encryptPayloadBytes_len %d", encryptPayloadBytes_len);
 
   ret = write_char_by_uuid_multi_atts(
 		admin_connection->gatt_connection, &admin_connection->admin_uuid, 
@@ -1629,28 +1633,14 @@ static int writeGetLockStatusRequest(void *arg)
   encryptPayloadBytes = NULL;
   free(retvalBytes);
   retvalBytes = NULL;
-  ig_GetLockStatusRequest_deinit(&getlockstatus_request);
+  ig_GetLockStatusRequest_deinit(&request);
   admin_connection->admin_step = BLE_ADMIN_GETLOCKSTATUS_REQUEST;
 
-
-  ret = releaseAdminConnection(&admin_connection);
-  if (ret)
-  {
-    serverLog(LL_ERROR, "waiting_unlock_result releaseAdminConnection error");
-    return ret;
-  }
-  ret = gattlib_adapter_close(ble_data->adapter);
-  if (ret)
-  {
-    serverLog(LL_ERROR, "gattlib_adapter_close error ");
-    return ret;
-  }
-  ble_data->adapter = NULL;
   return 0;
 
 GETLOCKSTATUS_REQUEST_ERROR:
   serverLog(LL_ERROR, "GETLOCKSTATUS_REQUEST_ERROR");
-  ig_GetLockStatusRequest_deinit(&getlockstatus_request);
+  ig_GetLockStatusRequest_deinit(&request);
   if (encryptPayloadBytes)
   {
     free(encryptPayloadBytes);
@@ -1719,11 +1709,19 @@ static int waitingGetLockStatusResult(void *arg)
   return 0;
 
 WAITING_GETLOCKSTATUS_ERROR:
-  serverLog(LL_ERROR, "WAITING_UNLOCK_ERROR ");
+  serverLog(LL_ERROR, "WAITING_GETLOCKSTATUS_ERROR ");
   g_main_loop_unref(task_node->loop);
+  serverLog(LL_ERROR, "WAITING_GETLOCKSTATUS_ERROR 1");
   task_node->loop = NULL;
+  serverLog(LL_ERROR, "WAITING_GETLOCKSTATUS_ERROR 2");
   releaseAdminConnectionData(admin_connection);
-  setAdminResultErr(admin_connection->admin_result, 1);
+  serverLog(LL_ERROR, "WAITING_GETLOCKSTATUS_ERROR 3");
+  if (admin_connection->has_admin_result)
+  {
+    serverLog(LL_NOTICE, "admin_connection->admin_result not null");
+  }
+  setAdminResultGetLockStatusRequestErr(admin_connection->admin_result, 1);
+  serverLog(LL_ERROR, "WAITING_GETLOCKSTATUS_ERROR 4");
   bleSetBleResult(ble_data, admin_connection->admin_result, sizeof(ble_admin_result_t));
   ret = releaseAdminConnection(&admin_connection);
   if (ret)
@@ -3315,6 +3313,14 @@ void setAdminResultDeletePinRequestErr(ble_admin_result_t *result, int err)
   result->delete_pin_request_result = err;
   return;
 }
+
+void setAdminResultGetLockStatusRequestErr(ble_admin_result_t *result, int err)
+{
+  result->getlockstatus_result = err;
+  return;
+}
+
+
 
 void setAdminResultSetTimeErr(ble_admin_result_t *result, int err)
 {

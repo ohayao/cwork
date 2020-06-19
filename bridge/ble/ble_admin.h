@@ -103,6 +103,7 @@ void setAdminResultUnlockErr(ble_admin_result_t *result, int err);
 void setAdminResultLockErr(ble_admin_result_t *result, int err);
 void setAdminResultGetLogsErr(ble_admin_result_t *result, int err);
 void setAdminResultDeletePinRequestErr(ble_admin_result_t *result, int err);
+void setAdminResultGetLockStatusRequestErr(ble_admin_result_t *result, int err);
 void setAdminResultSetTimeErr(ble_admin_result_t *result, int err);
 void setAdminResultCMDResponse(
       ble_admin_result_t *result, void *cmd_response, size_t cmd_response_size);
