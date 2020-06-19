@@ -1677,6 +1677,11 @@ static int handleGetLockStatusResponce(const uint8_t* data, int data_length,void
 			serverLog(LL_NOTICE, "set admin result to success");
 			admin_connection->ble_result->getlockstatus_result = status_resp.result;
 		}
+
+		if (status_resp.has_lock_open) {
+			BleSetStatusRes(ble_data, status_resp.lock_open); 
+		}
+
 		// 返回参数给调用进程
 		serverLog(LL_NOTICE, "handle_step3_message bleSetBleResult to ble data");
 		bleSetBleResult(ble_data, admin_connection->ble_result);

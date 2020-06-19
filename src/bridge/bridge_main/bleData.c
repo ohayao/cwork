@@ -82,6 +82,11 @@ int bleReleaseBleResult(ble_data_t *data) {
 	return 0;
 }
 
+int BleSetStatusRes(ble_data_t *data, int lock_open) {
+	data->lock_status = lock_open;
+	return 0;
+}
+ 
 int bleSetBleResult(ble_data_t *data, void *ble_result) {
 	unsigned int ble_result_len = sizeof(ble_admin_result_t);
 	bleReleaseBleResult(data);

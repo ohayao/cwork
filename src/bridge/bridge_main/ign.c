@@ -161,6 +161,79 @@ int HeartBeat(){
     return 0;
 }
 
+int Sync_Battery(){
+    ign_MsgInfo battery={};
+    battery.event_type=ign_EventType_DEMO_UPDATE_LOCK_BATTERY;
+    battery.time=get_ustime();
+    battery.msg_id=GetMsgID();
+    ign_BridgeEventData bed={};
+    sprintf(bed.demo_lockId,"IGM3037f4b09");
+    bed.has_profile=true;
+	bed.profile=Create_IgnBridgeProfile(&g_sysif);
+
+    bed.has_demo_update_lock_battery=true;
+    ign_DemoUpdateLockBattery dulb={};
+    dulb.battery=99;
+    bed.demo_update_lock_battery=dulb;
+
+    battery.has_bridge_data=true;
+    battery.bridge_data=bed;
+    
+
+    int publish_result;
+    uint8_t buf[1024];
+    memset(buf,0,sizeof(buf));
+    pb_ostream_t out=pb_ostream_from_buffer(buf,sizeof(buf));
+    if(pb_encode(&out,ign_MsgInfo_fields,&battery)){
+        size_t len=out.bytes_written;
+
+        if(MQTTCLIENT_SUCCESS != (publish_result=MQTT_sendMessage(g_sysif.mqtt_c,TOPIC_PUB,1,buf,(int)len))){
+            printf("SEND MQTT BATTERY ERROR WITH CODE[%d]\n",publish_result);
+        }else{
+            printf("SEND MQTT BATTERY SUCCESS\n");
+        }
+    }else{
+        printf("ENCODE MQTT BATTERY ERROR\n");
+    }
+    return 0;
+}
+
+int Sync_Status(int lock_status){
+	ign_MsgInfo battery={};
+    battery.event_type=ign_EventType_DEMO_UPDATE_LOCK_STATUS;
+    battery.time=get_ustime();
+    battery.msg_id=GetMsgID();
+    ign_BridgeEventData bed={};
+    sprintf(bed.demo_lockId,"IGM3037f4b09");
+    bed.has_profile=true;
+	bed.profile=Create_IgnBridgeProfile(&g_sysif);
+
+    bed.has_demo_update_lock_status=true;
+    ign_DemoUpdateLockStatus duls={};
+    duls.status=lock_status;//1;
+    bed.demo_update_lock_status=duls;
+
+    battery.has_bridge_data=true;
+    battery.bridge_data=bed;
+
+    int publish_result;
+    uint8_t buf[1024];
+    memset(buf,0,sizeof(buf));
+    pb_ostream_t out=pb_ostream_from_buffer(buf,sizeof(buf));
+    if(pb_encode(&out,ign_MsgInfo_fields,&battery)){
+        size_t len=out.bytes_written;
+        if(MQTTCLIENT_SUCCESS != (publish_result=MQTT_sendMessage(g_sysif.mqtt_c,TOPIC_PUB,1,buf,(int)len))){
+            printf("SEND MQTT STATUS ERROR WITH CODE[%d]\n",publish_result);
+        }else{
+            printf("SEND MQTT STATUS SUCCESS\n");
+        }
+    }else{
+        printf("ENCODE MQTT STATUS ERROR\n");
+    }
+    return 0;
+
+}
+
 static ign_LockEntry glocks[5];
 static int glock_index=0;
 
@@ -247,10 +320,9 @@ int Init_MQTT(MQTTClient* p_mqtt){
 }
 
 int Init_Ble(sysinfo_t* si) {
-	//demo	
-	char device_address[] = "E1:93:2A:A3:16:E7";
-	char admin_key[] = "8d29d572299deda54de78c16fcce1451"; 
-	char passwd[] = "35f1cfb6f8bee257";
+	char device_address[] = "EC:09:02:7F:4B:09";
+	char admin_key[] = "BD3967AE24FD72B750C4E48B89294592";
+	char passwd[] = "7E2113D9235EA288";
 
 	LockInfo_t *li = (LockInfo_t*) malloc(sizeof(LockInfo_t));
 	if (NULL==li) {
@@ -384,25 +456,20 @@ int testCreatePin(igm_lock_t *lock, IgCreatePinRequest *request) {
 
     tn->task_type = TASK_BLE_ADMIN_CREATE_PIN_REQUEST;
 
-    for (int j = 0; j < fsm_max_n; j++)
-    {
+    for (int j = 0; j < fsm_max_n; j++) {
         if (current_state == tn->task_sm_table[j].cur_state) {
             // 增加一个判断当前函数, 是否当前函数出错. 0 表示没问题
 			int event_result = tn->task_sm_table[j].eventActFun(tn);
-            if (event_result)
-            {
+            if (event_result) {
                 printf("%d step error.\n", j);
                 error = 1;
                 break;
-            }
-            else
-            {
+            } else {
                 current_state = tn->task_sm_table[j].next_state;
             }
 		}
     }
-    if (error)
-    {
+    if (error) {
         printf("lock error.\n");
         return error;
     }
@@ -489,6 +556,57 @@ int testDeletePin(igm_lock_t *lock, IgDeletePinRequest *request) {
     return 0;
 }
 
+int testGetLockStatus(igm_lock_t *lock) {
+	printf("get lock status cmd ask invoker to release the lock.\n");
+	ble_admin_param_t *admin_param = (ble_admin_param_t *)malloc(sizeof(ble_admin_param_t));
+    bleInitAdminParam(admin_param);
+    bleSetAdminParam(admin_param, lock);
+
+    ble_data_t *ble_data = malloc(sizeof(ble_data_t));
+    bleInitData(ble_data);
+    bleSetBleParam(ble_data, admin_param, sizeof(ble_admin_param_t));
+
+    fsm_table_t *get_lock_status_fsm = getAdminGetLockStatusFsmTable();
+    int fsm_max_n = getAdminGetLockStatusFsmTableLen();
+    int current_state = BLE_ADMIN_BEGIN;
+    int error = 0;
+
+    task_node_t *tn = (task_node_t *)malloc(sizeof(task_node_t));
+    tn->ble_data = ble_data;
+
+    tn->sm_table_len = fsm_max_n;
+    tn->task_sm_table = get_lock_status_fsm;
+
+    tn->task_type = TASK_BLE_ADMIN_GETLOCKSTATUS;
+
+    for (int j = 0; j < fsm_max_n; j++) {
+        if (current_state == tn->task_sm_table[j].cur_state) {
+			int event_result = tn->task_sm_table[j].eventActFun(tn);
+            if (event_result) {
+                printf("%d step error[%d]\n", j, event_result);
+                error = 1;
+                break;
+            } else {
+                current_state = tn->task_sm_table[j].next_state;
+            }
+		}
+    }
+    if (error) {
+        printf("process error.\n");
+        return error;
+    }
+
+    saveTaskData(tn);
+    bleReleaseBleResult(ble_data);
+    free(ble_data);
+    ble_data = NULL;
+    free(tn);
+    tn = NULL;
+    free(admin_param);
+    admin_param = NULL;
+    printf( "lock end-------\n");
+    return 0;
+}
 
 void WaitMQTT(sysinfo_t *si) {
 	printf("do Waiting MQTT...\n");
@@ -607,9 +725,9 @@ void WaitMQTT(sysinfo_t *si) {
 							//char admin_key[] = "8d29d572299deda54de78c16fcce1451"; 
 							//char passwd[] = "35f1cfb6f8bee257";
 
-							char device_address[] = "FB:98:0C:E9:57:5D";
-							char admin_key[] = "182CFF90BCD2D53A856A4B9C15ECA771";
-							char passwd[] = "3A562F52A40D79C4";
+							char device_address[] = "EC:09:02:7F:4B:09";
+							char admin_key[] = "BD3967AE24FD72B750C4E48B89294592";
+							char passwd[] = "7E2113D9235EA288";
 
 							setLockAddr(lock, device_address, strlen(device_address));
 							uint8_t tmp_buff[100];
@@ -647,14 +765,25 @@ void WaitMQTT(sysinfo_t *si) {
 								int res = testDeletePin(lock, &delete_pin_request);
 								printf( "delete lock pin ret[%d].\n", res);
 							}
+							else if (ign_DemoLockCommand_LOCK == imsg.server_data.demo_job.op_cmd) {
+								printf("@@@do lock.\n");
+							}
 							else if (ign_DemoLockCommand_UNLOCK == imsg.server_data.demo_job.op_cmd) {
-							// addDiscoverTask(1);
-							addAdminDoLockTask(lock);
-}
+								printf("@@@do unlock.\n");
+								// addDiscoverTask(1);
+								addAdminDoLockTask(lock);
+							} else if (ign_DemoLockCommand_GET_LOCK_STATUS == imsg.server_data.demo_job.op_cmd) {
+								printf("@@@get status.\n");
+								//Sync_Status();
+							} else if (ign_DemoLockCommand_GET_BATTERY == imsg.server_data.demo_job.op_cmd) {
+								printf("@@@get battery.\n");
+								Sync_Battery();
+							}
+
 							goto gomqttfree;
 							break;
 						default:
-							printf("RECV MQTT %u msg\n",imsg.event_type);
+							printf("RECV MQTT [%u] msg.\n", imsg.event_type);
 							goto gomqttfree;
 							break;
 					}
@@ -834,80 +963,92 @@ void addAdminDoLockTask(igm_lock_t *lock) {
     return;
 }
 
-void saveTaskData(task_node_t *ptn)
-{
-    if (!ptn) return;
+void saveTaskData(task_node_t* ptn) {
+	if (!ptn) return;
 
-    if(ptn->ble_data && ptn->ble_data_len)
-    {
-        ble_data_t *ble_data = ptn->ble_data;
-        int task_type = ptn->task_type;
-        switch (task_type)
-        {
-        case TASK_BLE_DISCOVER:
-        {
-            serverLog(LL_NOTICE, "saving ble TASK_BLE_DISCOVER data");
-            int num_of_result = bleGetNumsOfResult(ble_data);
-            void *result = ble_data->ble_result;
-            for (int j=0; j < num_of_result; j++)
-            {
-                igm_lock_t *lock = bleGetNResult(ble_data, j, sizeof(igm_lock_t));
-                serverLog(LL_NOTICE, "name %s  addr: %s", lock->name, lock->addr);
-                insertLock(lock);
-                // test 需要, 
-                // if (!lock->paired)
-                // {
-                //     serverLog(LL_NOTICE, "try to pair name %s  addr: %s", lock->name, lock->addr);
-                //     addPairingTask(lock);
-                // }              
-            }
-            break;
-        }
-        case TASK_BLE_PAIRING:
-        {
-            serverLog(LL_NOTICE, "saving ble TASK_BLE_PAIRING data");
-            ble_pairing_result_t *pairing_result = (ble_pairing_result_t *)ble_data->ble_result;
-            igm_lock_t *lock = findLockByAddr(pairing_result->addr);
-            // 只有找到这把锁, 并且匹配成功, 成保存称为Paired
-            // 添加任务, 纯属测试需要
-            if (lock && pairing_result->pairing_successed)
-            {
-                serverLog(LL_NOTICE, "set name %s addr %s to paired", lock->name, lock->addr);
-                setLockPaired(lock);
-                setLockAdminKey(lock, pairing_result->admin_key, pairing_result->admin_key_len);
-                setLockPassword(lock, pairing_result->password, pairing_result->password_size);
-                // addAdminTask(lock, 2);
-                // addAdminUnpairTask(lock);
-                // addAdminLockTask(lock);
-            }
-            break;
-        }
-        case TASK_BLE_ADMIN_CONNECTION:
-        {
-            serverLog(LL_NOTICE, "saving ble TASK_BLE_ADMIN_CONNECTION data");
-        }
-        case TASK_BLE_ADMIN_UNPAIR:
-        {
-            serverLog(LL_NOTICE, "saving ble TASK_BLE_ADMIN_UNPAIR data");
-            ble_admin_result_t *admin_unpair_result = (ble_admin_result_t *)ble_data->ble_result;
-            break;
-        }
-        case TASK_BLE_ADMIN_UNLOCK:
-        {
-            serverLog(LL_NOTICE, "saving ble TASK_BLE_ADMIN_UNLOCK data");
-            ble_admin_result_t *admin_lock_result = (ble_admin_result_t *)ble_data->ble_result;
-            break;
-        }
-        case TASK_BLE_ADMIN_LOCK:
-        {
-            serverLog(LL_NOTICE, "saving ble TASK_BLE_ADMIN_LOCK data");
-            ble_admin_result_t *admin_lock_result = (ble_admin_result_t *)ble_data->ble_result;
-            break;
-        }
-        default:
-            break;
-        }
-    }
+	if(ptn->ble_data && ptn->ble_data_len) {
+		ble_data_t *ble_data = ptn->ble_data;
+		int task_type = ptn->task_type;
+		switch (task_type) {
+			case TASK_BLE_ADMIN_GETLOCKSTATUS:
+				{
+					printf( "handle ble get lock status data.\n");
+					ble_admin_result_t *admin_unlock_result = (ble_admin_result_t *)ble_data->ble_result;
+					int ret = admin_unlock_result->getlockstatus_result;
+					if (ret) {
+						printf("get status error[%d].\n", ret);
+					} else {
+						printf("get status success.\n");
+						Sync_Status(ble_data->lock_status);
+					}
+					
+					break;
+				}
+
+			case TASK_BLE_DISCOVER:
+				{
+					serverLog(LL_NOTICE, "saving ble TASK_BLE_DISCOVER data");
+					int num_of_result = bleGetNumsOfResult(ble_data);
+					void *result = ble_data->ble_result;
+					for (int j=0; j < num_of_result; j++)
+					{
+						igm_lock_t *lock = bleGetNResult(ble_data, j, sizeof(igm_lock_t));
+						serverLog(LL_NOTICE, "name %s  addr: %s", lock->name, lock->addr);
+						insertLock(lock);
+						// test 需要, 
+						// if (!lock->paired)
+						// {
+						//     serverLog(LL_NOTICE, "try to pair name %s  addr: %s", lock->name, lock->addr);
+						//     addPairingTask(lock);
+						// }              
+					}
+					break;
+				}
+			case TASK_BLE_PAIRING:
+				{
+					serverLog(LL_NOTICE, "saving ble TASK_BLE_PAIRING data");
+					ble_pairing_result_t *pairing_result = (ble_pairing_result_t *)ble_data->ble_result;
+					igm_lock_t *lock = findLockByAddr(pairing_result->addr);
+					// 只有找到这把锁, 并且匹配成功, 成保存称为Paired
+					// 添加任务, 纯属测试需要
+					if (lock && pairing_result->pairing_successed)
+					{
+						serverLog(LL_NOTICE, "set name %s addr %s to paired", lock->name, lock->addr);
+						setLockPaired(lock);
+						setLockAdminKey(lock, pairing_result->admin_key, pairing_result->admin_key_len);
+						setLockPassword(lock, pairing_result->password, pairing_result->password_size);
+						// addAdminTask(lock, 2);
+						// addAdminUnpairTask(lock);
+						// addAdminLockTask(lock);
+					}
+					break;
+				}
+			case TASK_BLE_ADMIN_CONNECTION:
+				{
+					serverLog(LL_NOTICE, "saving ble TASK_BLE_ADMIN_CONNECTION data");
+				}
+			case TASK_BLE_ADMIN_UNPAIR:
+				{
+					serverLog(LL_NOTICE, "saving ble TASK_BLE_ADMIN_UNPAIR data");
+					ble_admin_result_t *admin_unpair_result = (ble_admin_result_t *)ble_data->ble_result;
+					break;
+				}
+			case TASK_BLE_ADMIN_UNLOCK:
+				{
+					serverLog(LL_NOTICE, "saving ble TASK_BLE_ADMIN_UNLOCK data");
+					ble_admin_result_t *admin_lock_result = (ble_admin_result_t *)ble_data->ble_result;
+					break;
+				}
+			case TASK_BLE_ADMIN_LOCK:
+				{
+					serverLog(LL_NOTICE, "saving ble TASK_BLE_ADMIN_LOCK data");
+					ble_admin_result_t *admin_lock_result = (ble_admin_result_t *)ble_data->ble_result;
+					break;
+				}
+			default:
+				break;
+		}
+	}
 }
 
 

@@ -1,81 +1,79 @@
 #include "GetLockStatusResponse.h"
 #include "external/cbor/cbor.h"
 
-void ig_GetLockStatusResponse_init(IgGetLockStatusResponse *obj)
-{
-  memset(obj, 0, sizeof(IgGetLockStatusResponse));
+void ig_GetLockStatusResponse_init(IgGetLockStatusResponse *obj) {
+	memset(obj, 0, sizeof(IgGetLockStatusResponse));
 }
-IgSerializerError ig_GetLockStatusResponse_encode(IgGetLockStatusResponse *obj,uint8_t *retval,uint32_t length,size_t *written_length)
-{
-  
-  if(!ig_GetLockStatusResponse_is_valid(obj)) return IgSerializerErrorInvalidPayload;
-  
-  CborEncoder encoder;
-  CborEncoder map;
-  CborError err;
-  
-  //msg_id property + required properties
-  size_t fields_size = 1 + 1;
-  if(obj->has_lock_open) fields_size++;
-  if(obj->has_cell_network_status) fields_size++;
-  if(obj->has_door_open) fields_size++;
-  if(obj->has_operation_id) fields_size++;
-  
-  cbor_encoder_init(&encoder, retval, length, 0);
-  err = cbor_encoder_create_map(&encoder, &map, fields_size);
-  if(err) return (IgSerializerError) err;
-  
-  //add msg_id
-  err = cbor_encode_uint(&map, 0);
-  if(err) return (IgSerializerError) err;
-  err = cbor_encode_uint(&map, 32);
-  if(err) return (IgSerializerError) err;
-  
-  
-      err = cbor_encode_uint(&map, 11);
-      if(err) return (IgSerializerError) err;
-      err = cbor_encode_uint(&map, obj->result);
-      if(err) return (IgSerializerError) err;
-  
-  
-  
-  if(obj->has_lock_open){
-      err = cbor_encode_uint(&map, 12);
-      if(err) return (IgSerializerError) err;
-      err = cbor_encode_boolean(&map, obj->lock_open);
-      if(err) return (IgSerializerError) err;
-  }
-  
-  
-  if(obj->has_cell_network_status){
-      err = cbor_encode_uint(&map, 13);
-      if(err) return (IgSerializerError) err;
-      err = cbor_encode_uint(&map, obj->cell_network_status);
-      if(err) return (IgSerializerError) err;
-  }
-  
-  
-  if(obj->has_door_open){
-      err = cbor_encode_uint(&map, 14);
-      if(err) return (IgSerializerError) err;
-      err = cbor_encode_uint(&map, obj->door_open);
-      if(err) return (IgSerializerError) err;
-  }
-  
-  
-  if(obj->has_operation_id){
-      err = cbor_encode_uint(&map, 100);
-      if(err) return (IgSerializerError) err;
-      err = cbor_encode_uint(&map, obj->operation_id);
-      if(err) return (IgSerializerError) err;
-  }
-  
-  err = cbor_encoder_close_container(&encoder, &map);
-  if(err) return (IgSerializerError) err;
-  
-  *written_length = cbor_encoder_get_buffer_size(&map, retval);
-  
-  return IgSerializerNoError;
+
+IgSerializerError ig_GetLockStatusResponse_encode(IgGetLockStatusResponse *obj,uint8_t *retval,uint32_t length,size_t *written_length) {
+	if(!ig_GetLockStatusResponse_is_valid(obj)) return IgSerializerErrorInvalidPayload;
+
+	CborEncoder encoder;
+	CborEncoder map;
+	CborError err;
+
+	//msg_id property + required properties
+	size_t fields_size = 1 + 1;
+	if(obj->has_lock_open) fields_size++;
+	if(obj->has_cell_network_status) fields_size++;
+	if(obj->has_door_open) fields_size++;
+	if(obj->has_operation_id) fields_size++;
+
+	cbor_encoder_init(&encoder, retval, length, 0);
+	err = cbor_encoder_create_map(&encoder, &map, fields_size);
+	if(err) return (IgSerializerError) err;
+
+	//add msg_id
+	err = cbor_encode_uint(&map, 0);
+	if(err) return (IgSerializerError) err;
+	err = cbor_encode_uint(&map, 32);
+	if(err) return (IgSerializerError) err;
+
+
+	err = cbor_encode_uint(&map, 11);
+	if(err) return (IgSerializerError) err;
+	err = cbor_encode_uint(&map, obj->result);
+	if(err) return (IgSerializerError) err;
+
+
+
+	if(obj->has_lock_open){
+		err = cbor_encode_uint(&map, 12);
+		if(err) return (IgSerializerError) err;
+		err = cbor_encode_boolean(&map, obj->lock_open);
+		if(err) return (IgSerializerError) err;
+	}
+
+
+	if(obj->has_cell_network_status){
+		err = cbor_encode_uint(&map, 13);
+		if(err) return (IgSerializerError) err;
+		err = cbor_encode_uint(&map, obj->cell_network_status);
+		if(err) return (IgSerializerError) err;
+	}
+
+
+	if(obj->has_door_open){
+		err = cbor_encode_uint(&map, 14);
+		if(err) return (IgSerializerError) err;
+		err = cbor_encode_uint(&map, obj->door_open);
+		if(err) return (IgSerializerError) err;
+	}
+
+
+	if(obj->has_operation_id){
+		err = cbor_encode_uint(&map, 100);
+		if(err) return (IgSerializerError) err;
+		err = cbor_encode_uint(&map, obj->operation_id);
+		if(err) return (IgSerializerError) err;
+	}
+
+	err = cbor_encoder_close_container(&encoder, &map);
+	if(err) return (IgSerializerError) err;
+
+	*written_length = cbor_encoder_get_buffer_size(&map, retval);
+
+	return IgSerializerNoError;
 }
 
 IgSerializerError ig_GetLockStatusResponse_decode(uint8_t *buf,size_t buf_size,IgGetLockStatusResponse *retval,size_t index) {
