@@ -151,8 +151,11 @@ sudo ./bridge/test/admin_create_pin D9:78:2F:E3:1A:5C d4c33574f65b83cc8d214e545b
 9. 测试 admin_delete_pin
 sudo ./bridge/test/admin_delete_pin D9:78:2F:E3:1A:5C d4c33574f65b83cc8d214e545b89d049 94c5b5d4a6ad3497 88888888
 
-10.测试 admin_get_battery_level
+10. 测试 admin_get_battery_level
 sudo ./bridge/test/admin_get_battery_level D9:78:2F:E3:1A:5C d4c33574f65b83cc8d214e545b89d049 94c5b5d4a6ad3497
+
+11. 测试 set_wifi_info
+sudo ./bridge/test/set_wifi_info B8:27:EB:42:03:2D Google 12345678
 
 ### BLE 相关用法
 1. void addDiscoverTask(int msg_id)
@@ -250,3 +253,9 @@ Aborted
 
 
 
+9.server 的一些记录
+generic_message: 消息的回调
+  dbus_message_get_interface:获得这个回调的interface
+  find_interface: 在我们的记录当中,找到是否有这个 interface
+  然后查找所有的这个的 interface 的所有的方法, 判断是哪个方法, 判断而且不是实验性的, 最后返回process_message
+    process_message: (process_message method->function)会调用 相应的方法名字, 也所就是 chr_write_value

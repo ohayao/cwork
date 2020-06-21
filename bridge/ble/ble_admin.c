@@ -2723,7 +2723,7 @@ DELETE_PINREQUEST_RESPONCE_EXIT:
   }
 }
 
-// ------------------------ get battery level -----------------------------
+// ------------------------ set time -----------------------------
 
 fsm_table_t admin_set_time_fsm_table[ADMIN_SET_TIME_SM_TABLE_LEN] = {
   {BLE_ADMIN_BEGIN,         register_admin_notfication,   BLE_ADMIN_STEP1},
