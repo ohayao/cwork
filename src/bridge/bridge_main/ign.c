@@ -161,19 +161,20 @@ int HeartBeat(){
     return 0;
 }
 
-int Sync_Battery(){
+int Sync_Battery(int battery_l){
     ign_MsgInfo battery={};
     battery.event_type=ign_EventType_DEMO_UPDATE_LOCK_BATTERY;
     battery.time=get_ustime();
     battery.msg_id=GetMsgID();
     ign_BridgeEventData bed={};
-    sprintf(bed.demo_lockId,"IGM3037f4b09");
+    //sprintf(bed.demo_lockId,"IGM3037f4b09");
+    sprintf(bed.demo_lockId,"IGM401e9575d");
     bed.has_profile=true;
 	bed.profile=Create_IgnBridgeProfile(&g_sysif);
 
     bed.has_demo_update_lock_battery=true;
     ign_DemoUpdateLockBattery dulb={};
-    dulb.battery=99;
+    dulb.battery=battery_l;
     bed.demo_update_lock_battery=dulb;
 
     battery.has_bridge_data=true;
@@ -204,7 +205,7 @@ int Sync_Status(int lock_status){
     battery.time=get_ustime();
     battery.msg_id=GetMsgID();
     ign_BridgeEventData bed={};
-    sprintf(bed.demo_lockId,"IGM3037f4b09");
+    sprintf(bed.demo_lockId,"IGM401e9575d");
     bed.has_profile=true;
 	bed.profile=Create_IgnBridgeProfile(&g_sysif);
 
@@ -231,7 +232,6 @@ int Sync_Status(int lock_status){
         printf("ENCODE MQTT STATUS ERROR\n");
     }
     return 0;
-
 }
 
 static ign_LockEntry glocks[5];
@@ -573,6 +573,7 @@ int testGetLockStatus(igm_lock_t *lock) {
 
     task_node_t *tn = (task_node_t *)malloc(sizeof(task_node_t));
     tn->ble_data = ble_data;
+    tn->ble_data_len = sizeof(task_node_t);
 
     tn->sm_table_len = fsm_max_n;
     tn->task_sm_table = get_lock_status_fsm;
@@ -605,6 +606,118 @@ int testGetLockStatus(igm_lock_t *lock) {
     free(admin_param);
     admin_param = NULL;
     printf( "lock end-------\n");
+    return 0;
+}
+
+int testGetLockBattery(igm_lock_t *lock) {
+	printf("get lock battery cmd ask invoker to release the lock.\n");
+
+	ble_admin_param_t *admin_param = (ble_admin_param_t *)malloc(sizeof(ble_admin_param_t));
+    bleInitAdminParam(admin_param);
+    bleSetAdminParam(admin_param, lock);
+
+    ble_data_t *ble_data = malloc(sizeof(ble_data_t));
+    bleInitData(ble_data);
+    bleSetBleParam(ble_data, admin_param, sizeof(ble_admin_param_t));
+
+    fsm_table_t *get_lock_fsm = getAdminGetBatteryLevelFsmTable();
+    int fsm_max_n = getAdminGetBatteryLevelFsmTableLen();
+    int current_state = BLE_ADMIN_BEGIN;
+    int error = 0;
+
+    task_node_t *tn = (task_node_t *)malloc(sizeof(task_node_t));
+    tn->ble_data = ble_data;
+
+    tn->sm_table_len = fsm_max_n;
+    tn->task_sm_table = get_lock_fsm;
+
+    tn->task_type = TASK_BLE_ADMIN_GET_BATTERY_LEVEL;
+
+    for (int j = 0; j < fsm_max_n; j++) {
+        if (current_state == tn->task_sm_table[j].cur_state) {
+            // 增加一个判断当前函数, 是否当前函数出错. 0 表示没问题
+			int event_result = tn->task_sm_table[j].eventActFun(tn);
+            if (event_result) {
+                printf("%d step error[%d]\n", j, event_result);
+                error = 1;
+                break;
+            } else {
+                current_state = tn->task_sm_table[j].next_state;
+            }
+		}
+    }
+    if (error) {
+        printf("process error.\n");
+        return error;
+    }
+
+    saveTaskData(tn);
+    bleReleaseBleResult(ble_data);
+    free(ble_data);
+    ble_data = NULL;
+    free(tn);
+    tn = NULL;
+    free(admin_param);
+    admin_param = NULL;
+    printf( "lock end-------\n");
+    return 0;
+}
+
+int testLock(igm_lock_t *lock) {
+    serverLog(LL_NOTICE,"Lock cmd ask invoker to release the lock.");
+      
+    ble_admin_param_t *admin_param = (ble_admin_param_t *)malloc(sizeof(ble_admin_param_t));
+    bleInitAdminParam(admin_param);
+    bleSetAdminParam(admin_param, lock);
+
+    ble_data_t *ble_data = malloc(sizeof(ble_data_t));
+    bleInitData(ble_data);
+    bleSetBleParam(ble_data, admin_param, sizeof(ble_admin_param_t));
+
+    fsm_table_t *unlock_fsm = getAdminLockFsmTable();
+    int fsm_max_n = getAdminLockFsmTableLen();
+    int current_state = BLE_ADMIN_BEGIN;
+    int error = 0;
+
+    task_node_t *tn = (task_node_t *)malloc(sizeof(task_node_t));
+    tn->ble_data = ble_data;
+
+    tn->sm_table_len = fsm_max_n;
+    tn->task_sm_table = unlock_fsm;
+
+    tn->task_type = TASK_BLE_ADMIN_LOCK;
+
+    for (int j = 0; j < fsm_max_n; j++) {
+        if (current_state == tn->task_sm_table[j].cur_state) {
+            // 增加一个判断当前函数, 是否当前函数出错. 0 表示没问题
+			int event_result = tn->task_sm_table[j].eventActFun(tn);
+            if (event_result) {
+                serverLog(LL_ERROR, "%d step error", j);
+                error = 1;
+                break;
+            } else {
+				current_state = tn->task_sm_table[j].next_state;
+            }
+		}
+    }
+    if (error) {
+        serverLog(LL_ERROR, "lock error");
+        return error;
+    }
+
+    //saveTaskData(tn);
+    ble_admin_result_t *admin_unlock_result = (ble_admin_result_t *)ble_data->ble_result;
+    ig_AdminLockResponse_deinit(admin_unlock_result->cmd_response);
+    // 这儿是释放结果, 因为已经用完
+    releaseAdminResult(&admin_unlock_result);
+    bleReleaseBleResult(ble_data);
+    free(ble_data);
+    ble_data = NULL;
+    free(tn);
+    tn = NULL;
+    free(admin_param);
+    admin_param = NULL;
+    serverLog(LL_NOTICE, "lock end-------");
     return 0;
 }
 
@@ -767,17 +880,19 @@ void WaitMQTT(sysinfo_t *si) {
 							}
 							else if (ign_DemoLockCommand_LOCK == imsg.server_data.demo_job.op_cmd) {
 								printf("@@@do lock.\n");
+								testLock(lock);
 							}
 							else if (ign_DemoLockCommand_UNLOCK == imsg.server_data.demo_job.op_cmd) {
 								printf("@@@do unlock.\n");
 								// addDiscoverTask(1);
 								addAdminDoLockTask(lock);
 							} else if (ign_DemoLockCommand_GET_LOCK_STATUS == imsg.server_data.demo_job.op_cmd) {
+								testGetLockStatus(lock);
 								printf("@@@get status.\n");
 								//Sync_Status();
 							} else if (ign_DemoLockCommand_GET_BATTERY == imsg.server_data.demo_job.op_cmd) {
 								printf("@@@get battery.\n");
-								Sync_Battery();
+								testGetLockBattery(lock);
 							}
 
 							goto gomqttfree;
@@ -966,22 +1081,34 @@ void addAdminDoLockTask(igm_lock_t *lock) {
 void saveTaskData(task_node_t* ptn) {
 	if (!ptn) return;
 
-	if(ptn->ble_data && ptn->ble_data_len) {
+	printf( "in saveTaskData, ptn->task_type[%d], ble_data_len[%d]\n", ptn->task_type, ptn->ble_data_len);
+	if(ptn->ble_data) {
 		ble_data_t *ble_data = ptn->ble_data;
-		int task_type = ptn->task_type;
-		switch (task_type) {
+		switch (ptn->task_type) {
 			case TASK_BLE_ADMIN_GETLOCKSTATUS:
 				{
 					printf( "handle ble get lock status data.\n");
-					ble_admin_result_t *admin_unlock_result = (ble_admin_result_t *)ble_data->ble_result;
-					int ret = admin_unlock_result->getlockstatus_result;
-					if (ret) {
-						printf("get status error[%d].\n", ret);
+					ble_admin_result_t *admin_result = (ble_admin_result_t *)ble_data->ble_result;
+					if(admin_result->getlockstatus_result) {
+						printf("get status error[%d].\n", admin_result->getlockstatus_result);
 					} else {
-						printf("get status success.\n");
+						printf("@@@get status success. lock_status[%d]\n", ble_data->lock_status);
 						Sync_Status(ble_data->lock_status);
 					}
-					
+					break;
+				}
+			case TASK_BLE_ADMIN_GET_BATTERY_LEVEL:
+				{
+					printf( "handle battery data.\n");
+					ble_admin_result_t *admin_unlock_result = (ble_admin_result_t *)ble_data->ble_result;
+					int ret = admin_unlock_result->get_battery_level_result;
+					if (ret) {
+						printf("get battery error[%d].\n", ret);
+					} else {
+						printf("get battery success, battery_level[%d]\n", ble_data->battery_level);
+						Sync_Battery( ble_data->battery_level);
+					}
+
 					break;
 				}
 

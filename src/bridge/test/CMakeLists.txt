@@ -60,6 +60,11 @@ target_link_libraries(admin_get_lock_status
   ${TEST_DEPENDENCIES}
 )
 
+add_executable(admin_get_battery ./admin_get_battery.c)
+target_link_libraries(admin_get_battery
+  ${TEST_DEPENDENCIES}
+)
+
 add_executable(admin_create_pin ./admin_create_pin.c)
 target_link_libraries(admin_create_pin
   ${TEST_DEPENDENCIES}

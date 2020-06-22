@@ -13,6 +13,7 @@ typedef struct BleData {
 	int n_of_result;
 	void *ble_connection; // 为了能够线程安全, 所以不要用全局变量 
 	int lock_status;
+	int battery_level;
 }ble_data_t;
 
 int bleInitData(ble_data_t *data);

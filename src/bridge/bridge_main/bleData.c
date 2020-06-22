@@ -82,6 +82,11 @@ int bleReleaseBleResult(ble_data_t *data) {
 	return 0;
 }
 
+int BleSetBatteryLRes(ble_data_t *data, int battery_level) {
+	data->battery_level = battery_level; 
+	return 0;
+}
+
 int BleSetStatusRes(ble_data_t *data, int lock_open) {
 	data->lock_status = lock_open;
 	return 0;
