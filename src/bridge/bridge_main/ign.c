@@ -292,7 +292,22 @@ int Init_Ble(sysinfo_t* si) {
 	serverLog(LL_NOTICE, "gattlib_string_to_uuid to admin_uuid success." );
 	*/
 
-	
+    char *addr_name = NULL;
+    void *adapter = NULL;
+    int ret;
+    ret = gattlib_adapter_open(addr_name, &adapter);
+    if (ret) {
+        serverLog(LL_ERROR, "discoverLock ERROR: Failed to open adapter.\n");
+        // TODO: our own error;
+        return ret;
+    }
+
+    ret = gattlib_adapter_scan_enable(adapter, ble_discovered_device, BLE_SCAN_TIMEOUT, NULL);
+    if (ret) {
+        serverLog(LL_NOTICE, "ERROR: Failed to scan.");
+        //goto EXIT;
+    }
+
 	si->lockinfo = (LockInfo_t**) malloc(sizeof(LockInfo_t*)*5);
 	si->lockinfo[0] = li;
 	si->lock_total = 1;
