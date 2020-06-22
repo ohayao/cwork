@@ -2,8 +2,8 @@
 #define _MQTT_CONSTANT_H_
 
 //临时定义发布和订阅的TOPIC_PREFIX
-#define PUB_TOPIC_PREFIX "igh/dev/"
-#define SUB_TOPIC_PREFIX "igh/srv/"
+#define PUB_TOPIC_PREFIX "igh/ign1/dev/"
+#define SUB_TOPIC_PREFIX "igh/ign1/srv/"
 
 //定义订阅和发布web端TOPIC    
 #define SUB_WEBDEMO "/WEBSOCKET_DEMO_SUB"
