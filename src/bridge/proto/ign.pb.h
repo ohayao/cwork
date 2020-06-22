@@ -19,10 +19,13 @@ typedef enum _ign_EventType {
     ign_EventType_HEARTBEAT = 1,
     ign_EventType_LOCK_LOG = 2,
     ign_EventType_GET_USER_INFO = 3,
-    ign_EventType_UPDATE_LOCK_STATUS = 4,
+    ign_EventType_UPDATE_LOCK_LIST = 4,
     ign_EventType_ADD_LOCK = 5,
     ign_EventType_GET_JOBS = 6,
     ign_EventType_UPDATE_JOB = 7,
+    ign_EventType_DEMO_UPDATE_LOCK_BATTERY = 8,
+    ign_EventType_DEMO_UPDATE_LOCK_STATUS = 9,
+    ign_EventType_DEMO_UPDATE_LOCK_ACTIVITIES = 10,
     ign_EventType_UPDATE_USER_INFO = 128,
     ign_EventType_LOCK_JOB = 129,
     ign_EventType_NEW_JOB_NOTIFY = 130
@@ -39,7 +42,10 @@ typedef enum _ign_DemoLockCommand {
     ign_DemoLockCommand_UNLOCK = 1,
     ign_DemoLockCommand_LOCK = 2,
     ign_DemoLockCommand_CREATE_PIN = 3,
-    ign_DemoLockCommand_DELETE_PIN = 4
+    ign_DemoLockCommand_DELETE_PIN = 4,
+    ign_DemoLockCommand_GET_BATTERY = 5,
+    ign_DemoLockCommand_GET_LOCK_STATUS = 6,
+    ign_DemoLockCommand_GET_LOGS = 7
 } ign_DemoLockCommand;
 
 /* Struct definitions */
@@ -70,6 +76,19 @@ typedef struct _ign_DemoLockJob {
     ign_DemoLockJob_pin_t pin;
 } ign_DemoLockJob;
 
+typedef PB_BYTES_ARRAY_T(500) ign_DemoUpdateLockActivities_log_t;
+typedef struct _ign_DemoUpdateLockActivities {
+    ign_DemoUpdateLockActivities_log_t log;
+} ign_DemoUpdateLockActivities;
+
+typedef struct _ign_DemoUpdateLockBattery {
+    uint32_t battery;
+} ign_DemoUpdateLockBattery;
+
+typedef struct _ign_DemoUpdateLockStatus {
+    uint32_t status;
+} ign_DemoUpdateLockStatus;
+
 typedef PB_BYTES_ARRAY_T(100) ign_LockEntry_ekey_t;
 typedef struct _ign_LockEntry {
     char bt_id[100];
@@ -92,8 +111,15 @@ typedef struct _ign_BridgeEventData {
     bool has_profile;
     ign_BridgeProfile profile;
     pb_callback_t bt_ids;
-    pb_size_t logs_count;
-    ign_LockLog logs[5];
+    pb_size_t lock_log_count;
+    ign_LockLog lock_log[5];
+    char demo_lockId[100];
+    bool has_demo_update_lock_battery;
+    ign_DemoUpdateLockBattery demo_update_lock_battery;
+    bool has_demo_update_lock_status;
+    ign_DemoUpdateLockStatus demo_update_lock_status;
+    bool has_demo_update_lock_activities;
+    ign_DemoUpdateLockActivities demo_update_lock_activities;
 } ign_BridgeEventData;
 
 typedef struct _ign_ServerEventData {
@@ -126,23 +152,29 @@ typedef struct _ign_MsgInfo {
 #define _ign_OSType_ARRAYSIZE ((ign_OSType)(ign_OSType_RTOS+1))
 
 #define _ign_DemoLockCommand_MIN ign_DemoLockCommand_UNSPECIFIED_DLC
-#define _ign_DemoLockCommand_MAX ign_DemoLockCommand_DELETE_PIN
-#define _ign_DemoLockCommand_ARRAYSIZE ((ign_DemoLockCommand)(ign_DemoLockCommand_DELETE_PIN+1))
+#define _ign_DemoLockCommand_MAX ign_DemoLockCommand_GET_LOGS
+#define _ign_DemoLockCommand_ARRAYSIZE ((ign_DemoLockCommand)(ign_DemoLockCommand_GET_LOGS+1))
 
 
 /* Initializer values for message structs */
 #define ign_MsgInfo_init_default                 {0, 0, _ign_EventType_MIN, false, ign_BridgeEventData_init_default, false, ign_ServerEventData_init_default}
+#define ign_BridgeEventData_init_default         {false, ign_BridgeProfile_init_default, {{NULL}, NULL}, 0, {ign_LockLog_init_default, ign_LockLog_init_default, ign_LockLog_init_default, ign_LockLog_init_default, ign_LockLog_init_default}, "", false, ign_DemoUpdateLockBattery_init_default, false, ign_DemoUpdateLockStatus_init_default, false, ign_DemoUpdateLockActivities_init_default}
 #define ign_BridgeProfile_init_default           {_ign_OSType_MIN, {0, {0}}, {0, {0}}, {0, {0}}, {0, {0}}, {0, {0}}, {0, {0}}, 0, 0, {0, {0}}}
 #define ign_LockLog_init_default                 {"", {0, {0}}}
-#define ign_BridgeEventData_init_default         {false, ign_BridgeProfile_init_default, {{NULL}, NULL}, 0, {ign_LockLog_init_default, ign_LockLog_init_default, ign_LockLog_init_default, ign_LockLog_init_default, ign_LockLog_init_default}}
+#define ign_DemoUpdateLockBattery_init_default   {0}
+#define ign_DemoUpdateLockStatus_init_default    {0}
+#define ign_DemoUpdateLockActivities_init_default {{0, {0}}}
 #define ign_LockJob_init_default                 {"", {0, {0}}}
 #define ign_LockEntry_init_default               {"", {0, {0}}}
 #define ign_ServerEventData_init_default         {0, {ign_LockEntry_init_default, ign_LockEntry_init_default, ign_LockEntry_init_default, ign_LockEntry_init_default, ign_LockEntry_init_default}, false, ign_LockJob_init_default, false, ign_DemoLockJob_init_default}
 #define ign_DemoLockJob_init_default             {"", _ign_DemoLockCommand_MIN, {0, {0}}}
 #define ign_MsgInfo_init_zero                    {0, 0, _ign_EventType_MIN, false, ign_BridgeEventData_init_zero, false, ign_ServerEventData_init_zero}
+#define ign_BridgeEventData_init_zero            {false, ign_BridgeProfile_init_zero, {{NULL}, NULL}, 0, {ign_LockLog_init_zero, ign_LockLog_init_zero, ign_LockLog_init_zero, ign_LockLog_init_zero, ign_LockLog_init_zero}, "", false, ign_DemoUpdateLockBattery_init_zero, false, ign_DemoUpdateLockStatus_init_zero, false, ign_DemoUpdateLockActivities_init_zero}
 #define ign_BridgeProfile_init_zero              {_ign_OSType_MIN, {0, {0}}, {0, {0}}, {0, {0}}, {0, {0}}, {0, {0}}, {0, {0}}, 0, 0, {0, {0}}}
 #define ign_LockLog_init_zero                    {"", {0, {0}}}
-#define ign_BridgeEventData_init_zero            {false, ign_BridgeProfile_init_zero, {{NULL}, NULL}, 0, {ign_LockLog_init_zero, ign_LockLog_init_zero, ign_LockLog_init_zero, ign_LockLog_init_zero, ign_LockLog_init_zero}}
+#define ign_DemoUpdateLockBattery_init_zero      {0}
+#define ign_DemoUpdateLockStatus_init_zero       {0}
+#define ign_DemoUpdateLockActivities_init_zero   {{0, {0}}}
 #define ign_LockJob_init_zero                    {"", {0, {0}}}
 #define ign_LockEntry_init_zero                  {"", {0, {0}}}
 #define ign_ServerEventData_init_zero            {0, {ign_LockEntry_init_zero, ign_LockEntry_init_zero, ign_LockEntry_init_zero, ign_LockEntry_init_zero, ign_LockEntry_init_zero}, false, ign_LockJob_init_zero, false, ign_DemoLockJob_init_zero}
@@ -162,6 +194,9 @@ typedef struct _ign_MsgInfo {
 #define ign_DemoLockJob_bt_id_tag                1
 #define ign_DemoLockJob_op_cmd_tag               2
 #define ign_DemoLockJob_pin_tag                  3
+#define ign_DemoUpdateLockActivities_log_tag     1
+#define ign_DemoUpdateLockBattery_battery_tag    1
+#define ign_DemoUpdateLockStatus_status_tag      1
 #define ign_LockEntry_bt_id_tag                  1
 #define ign_LockEntry_ekey_tag                   2
 #define ign_LockJob_bt_id_tag                    1
@@ -170,7 +205,11 @@ typedef struct _ign_MsgInfo {
 #define ign_LockLog_log_data_tag                 2
 #define ign_BridgeEventData_profile_tag          1
 #define ign_BridgeEventData_bt_ids_tag           2
-#define ign_BridgeEventData_logs_tag             3
+#define ign_BridgeEventData_lock_log_tag         3
+#define ign_BridgeEventData_demo_lockId_tag      4
+#define ign_BridgeEventData_demo_update_lock_battery_tag 5
+#define ign_BridgeEventData_demo_update_lock_status_tag 6
+#define ign_BridgeEventData_demo_update_lock_activities_tag 7
 #define ign_ServerEventData_lock_entries_tag     1
 #define ign_ServerEventData_job_tag              2
 #define ign_ServerEventData_demo_job_tag         3
@@ -192,6 +231,22 @@ X(a, STATIC,   OPTIONAL, MESSAGE,  server_data,       5)
 #define ign_MsgInfo_bridge_data_MSGTYPE ign_BridgeEventData
 #define ign_MsgInfo_server_data_MSGTYPE ign_ServerEventData
 
+#define ign_BridgeEventData_FIELDLIST(X, a) \
+X(a, STATIC,   OPTIONAL, MESSAGE,  profile,           1) \
+X(a, CALLBACK, REPEATED, STRING,   bt_ids,            2) \
+X(a, STATIC,   REPEATED, MESSAGE,  lock_log,          3) \
+X(a, STATIC,   SINGULAR, STRING,   demo_lockId,       4) \
+X(a, STATIC,   OPTIONAL, MESSAGE,  demo_update_lock_battery,   5) \
+X(a, STATIC,   OPTIONAL, MESSAGE,  demo_update_lock_status,   6) \
+X(a, STATIC,   OPTIONAL, MESSAGE,  demo_update_lock_activities,   7)
+#define ign_BridgeEventData_CALLBACK pb_default_field_callback
+#define ign_BridgeEventData_DEFAULT NULL
+#define ign_BridgeEventData_profile_MSGTYPE ign_BridgeProfile
+#define ign_BridgeEventData_lock_log_MSGTYPE ign_LockLog
+#define ign_BridgeEventData_demo_update_lock_battery_MSGTYPE ign_DemoUpdateLockBattery
+#define ign_BridgeEventData_demo_update_lock_status_MSGTYPE ign_DemoUpdateLockStatus
+#define ign_BridgeEventData_demo_update_lock_activities_MSGTYPE ign_DemoUpdateLockActivities
+
 #define ign_BridgeProfile_FIELDLIST(X, a) \
 X(a, STATIC,   SINGULAR, UENUM,    os_info,           1) \
 X(a, STATIC,   SINGULAR, BYTES,    bt_id,             2) \
@@ -212,14 +267,20 @@ X(a, STATIC,   SINGULAR, BYTES,    log_data,          2)
 #define ign_LockLog_CALLBACK NULL
 #define ign_LockLog_DEFAULT NULL
 
-#define ign_BridgeEventData_FIELDLIST(X, a) \
-X(a, STATIC,   OPTIONAL, MESSAGE,  profile,           1) \
-X(a, CALLBACK, REPEATED, STRING,   bt_ids,            2) \
-X(a, STATIC,   REPEATED, MESSAGE,  logs,              3)
-#define ign_BridgeEventData_CALLBACK pb_default_field_callback
-#define ign_BridgeEventData_DEFAULT NULL
-#define ign_BridgeEventData_profile_MSGTYPE ign_BridgeProfile
-#define ign_BridgeEventData_logs_MSGTYPE ign_LockLog
+#define ign_DemoUpdateLockBattery_FIELDLIST(X, a) \
+X(a, STATIC,   SINGULAR, UINT32,   battery,           1)
+#define ign_DemoUpdateLockBattery_CALLBACK NULL
+#define ign_DemoUpdateLockBattery_DEFAULT NULL
+
+#define ign_DemoUpdateLockStatus_FIELDLIST(X, a) \
+X(a, STATIC,   SINGULAR, UINT32,   status,            1)
+#define ign_DemoUpdateLockStatus_CALLBACK NULL
+#define ign_DemoUpdateLockStatus_DEFAULT NULL
+
+#define ign_DemoUpdateLockActivities_FIELDLIST(X, a) \
+X(a, STATIC,   SINGULAR, BYTES,    log,               1)
+#define ign_DemoUpdateLockActivities_CALLBACK NULL
+#define ign_DemoUpdateLockActivities_DEFAULT NULL
 
 #define ign_LockJob_FIELDLIST(X, a) \
 X(a, STATIC,   SINGULAR, STRING,   bt_id,             1) \
@@ -251,9 +312,12 @@ X(a, STATIC,   SINGULAR, BYTES,    pin,               3)
 #define ign_DemoLockJob_DEFAULT NULL
 
 extern const pb_msgdesc_t ign_MsgInfo_msg;
+extern const pb_msgdesc_t ign_BridgeEventData_msg;
 extern const pb_msgdesc_t ign_BridgeProfile_msg;
 extern const pb_msgdesc_t ign_LockLog_msg;
-extern const pb_msgdesc_t ign_BridgeEventData_msg;
+extern const pb_msgdesc_t ign_DemoUpdateLockBattery_msg;
+extern const pb_msgdesc_t ign_DemoUpdateLockStatus_msg;
+extern const pb_msgdesc_t ign_DemoUpdateLockActivities_msg;
 extern const pb_msgdesc_t ign_LockJob_msg;
 extern const pb_msgdesc_t ign_LockEntry_msg;
 extern const pb_msgdesc_t ign_ServerEventData_msg;
@@ -261,9 +325,12 @@ extern const pb_msgdesc_t ign_DemoLockJob_msg;
 
 /* Defines for backwards compatibility with code written before nanopb-0.4.0 */
 #define ign_MsgInfo_fields &ign_MsgInfo_msg
+#define ign_BridgeEventData_fields &ign_BridgeEventData_msg
 #define ign_BridgeProfile_fields &ign_BridgeProfile_msg
 #define ign_LockLog_fields &ign_LockLog_msg
-#define ign_BridgeEventData_fields &ign_BridgeEventData_msg
+#define ign_DemoUpdateLockBattery_fields &ign_DemoUpdateLockBattery_msg
+#define ign_DemoUpdateLockStatus_fields &ign_DemoUpdateLockStatus_msg
+#define ign_DemoUpdateLockActivities_fields &ign_DemoUpdateLockActivities_msg
 #define ign_LockJob_fields &ign_LockJob_msg
 #define ign_LockEntry_fields &ign_LockEntry_msg
 #define ign_ServerEventData_fields &ign_ServerEventData_msg
@@ -271,9 +338,12 @@ extern const pb_msgdesc_t ign_DemoLockJob_msg;
 
 /* Maximum encoded size of messages (where known) */
 /* ign_MsgInfo_size depends on runtime parameters */
+/* ign_BridgeEventData_size depends on runtime parameters */
 #define ign_BridgeProfile_size                   733
 #define ign_LockLog_size                         1128
-/* ign_BridgeEventData_size depends on runtime parameters */
+#define ign_DemoUpdateLockBattery_size           6
+#define ign_DemoUpdateLockStatus_size            6
+#define ign_DemoUpdateLockActivities_size        503
 #define ign_LockJob_size                         604
 #define ign_LockEntry_size                       203
 #define ign_ServerEventData_size                 1845

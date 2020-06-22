@@ -47,6 +47,7 @@ int setLockConnectionID(igm_lock_t *lock, int ID);
 // 可能泄漏操作
 int releaseLockAminKey(igm_lock_t *lock);
 int releaseLockPassword(igm_lock_t *lock);
+int releaseLockCmd(igm_lock_t *lock);
 int setLockAdminKey(igm_lock_t *lock, uint8_t *admin_key, int admin_key_len);
 int setLockPassword(igm_lock_t *lock, uint8_t *password, int password_size);
 int setLockCmd(igm_lock_t *lock, uint8_t *lock_cmd, unsigned int lock_cmd_size);

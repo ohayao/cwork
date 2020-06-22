@@ -22,6 +22,9 @@
 #include "bridge/lock/messages/DeletePinResponse.h"
 #include "bridge/lock/messages/SetTimeRequest.h"
 #include "bridge/lock/messages/SetTimeResponse.h"
+#include "bridge/lock/messages/GetBatteryLevelRequest.h"
+#include "bridge/lock/messages/GetBatteryLevelResponse.h"
+
 
 static char admin_str[] = "5c3a659f-897e-45e1-b016-007107c96df6";
 
@@ -134,8 +137,8 @@ typedef struct AdminConnection {
 	size_t n_size_byte;
 	uint8_t *step_data;
 	uuid_t admin_uuid;
-	int has_admin_result;
-	ble_admin_result_t *admin_result;
+	int has_ble_result;
+	ble_admin_result_t *ble_result;
 	int waiting_err;
 	int receive_err;
 }admin_connection_t;
@@ -164,15 +167,17 @@ void releaseAdminConnectionData(admin_connection_t *admin_connection) {
 int releaseAdminConnection(admin_connection_t **pp_admin_connection)
 {
 	admin_connection_t *admin_connection = *pp_admin_connection;
+	if (NULL == admin_connection) {
+		return 0;
+	}
 	int ret;
-	if (admin_connection->cmd_request)
-	{
+	if (admin_connection->cmd_request) {
 		admin_connection->cmd_request_size = 0;
 		free(admin_connection->cmd_request);
 		admin_connection->cmd_request = NULL;
 	}
 	releaseLock(&admin_connection->lock);
-	bleReleaseAdminResult(&admin_connection->admin_result);
+	bleReleaseAdminResult(&admin_connection->ble_result);
 	ret = gattlib_notification_stop(
 			admin_connection->gatt_connection, &admin_connection->admin_uuid);
 	if (ret != GATTLIB_SUCCESS)
@@ -207,16 +212,14 @@ static int clearAdminConnectionStepData(admin_connection_t *admin_connection)
 // --------------------------- waiting function -----------------------------
 
 // memcheck 会超时, 所以设置大点调试
-static size_t main_loop_timeout = 10;
-static gboolean stop_main_loop_func(gpointer data)
-{
-  serverLog(LL_ERROR, "stop_main_loop_func timeout");
-  task_node_t *task_node = (task_node_t *)data;
-  ble_data_t *ble_data = task_node->ble_data;
-  admin_connection_t *admin_connection = 
-                              (admin_connection_t *)ble_data->ble_connection;
-  admin_connection->waiting_err = 1;
-  g_source_remove(task_node->timeout_id);
+static size_t main_loop_timeout = 15;
+static gboolean stop_main_loop_func(gpointer data) {
+	serverLog(LL_ERROR, "stop_main_loop_func timeout");
+	task_node_t *task_node = (task_node_t *)data;
+	ble_data_t *ble_data = task_node->ble_data;
+	admin_connection_t *admin_connection = (admin_connection_t *)ble_data->ble_connection;
+	admin_connection->waiting_err = 1;
+	g_source_remove(task_node->timeout_id);
 	g_main_loop_quit(task_node->loop);
 	return FALSE;
 }
@@ -230,86 +233,74 @@ fsm_table_t admin_fsm_table[ADMIN_SM_TABLE_LEN] = {
   {BLE_ADMIN_ESTABLISHED, waiting_admin_step3,     BLE_ADMIN_DONE},
 };
 
-void message_handler(
-	const uuid_t* uuid, const uint8_t* data, size_t data_length, void* user_data)
-{
-  serverLog(LL_NOTICE, "message_handler---------------");
-  task_node_t *task_node = (task_node_t *)user_data;
-  ble_data_t *ble_data = task_node->ble_data;
-  admin_connection_t *admin_connection = 
-                              (admin_connection_t *)ble_data->ble_connection;
-  
-  switch(admin_connection->admin_step)
-  {
-    case BLE_ADMIN_BEGIN:
-    {
-      serverLog(LL_NOTICE, 
-      "admin_connection->admin_step BLE_ADMIN_BEGIN handle_step1_message");
-      handle_step1_message(data, data_length,user_data);
-      break;
-    }
-    case BLE_ADMIN_STEP2:
-    {
-      serverLog(LL_NOTICE, 
-      "admin_connection->admin_step BLE_PAIRING_STEP3 handle_step3_message");
-      handle_step3_message(data, data_length, user_data);
-      break;
-    }
-    case BLE_ADMIN_UNPAIR_REQUEST:
-    {
-      serverLog(LL_NOTICE, 
-      "BLE_ADMIN_UNPAIR_REQUEST handle_unpair_responce");
-      handle_unpair_responce(data, data_length,user_data);
-      break;
-    }
-    case BLE_ADMIN_UNLOCK_REQUEST:
-    {
-      serverLog(LL_NOTICE, 
-      "BLE_ADMIN_UNLOCK_REQUEST handle_unlock_responce");
-      handle_unlock_responce(data, data_length,user_data);
-      break;
-    }
-    case BLE_ADMIN_LOCK_REQUEST:
-    {
-      serverLog(LL_NOTICE, 
-      "BLE_ADMIN_LOCK_REQUEST handle_lock_responce");
-      handle_lock_responce(data, data_length, user_data);
-      break;
-    }
-    case BLE_ADMIN_GETLOGS_REQUEST:
-    {
-      serverLog(LL_NOTICE, 
-                          "BLE_ADMIN_GETLOGS_REQUEST handleGetLogsResponce");
-      handleGetLogsResponce(data, data_length, user_data);
-      break;
-    }
-    case BLE_ADMIN_GETLOCKSTATUS_REQUEST:
-    {
-      serverLog(LL_NOTICE, 
-                          "BLE_ADMIN_GETLOCKSTATUS_REQUEST handleGetLockStatusResponce");
-      handleGetLockStatusResponce(data, data_length, user_data);
-      break;
-    }
-    case BLE_ADMIN_CREATEPINREQUEST_REQUEST:
-    {
-      serverLog(LL_NOTICE, 
-                          "BLE_ADMIN_CREATEPINREQUEST_REQUEST handleCreatePinResponce");
-      handleCreatePinResponce(data, data_length, user_data);
-      break;
-    }
-    case BLE_ADMIN_DELETEPINREQUEST_REQUEST:
-    {
-      serverLog(LL_NOTICE, 
-                          "BLE_ADMIN_DELETEPINREQUEST_REQUEST handleDeletePinResponce");
-      handleDeletePinResponce(data, data_length, user_data);
-      break;
-    }
-    default:
-    {
-      serverLog(LL_ERROR, "admin_connection->admin_step error");
-      break;
-    }
-  }
+void message_handler(const uuid_t* uuid, const uint8_t* data, size_t data_length, void* user_data) {
+	serverLog(LL_NOTICE, "message_handler---------------");
+	task_node_t *task_node = (task_node_t *)user_data;
+	ble_data_t *ble_data = task_node->ble_data;
+	admin_connection_t *admin_connection = (admin_connection_t *)ble_data->ble_connection;
+
+	switch(admin_connection->admin_step)
+	{
+		case BLE_ADMIN_BEGIN:
+			{
+				serverLog(LL_NOTICE, "admin_connection->admin_step BLE_ADMIN_BEGIN handle_step1_message");
+				handle_step1_message(data, data_length,user_data);
+				break;
+			}
+		case BLE_ADMIN_STEP2:
+			{
+				serverLog(LL_NOTICE, "admin_connection->admin_step BLE_PAIRING_STEP3 handle_step3_message");
+				handle_step3_message(data, data_length, user_data);
+				break;
+			}
+		case BLE_ADMIN_UNPAIR_REQUEST:
+			{
+				serverLog(LL_NOTICE, "BLE_ADMIN_UNPAIR_REQUEST handle_unpair_responce");
+				handle_unpair_responce(data, data_length,user_data);
+				break;
+			}
+		case BLE_ADMIN_UNLOCK_REQUEST:
+			{
+				serverLog(LL_NOTICE, "BLE_ADMIN_UNLOCK_REQUEST handle_unlock_responce");
+				handle_unlock_responce(data, data_length,user_data);
+				break;
+			}
+		case BLE_ADMIN_LOCK_REQUEST:
+			{
+				serverLog(LL_NOTICE, "BLE_ADMIN_LOCK_REQUEST handle_lock_responce");
+				handle_lock_responce(data, data_length, user_data);
+				break;
+			}
+		case BLE_ADMIN_GETLOGS_REQUEST:
+			{
+				serverLog(LL_NOTICE, "BLE_ADMIN_GETLOGS_REQUEST handleGetLogsResponce");
+				handleGetLogsResponce(data, data_length, user_data);
+				break;
+			}
+		case BLE_ADMIN_GETLOCKSTATUS_REQUEST:
+			{
+				serverLog(LL_NOTICE, "BLE_ADMIN_GETLOCKSTATUS_REQUEST handleGetLockStatusResponce");
+				handleGetLockStatusResponce(data, data_length, user_data);
+				break;
+			}
+		case BLE_ADMIN_CREATEPINREQUEST_REQUEST:
+			{
+				serverLog(LL_NOTICE, "BLE_ADMIN_CREATEPINREQUEST_REQUEST handleCreatePinResponce");
+				handleCreatePinResponce(data, data_length, user_data);
+				break;
+			}
+		case BLE_ADMIN_DELETEPINREQUEST_REQUEST:
+			{
+				serverLog(LL_NOTICE, "BLE_ADMIN_DELETEPINREQUEST_REQUEST handleDeletePinResponce");
+				handleDeletePinResponce(data, data_length, user_data);
+				break;
+			}
+		default:
+			{
+				serverLog(LL_ERROR, "admin_connection->admin_step error");
+				break;
+			}
+	}
 }
 
 // 传入已经分配的资源:
@@ -317,7 +308,7 @@ void message_handler(
 // task_node->ble_data->ble_param, 当前拷贝后立刻释放
 // 自行分配的资源:
 // task_node->ble_data->ble_connection 共享给所有步骤
-// task_node->ble_data->ble_connection->admin_result 需要共享
+// task_node->ble_data->ble_connection->ble_result 需要共享
 // ble_data->adapter, 保存了当前的蓝牙
 // task_node->ble_data->ble_connection->gatt_connection, 保存当前的gatt连接,共享
 // task_node->loop: 共享
@@ -328,8 +319,7 @@ void message_handler(
 // gattlib_notification_stop
 // ble_data->adapter close
 // task_node->loop
-int register_admin_notfication(void *arg)
-{
+int register_admin_notfication(void *arg) {
 	serverLog(LL_NOTICE, "register_admin_notfication start --------");
 	int ret;
 	task_node_t *task_node = (task_node_t *)arg;
@@ -349,16 +339,16 @@ int register_admin_notfication(void *arg)
 	//bleReleaseAdminParam(&param);
 
 	serverLog(LL_NOTICE, "register_admin_notfication apply for a ble_admin_result_t, need user to release");
-	admin_connection->has_admin_result = 1;
-	admin_connection->admin_result = malloc(sizeof(ble_admin_result_t));
-	initAdminResult(admin_connection->admin_result);
-	setAdminResultAddr(admin_connection->admin_result, 
+	admin_connection->has_ble_result = 1;
+	admin_connection->ble_result = malloc(sizeof(ble_admin_result_t));
+	initAdminResult(admin_connection->ble_result);
+	setAdminResultAddr(admin_connection->ble_result, 
 			admin_connection->lock->addr, admin_connection->lock->addr_len);
 
 	ble_data->adapter_name = NULL;
 	ble_data->adapter = NULL;
 
-	///*
+	//*
 	ret = gattlib_adapter_open(ble_data->adapter_name, &(ble_data->adapter));
 	if (ret) {
 		serverLog(LL_ERROR, 
@@ -401,25 +391,22 @@ int register_admin_notfication(void *arg)
 ADMIN_ERROR_EXIT:
 	serverLog(LL_ERROR, "register_admin_notfication ERROR EXIT.");
 	// 拷贝这个结果到ble_data, 所以可以安全释放admin_connection
-	setAdminResultErr(admin_connection->admin_result, 1);
-	bleSetBleResult(ble_data, admin_connection->admin_result, sizeof(ble_admin_result_t));
+	setAdminResultErr(admin_connection->ble_result, 1);
+	bleSetBleResult(ble_data, admin_connection->ble_result);
 
 	ret = releaseAdminConnection(&admin_connection);
 	if (ret) {
-		serverLog(LL_ERROR, 
-				"register_admin_notfication releaseAdminConnection error");
+		serverLog(LL_ERROR, "register_admin_notfication releaseAdminConnection error[%d]", ret);
 		return ret;
 	}
-	serverLog(LL_NOTICE, 
-			"register_admin_notfication releaseAdminConnection success");
+	serverLog(LL_NOTICE, "register_admin_notfication releaseAdminConnection success");
 
 	ret = gattlib_adapter_close(ble_data->adapter);
 	if (ret) {
-		serverLog(LL_ERROR, "gattlib_adapter_close error ");
+		serverLog(LL_ERROR, "gattlib_adapter_close error[%d]", ret);
 		return ret;
 	}
-	serverLog(LL_NOTICE, 
-			"register_admin_notfication gattlib_adapter_close success");
+	serverLog(LL_NOTICE, "register_admin_notfication gattlib_adapter_close success");
 
 	return 1;
 }
@@ -443,45 +430,36 @@ WAITING_STEP1_ERROR:
 	serverLog(LL_ERROR, "WAITING_STEP1_ERROR ");
 	g_main_loop_unref(task_node->loop);
 	releaseAdminConnectionData(admin_connection);
-	setAdminResultErr(admin_connection->admin_result, 1);
-	bleSetBleResult(ble_data, admin_connection->admin_result, sizeof(ble_admin_result_t));
+	setAdminResultErr(admin_connection->ble_result, 1);
+	bleSetBleResult(ble_data, admin_connection->ble_result);
 	int ret = releaseAdminConnection(&admin_connection);
-	if (ret)
-	{
-		serverLog(LL_ERROR, 
-				"register_admin_notfication releaseAdminConnection error");
+	if (ret) {
+		serverLog(LL_ERROR, "register_admin_notfication releaseAdminConnection error");
 		return ret;
 	}
-	serverLog(LL_NOTICE, 
-			"register_admin_notfication releaseAdminConnection success");
+	serverLog(LL_NOTICE, "register_admin_notfication releaseAdminConnection success");
 
 	ret = gattlib_adapter_close(ble_data->adapter);
-	if (ret)
-	{
+	if (ret) {
 		serverLog(LL_ERROR, "gattlib_adapter_close error ");
 		return ret;
 	}
-	serverLog(LL_NOTICE, 
-			"register_admin_notfication gattlib_adapter_close success");
+	serverLog(LL_NOTICE, "register_admin_notfication gattlib_adapter_close success");
 	return 1;
 }
 
-int handle_step1_message(const uint8_t* data, int data_length,void* user_data)
-{
-  serverLog(LL_NOTICE, "handle_step1_message");
-  task_node_t *task_node = (task_node_t *)user_data;
-  ble_data_t *ble_data = task_node->ble_data;
-  admin_connection_t *admin_connection = 
-                              (admin_connection_t *)ble_data->ble_connection;
-  save_message_data(data, data_length, user_data);
-  
-  if (admin_connection->step_max_size == admin_connection->step_cur_size)
-  {
-    int ret;
-    serverLog(LL_NOTICE, "handle_step1_message RECV step2 data finished");
-    admin_connection->admin_step = BLE_ADMIN_STEP1;
-    g_main_loop_quit(task_node->loop);
-  }
+int handle_step1_message(const uint8_t* data, int data_length,void* user_data) {
+	serverLog(LL_NOTICE, "handle_step1_message");
+	task_node_t *task_node = (task_node_t *)user_data;
+	ble_data_t *ble_data = task_node->ble_data;
+	admin_connection_t *admin_connection = (admin_connection_t *)ble_data->ble_connection;
+	save_message_data(data, data_length, user_data);
+
+	if (admin_connection->step_max_size == admin_connection->step_cur_size) {
+		serverLog(LL_NOTICE, "handle_step1_message RECV step2 data finished");
+		admin_connection->admin_step = BLE_ADMIN_STEP1;
+		g_main_loop_quit(task_node->loop);
+	}
 }
 
 int save_message_data(const uint8_t* data, int data_length, void* user_data)
@@ -571,7 +549,7 @@ int write_admin_step2(void *arg) {
 	ret = igloohome_ble_lock_crypto_AdminConnection_beginConnection(
 			admin_connection->lock->admin_key, admin_connection->lock->admin_key_len);
 	if (ERROR_CONNECTION_ID == ret) {
-		serverLog(LL_ERROR, "igloohome_ble_lock_crypto_AdminConnection_beginConnection error");
+		serverLog(LL_ERROR, "igloohome_ble_lock_crypto_AdminConnection_beginConnection error[%d]", ret);
 		goto ADMIN_STEP2_ERROR_EXIT;
 	}
 	serverLog(LL_NOTICE, "igloohome_ble_lock_crypto_AdminConnection_beginConnection success");
@@ -600,7 +578,7 @@ int write_admin_step2(void *arg) {
 			admin_connection->gatt_connection, &admin_connection->admin_uuid, 
 			payloadBytes, payload_len);
 	if (ret != GATTLIB_SUCCESS) {
-		serverLog(LL_ERROR, "write_char_by_uuid_multi_atts failed in writing packags");
+		serverLog(LL_ERROR, "write_char_by_uuid_multi_atts err[%d]", ret);
 		goto ADMIN_STEP2_ERROR_EXIT;
 	}
 	serverLog(LL_NOTICE, "admin write step2 write_char_by_uuid_multi_atts success in writing packages");
@@ -618,37 +596,30 @@ ADMIN_STEP2_ERROR_EXIT:
 	// 释放 admin_connection 里面的数据
 	// admin_connection 需要释放
 	// 释放 adapter
-	setAdminResultErr(admin_connection->admin_result, 2);
-	bleSetBleResult(ble_data, admin_connection->admin_result, sizeof(ble_admin_result_t));
+	setAdminResultErr(admin_connection->ble_result, 2);
+	bleSetBleResult(ble_data, admin_connection->ble_result);
 
 	releaseAdminConnectionData(admin_connection);
 
 	ret = releaseAdminConnection(&admin_connection);
-	if (ret)
-	{
-		serverLog(LL_ERROR, 
-				"register_admin_notfication releaseAdminConnection error");
+	if (ret) {
+		serverLog(LL_ERROR, "register_admin_notfication releaseAdminConnection error");
 		return ret;
 	}
-	serverLog(LL_NOTICE, 
-			"register_admin_notfication releaseAdminConnection success");
+	serverLog(LL_NOTICE, "register_admin_notfication releaseAdminConnection success");
 
 	ret = gattlib_adapter_close(ble_data->adapter);
-	if (ret)
-	{
+	if (ret) {
 		serverLog(LL_ERROR, "gattlib_adapter_close error ");
 		return ret;
 	}
-	serverLog(LL_NOTICE, 
-			"register_admin_notfication gattlib_adapter_close success");
+	serverLog(LL_NOTICE, "register_admin_notfication gattlib_adapter_close success");
 
-	if (step2Bytes)
-	{
+	if (step2Bytes) {
 		free(step2Bytes);
 		step2Bytes = NULL;
 	}
-	if (payloadBytes)
-	{
+	if (payloadBytes) {
 		free(payloadBytes);
 		payloadBytes = NULL;
 	}
@@ -666,7 +637,7 @@ static int waiting_admin_step3(void *arg) {
 	g_main_loop_run(task_node->loop);
 	if (admin_connection->waiting_err || admin_connection->receive_err)
 		goto WAITING_STEP3_ERROR;
-	serverLog(LL_NOTICE, "waiting_admin_step3 end loop waiting");
+	serverLog(LL_NOTICE, "waiting_admin_step3 end loop waiting, BLE_ADMIN_DONE");
 	admin_connection->admin_step = BLE_ADMIN_DONE;
 	return 0;
 WAITING_STEP3_ERROR:
@@ -674,72 +645,63 @@ WAITING_STEP3_ERROR:
 	g_main_loop_unref(task_node->loop);
 	task_node->loop = NULL;
 	//releaseAdminConnectionData(admin_connection);
-	setAdminResultErr(admin_connection->admin_result, 1);
-	bleSetBleResult(ble_data, admin_connection->admin_result, sizeof(ble_admin_result_t));
+	setAdminResultErr(admin_connection->ble_result, 1);
+	bleSetBleResult(ble_data, admin_connection->ble_result);
 	int ret = releaseAdminConnection(&admin_connection);
-	if (ret)
-	{
-		serverLog(LL_ERROR, 
-				"register_admin_notfication releaseAdminConnection error");
+	if (ret) {
+		serverLog(LL_ERROR, "register_admin_notfication releaseAdminConnection error");
 		return ret;
 	}
-	serverLog(LL_NOTICE, 
-			"register_admin_notfication releaseAdminConnection success");
+	serverLog(LL_NOTICE, "register_admin_notfication releaseAdminConnection success");
 
 	ret = gattlib_adapter_close(ble_data->adapter);
-	if (ret)
-	{
+	if (ret) {
 		serverLog(LL_ERROR, "gattlib_adapter_close error ");
 		return ret;
 	}
-	serverLog(LL_NOTICE, 
-			"register_admin_notfication gattlib_adapter_close success");
+	serverLog(LL_NOTICE, "register_admin_notfication gattlib_adapter_close success");
 	return 1;
 }
 
-int handle_step3_message(const uint8_t* data, int data_length,void* user_data)
-{
-  serverLog(LL_NOTICE, "handle_admin_step3_message");
-  task_node_t *task_node = (task_node_t *)user_data;
-  ble_data_t *ble_data = task_node->ble_data;
-  admin_connection_t *admin_connection = 
-                              (admin_connection_t *)ble_data->ble_connection;
-  
-  save_message_data(data, data_length, user_data);
+int handle_step3_message(const uint8_t* data, int data_length,void* user_data) {
+	serverLog(LL_NOTICE, "handle_admin_step3_message");
+	task_node_t *task_node = (task_node_t *)user_data;
+	ble_data_t *ble_data = task_node->ble_data;
+	admin_connection_t *admin_connection = (admin_connection_t *)ble_data->ble_connection;
 
-  if (admin_connection->step_max_size == admin_connection->step_cur_size)
-  {
-    int ret;
-    serverLog(LL_NOTICE, "handle_step3_message RECV step3 data finished %d", admin_connection->step_max_size);
-    admin_connection->admin_step = BLE_ADMIN_ESTABLISHED;
+	save_message_data(data, data_length, user_data);
 
-    int rec_ret = igloohome_ble_lock_crypto_AdminConnection_recConnStep3Native(
-			(admin_connection->lock)->connectionID, 
-      admin_connection->step_data + admin_connection->n_size_byte, 
-      admin_connection->step_max_size-admin_connection->n_size_byte
-		);
+	if (admin_connection->step_max_size == admin_connection->step_cur_size) {
+		int ret;
+		serverLog(LL_NOTICE, "handle_step3_message RECV step3 data finished %d", admin_connection->step_max_size);
+		admin_connection->admin_step = BLE_ADMIN_ESTABLISHED;
 
-    if (!rec_ret){
-      serverLog(LL_ERROR, "igloohome_ble_lock_crypto_AdminConnection_recConnStep3Native err");
-      admin_connection->receive_err = 1;
-      goto STEP3_EXIT;
+		int rec_ret = igloohome_ble_lock_crypto_AdminConnection_recConnStep3Native(
+				(admin_connection->lock)->connectionID, 
+				admin_connection->step_data + admin_connection->n_size_byte, 
+				admin_connection->step_max_size-admin_connection->n_size_byte
+				);
+
+		if (!rec_ret){
+			serverLog(LL_ERROR, "igloohome_ble_lock_crypto_AdminConnection_recConnStep3Native err");
+			admin_connection->receive_err = 1;
+			goto STEP3_EXIT;
 		}
-    serverLog(LL_NOTICE, "igloohome_ble_lock_crypto_AdminConnection_recConnStep3Native success");
-    if (admin_connection->has_admin_result)
-    {
-      serverLog(LL_NOTICE, "set admin result to success");
-      setAdminResultErr(admin_connection->admin_result, 0);
-    }
-     // 返回参数给调用进程
-    serverLog(LL_NOTICE, "handle_step3_message bleSetBleResult to ble data");
+		serverLog(LL_NOTICE, "igloohome_ble_lock_crypto_AdminConnection_recConnStep3Native success");
+		if (admin_connection->has_ble_result) {
+			serverLog(LL_NOTICE, "set admin result to success");
+			setAdminResultErr(admin_connection->ble_result, 0);
+		}
+		// 返回参数给调用进程
+		serverLog(LL_NOTICE, "handle_step3_message bleSetBleResult to ble data");
 
-    // ?>?释放内存?
-    releaseAdminConnectionData(admin_connection);
-    serverLog(LL_NOTICE, "g_main_loop_quit connection->properties_changes_loop");
+		// ?>?释放内存?
+		releaseAdminConnectionData(admin_connection);
+		serverLog(LL_NOTICE, "g_main_loop_quit connection->properties_changes_loop");
 STEP3_EXIT:
-    releaseAdminConnectionData(admin_connection);
-    g_main_loop_quit(task_node->loop);
-  }
+		releaseAdminConnectionData(admin_connection);
+		g_main_loop_quit(task_node->loop);
+	}
 }
 
 // ------------------------ lock --------------------------------
@@ -831,35 +793,28 @@ static int write_lock_request(void *arg) {
 LOCK_REQUEST_ERROR:
 	serverLog(LL_ERROR, "LOCK_REQUEST_ERROR");
 	ig_AdminLockRequest_deinit(&lock_request);
-	if (encryptPayloadBytes)
-	{
+	if (encryptPayloadBytes) {
 		free(encryptPayloadBytes);
 	}
-	if (retvalBytes)
-	{
+	if (retvalBytes) {
 		free(retvalBytes);
 		retvalBytes = NULL;
 	}
-	setAdminResultLockErr(admin_connection->admin_result, 1);
-	bleSetBleResult(ble_data, admin_connection->admin_result, sizeof(ble_admin_result_t));
+	setAdminResultLockErr(admin_connection->ble_result, 1);
+	bleSetBleResult(ble_data, admin_connection->ble_result);
 	ret = releaseAdminConnection(&admin_connection);
-	if (ret)
-	{
-		serverLog(LL_ERROR, 
-				"register_admin_notfication releaseAdminConnection error");
+	if (ret) {
+		serverLog(LL_ERROR, "register_admin_notfication releaseAdminConnection error");
 		return ret;
 	}
-	serverLog(LL_NOTICE, 
-			"register_admin_notfication releaseAdminConnection success");
+	serverLog(LL_NOTICE, "register_admin_notfication releaseAdminConnection success");
 
 	ret = gattlib_adapter_close(ble_data->adapter);
-	if (ret)
-	{
+	if (ret) {
 		serverLog(LL_ERROR, "gattlib_adapter_close error ");
 		return ret;
 	}
-	serverLog(LL_NOTICE, 
-			"register_admin_notfication gattlib_adapter_close success");
+	serverLog(LL_NOTICE, "register_admin_notfication gattlib_adapter_close success");
 	return 1;
 }
 
@@ -906,26 +861,21 @@ WAITING_LOCK_ERROR:
 	g_main_loop_unref(task_node->loop);
 	task_node->loop = NULL;
 	releaseAdminConnectionData(admin_connection);
-	setAdminResultLockErr(admin_connection->admin_result, 1);
-	bleSetBleResult(ble_data, admin_connection->admin_result, sizeof(ble_admin_result_t));
+	setAdminResultLockErr(admin_connection->ble_result, 1);
+	bleSetBleResult(ble_data, admin_connection->ble_result);
 	ret = releaseAdminConnection(&admin_connection);
-	if (ret)
-	{
-		serverLog(LL_ERROR, 
-				"register_admin_notfication releaseAdminConnection error");
+	if (ret) {
+		serverLog(LL_ERROR, "register_admin_notfication releaseAdminConnection error");
 		return ret;
 	}
-	serverLog(LL_NOTICE, 
-			"register_admin_notfication releaseAdminConnection success");
+	serverLog(LL_NOTICE, "register_admin_notfication releaseAdminConnection success");
 
 	ret = gattlib_adapter_close(ble_data->adapter);
-	if (ret)
-	{
+	if (ret) {
 		serverLog(LL_ERROR, "gattlib_adapter_close error ");
 		return ret;
 	}
-	serverLog(LL_NOTICE, 
-			"register_admin_notfication gattlib_adapter_close success");
+	serverLog(LL_NOTICE, "register_admin_notfication gattlib_adapter_close success");
 	return 1;
 }
 
@@ -979,17 +929,16 @@ static int handle_lock_responce(const uint8_t* data, int data_length,void* user_
 				"has unlock response %d error %d",
 				admin_lock_responce.has_result, admin_lock_responce.result);
 
-		if (admin_connection->has_admin_result && admin_lock_responce.has_result)
+		if (admin_connection->has_ble_result && admin_lock_responce.has_result)
 		{
 			serverLog(LL_NOTICE, "set admin result to success");
-			admin_connection->admin_result->lock_result= admin_lock_responce.result;
+			admin_connection->ble_result->lock_result= admin_lock_responce.result;
 		}
 		setAdminResultCMDResponse(
-				admin_connection->admin_result, &admin_lock_responce, sizeof(IgAdminLockResponse));
+				admin_connection->ble_result, &admin_lock_responce, sizeof(IgAdminLockResponse));
 
 		serverLog(LL_NOTICE, "handle_step3_message bleSetBleResult to ble data");
-		bleSetBleResult(
-				ble_data, admin_connection->admin_result, sizeof(ble_admin_result_t));
+		bleSetBleResult( ble_data, admin_connection->ble_result);
 		AdminConnection_endConnection((admin_connection->lock)->connectionID);
 		serverLog(LL_NOTICE, "AdminConnection_endConnection success");
 		serverLog(LL_NOTICE, "LOCK_RESULT_EXIT--------------------------------");
@@ -1115,24 +1064,21 @@ UNLOCK_REQUEST_ERROR:
 		free(retvalBytes);
 		retvalBytes = NULL;
 	}
-	setAdminResultUnlockErr(admin_connection->admin_result, 1);
-	bleSetBleResult(ble_data, admin_connection->admin_result, sizeof(ble_admin_result_t));
+	setAdminResultUnlockErr(admin_connection->ble_result, 1);
+	bleSetBleResult(ble_data, admin_connection->ble_result);
 	ret = releaseAdminConnection(&admin_connection);
 	if (ret) {
-		serverLog(LL_ERROR, 
-				"register_admin_notfication releaseAdminConnection error");
+		serverLog(LL_ERROR, "register_admin_notfication releaseAdminConnection error");
 		return ret;
 	}
-	serverLog(LL_NOTICE, 
-			"register_admin_notfication releaseAdminConnection success");
+	serverLog(LL_NOTICE, "register_admin_notfication releaseAdminConnection success");
 
 	ret = gattlib_adapter_close(ble_data->adapter);
 	if (ret) {
 		serverLog(LL_ERROR, "gattlib_adapter_close error ");
 		return ret;
 	}
-	serverLog(LL_NOTICE, 
-			"register_admin_notfication gattlib_adapter_close success");
+	serverLog(LL_NOTICE, "register_admin_notfication gattlib_adapter_close success");
 	return 1;
 }
 
@@ -1174,26 +1120,21 @@ WAITING_UNLOCK_ERROR:
 	g_main_loop_unref(task_node->loop);
 	task_node->loop = NULL;
 	releaseAdminConnectionData(admin_connection);
-	setAdminResultUnlockErr(admin_connection->admin_result, 1);
-	bleSetBleResult(ble_data, admin_connection->admin_result, sizeof(ble_admin_result_t));
+	setAdminResultUnlockErr(admin_connection->ble_result, 1);
+	bleSetBleResult(ble_data, admin_connection->ble_result);
 	ret = releaseAdminConnection(&admin_connection);
-	if (ret)
-	{
-		serverLog(LL_ERROR, 
-				"register_admin_notfication releaseAdminConnection error");
+	if (ret) {
+		serverLog(LL_ERROR, "register_admin_notfication releaseAdminConnection error");
 		return ret;
 	}
-	serverLog(LL_NOTICE, 
-			"register_admin_notfication releaseAdminConnection success");
+	serverLog(LL_NOTICE, "register_admin_notfication releaseAdminConnection success");
 
 	ret = gattlib_adapter_close(ble_data->adapter);
-	if (ret)
-	{
+	if (ret) {
 		serverLog(LL_ERROR, "gattlib_adapter_close error ");
 		return ret;
 	}
-	serverLog(LL_NOTICE, 
-			"register_admin_notfication gattlib_adapter_close success");
+	serverLog(LL_NOTICE, "register_admin_notfication gattlib_adapter_close success");
 	return 1;
 }
 
@@ -1245,20 +1186,19 @@ static int handle_unlock_responce(const uint8_t* data, int data_length,void* use
     serverLog(LL_NOTICE, 
           "has unlock response %d error %d", 
               admin_unlock_responce.has_result, admin_unlock_responce.result);
-    if (admin_connection->has_admin_result && admin_unlock_responce.has_result)
+    if (admin_connection->has_ble_result && admin_unlock_responce.has_result)
     {
       serverLog(LL_NOTICE, "set admin result to success");
-      admin_connection->admin_result->unlock_result= admin_unlock_responce.result;
+      admin_connection->ble_result->unlock_result= admin_unlock_responce.result;
     }
     // 复制所返回的结果 这儿会有内存申请
     setAdminResultCMDResponse(
-      admin_connection->admin_result, &admin_unlock_responce, sizeof(IgAdminUnlockResponse));
+      admin_connection->ble_result, &admin_unlock_responce, sizeof(IgAdminUnlockResponse));
     
      // 返回参数给调用进程
     serverLog(LL_NOTICE, "handle_step3_message bleSetBleResult to ble data");
   
-    bleSetBleResult(
-      ble_data, admin_connection->admin_result, sizeof(ble_admin_result_t));
+    bleSetBleResult(ble_data, admin_connection->ble_result);
     
     AdminConnection_endConnection((admin_connection->lock)->connectionID);
 
@@ -1286,253 +1226,242 @@ fsm_table_t admin_getlogs_fsm_table[ADMIN_GET_LOGS_SM_TABLE_LEN] = {
   {BLE_ADMIN_UNLOCK_RESULT,  waitingGetLogsResult,        BLE_ADMIN_UNLOCK_DONE},
 };
 
-fsm_table_t *getAdminGetLogsFsmTable()
-{
+fsm_table_t *getAdminGetLogsFsmTable() {
   return admin_getlogs_fsm_table;
 }
 
-int getAdminGetLogsFsmTableLen()
-{
+int getAdminGetLogsFsmTableLen() {
   return ADMIN_GET_LOGS_SM_TABLE_LEN;
 }
 
-static int writeGetLogsRequest(void *arg)
-{
-  serverLog(LL_NOTICE, "writeGetLogsRequest start --------");
-  int ret = 0;
-  task_node_t *task_node = (task_node_t *)arg;
-  ble_data_t *ble_data = task_node->ble_data;
-  admin_connection_t *admin_connection = 
-                              (admin_connection_t *)ble_data->ble_connection;
-  srand(time(0));
-  int requestID = rand() % 2147483647;
-  time_t cur_timestamp = time(NULL);
-  size_t buf_size = 32;
-  size_t encode_size = 0;
-  uint8_t buf[buf_size];
-  int retvalLen;
-  uint8_t *retvalBytes = NULL;
-  uint8_t *encryptPayloadBytes = NULL;
+static int writeGetLogsRequest(void *arg) {
+	serverLog(LL_NOTICE, "writeGetLogsRequest start --------");
+	int ret = 0;
+	task_node_t *task_node = (task_node_t *)arg;
+	ble_data_t *ble_data = task_node->ble_data;
+	admin_connection_t *admin_connection = 
+		(admin_connection_t *)ble_data->ble_connection;
+	srand(time(0));
+	int requestID = rand() % 2147483647;
+	time_t cur_timestamp = time(NULL);
+	size_t buf_size = 32;
+	size_t encode_size = 0;
+	uint8_t buf[buf_size];
+	int retvalLen;
+	uint8_t *retvalBytes = NULL;
+	uint8_t *encryptPayloadBytes = NULL;
 	size_t encryptPayloadBytes_len;
 
-  IgGetLogsRequest getlogs_request;
-  ig_GetLogsRequest_init(&getlogs_request);
-  ig_GetLogsRequest_set_operation_id(&getlogs_request, requestID);
-  ig_GetLogsRequest_set_password(
-    &getlogs_request, admin_connection->lock->password, admin_connection->lock->password_size);
-  ig_GetLogsRequest_set_timestamp(&getlogs_request, cur_timestamp);
-  IgSerializerError IgErr = ig_GetLogsRequest_encode(
-		&getlogs_request, buf, buf_size, &encode_size);
-  if (IgErr)
+	IgGetLogsRequest getlogs_request;
+	ig_GetLogsRequest_init(&getlogs_request);
+	ig_GetLogsRequest_set_operation_id(&getlogs_request, requestID);
+	ig_GetLogsRequest_set_password(
+			&getlogs_request, admin_connection->lock->password, admin_connection->lock->password_size);
+	ig_GetLogsRequest_set_timestamp(&getlogs_request, cur_timestamp);
+	IgSerializerError IgErr = ig_GetLogsRequest_encode(
+			&getlogs_request, buf, buf_size, &encode_size);
+	if (IgErr)
 	{
-    serverLog(LL_ERROR, "ig_GetLogsRequest_encode err");
-    goto GETLOGS_REQUEST_ERROR;
-	}
-  serverLog(LL_NOTICE, "ig_UnpairRequest_encode success size:" );
-
-  retvalLen = AdminConnection_encryptNative(
-    admin_connection->lock->connectionID, buf, encode_size, &retvalBytes);
-  if (!retvalLen) 
-  {
-    serverLog(LL_ERROR, "failed in AdminConnection_encryptNative");
-    goto GETLOGS_REQUEST_ERROR;
-  }
-  
-  if (!build_msg_payload(
-		&encryptPayloadBytes, &encryptPayloadBytes_len, retvalBytes, retvalLen))
-	{
-    serverLog(LL_ERROR, "failed in build_msg_payload");
+		serverLog(LL_ERROR, "ig_GetLogsRequest_encode err");
 		goto GETLOGS_REQUEST_ERROR;
 	}
-  serverLog(LL_NOTICE, "build_msg_payload success");
+	serverLog(LL_NOTICE, "ig_UnpairRequest_encode success size:" );
 
-  ret = write_char_by_uuid_multi_atts(
-		admin_connection->gatt_connection, &admin_connection->admin_uuid, 
-    encryptPayloadBytes, encryptPayloadBytes_len);
+	retvalLen = AdminConnection_encryptNative(
+			admin_connection->lock->connectionID, buf, encode_size, &retvalBytes);
+	if (!retvalLen) 
+	{
+		serverLog(LL_ERROR, "failed in AdminConnection_encryptNative");
+		goto GETLOGS_REQUEST_ERROR;
+	}
+
+	if (!build_msg_payload(
+				&encryptPayloadBytes, &encryptPayloadBytes_len, retvalBytes, retvalLen))
+	{
+		serverLog(LL_ERROR, "failed in build_msg_payload");
+		goto GETLOGS_REQUEST_ERROR;
+	}
+	serverLog(LL_NOTICE, "build_msg_payload success");
+
+	ret = write_char_by_uuid_multi_atts(
+			admin_connection->gatt_connection, &admin_connection->admin_uuid, 
+			encryptPayloadBytes, encryptPayloadBytes_len);
 	if (ret != GATTLIB_SUCCESS) {
-    serverLog(LL_ERROR, "write_char_by_uuid_multi_atts failed in writing th packags");
+		serverLog(LL_ERROR, "write_char_by_uuid_multi_atts failed in writing th packags");
 		goto GETLOGS_REQUEST_ERROR;
 	}
-  serverLog(LL_NOTICE, "write_char_by_uuid_multi_atts success");
-  
-  free(encryptPayloadBytes);
-  encryptPayloadBytes = NULL;
-  free(retvalBytes);
-  retvalBytes = NULL;
-  ig_GetLogsRequest_deinit(&getlogs_request);
-  admin_connection->admin_step = BLE_ADMIN_GETLOGS_REQUEST;
-  return 0;
+	serverLog(LL_NOTICE, "write_char_by_uuid_multi_atts success");
+
+	free(encryptPayloadBytes);
+	encryptPayloadBytes = NULL;
+	free(retvalBytes);
+	retvalBytes = NULL;
+	ig_GetLogsRequest_deinit(&getlogs_request);
+	admin_connection->admin_step = BLE_ADMIN_GETLOGS_REQUEST;
+	return 0;
 
 GETLOGS_REQUEST_ERROR:
-  serverLog(LL_ERROR, "GETLOGS_REQUEST_ERROR");
-  ig_GetLogsRequest_deinit(&getlogs_request);
+	serverLog(LL_ERROR, "GETLOGS_REQUEST_ERROR");
+	ig_GetLogsRequest_deinit(&getlogs_request);
 
-  if (encryptPayloadBytes)
-  {
-    free(encryptPayloadBytes);
-    encryptPayloadBytes = NULL;
-  }
-  if (retvalBytes)
-  {
-    free(retvalBytes);
-    retvalBytes = NULL;
-  }
-  setAdminResultGetLogsErr(admin_connection->admin_result, 1);
-  bleSetBleResult(ble_data, admin_connection->admin_result, sizeof(ble_admin_result_t));
-  ret = releaseAdminConnection(&admin_connection);
-  if (ret)
-  {
-    serverLog(LL_ERROR, 
-      "register_admin_notfication releaseAdminConnection error");
-    return ret;
-  }
-  serverLog(LL_NOTICE, 
-      "register_admin_notfication releaseAdminConnection success");
+	if (encryptPayloadBytes)
+	{
+		free(encryptPayloadBytes);
+		encryptPayloadBytes = NULL;
+	}
+	if (retvalBytes)
+	{
+		free(retvalBytes);
+		retvalBytes = NULL;
+	}
+	setAdminResultGetLogsErr(admin_connection->ble_result, 1);
+	bleSetBleResult(ble_data, admin_connection->ble_result);
+	ret = releaseAdminConnection(&admin_connection);
+	if (ret)
+	{
+		serverLog(LL_ERROR, 
+				"register_admin_notfication releaseAdminConnection error");
+		return ret;
+	}
+	serverLog(LL_NOTICE, 
+			"register_admin_notfication releaseAdminConnection success");
 
-  ret = gattlib_adapter_close(ble_data->adapter);
-  if (ret)
-  {
-    serverLog(LL_ERROR, "gattlib_adapter_close error ");
-    return ret;
-  }
-  serverLog(LL_NOTICE, 
-      "register_admin_notfication gattlib_adapter_close success");
-  return 1;
+	ret = gattlib_adapter_close(ble_data->adapter);
+	if (ret)
+	{
+		serverLog(LL_ERROR, "gattlib_adapter_close error ");
+		return ret;
+	}
+	serverLog(LL_NOTICE, 
+			"register_admin_notfication gattlib_adapter_close success");
+	return 1;
 }
 
-static int waitingGetLogsResult(void *arg)
-{
-  serverLog(LL_NOTICE, "waitingGetLogsResult -------------------------------");
-  task_node_t *task_node = (task_node_t *)arg;
-  ble_data_t *ble_data = (ble_data_t *)(task_node->ble_data);
-  admin_connection_t *admin_connection = 
-                            (admin_connection_t *)ble_data->ble_connection;
+static int waitingGetLogsResult(void *arg) {
+	serverLog(LL_NOTICE, "waitingGetLogsResult -------------------------------");
+	task_node_t *task_node = (task_node_t *)arg;
+	ble_data_t *ble_data = (ble_data_t *)(task_node->ble_data);
+	admin_connection_t *admin_connection = 
+		(admin_connection_t *)ble_data->ble_connection;
 
-  serverLog(LL_NOTICE, "waitingGetLogsResult new loop waiting");
-  g_main_loop_run(task_node->loop);
-  if (admin_connection->waiting_err || admin_connection->receive_err)
-    goto WAITING_GETLOGS_ERROR;
-  g_source_remove(task_node->timeout_id);
-  g_main_loop_unref(task_node->loop);
-  task_node->loop = NULL;
+	serverLog(LL_NOTICE, "waitingGetLogsResult new loop waiting");
+	g_main_loop_run(task_node->loop);
+	if (admin_connection->waiting_err || admin_connection->receive_err)
+		goto WAITING_GETLOGS_ERROR;
+	g_source_remove(task_node->timeout_id);
+	g_main_loop_unref(task_node->loop);
+	task_node->loop = NULL;
 
-  serverLog(LL_NOTICE, "waitingGetLogsResult exit task_node->loop");
+	serverLog(LL_NOTICE, "waitingGetLogsResult exit task_node->loop");
 
-  releaseAdminConnectionData(admin_connection);
-  int ret = releaseAdminConnection(&admin_connection);
-  if (ret)
-  {
-    serverLog(LL_ERROR, "waiting_unlock_result releaseAdminConnection error");
-    return ret;
-  }
-  ret = gattlib_adapter_close(ble_data->adapter);
-  if (ret)
-  {
-    serverLog(LL_ERROR, "gattlib_adapter_close error ");
-    return ret;
-  }
-  ble_data->adapter = NULL;
-  return 0;
+	releaseAdminConnectionData(admin_connection);
+	int ret = releaseAdminConnection(&admin_connection);
+	if (ret)
+	{
+		serverLog(LL_ERROR, "waiting_unlock_result releaseAdminConnection error");
+		return ret;
+	}
+	ret = gattlib_adapter_close(ble_data->adapter);
+	if (ret)
+	{
+		serverLog(LL_ERROR, "gattlib_adapter_close error ");
+		return ret;
+	}
+	ble_data->adapter = NULL;
+	return 0;
 
 WAITING_GETLOGS_ERROR:
-  serverLog(LL_ERROR, "WAITING_UNLOCK_ERROR ");
-  g_main_loop_unref(task_node->loop);
-  task_node->loop = NULL;
-  releaseAdminConnectionData(admin_connection);
-  setAdminResultGetLogsErr(admin_connection->admin_result, 1);
-  bleSetBleResult(ble_data, admin_connection->admin_result, sizeof(ble_admin_result_t));
-  ret = releaseAdminConnection(&admin_connection);
-  if (ret)
-  {
-    serverLog(LL_ERROR, 
-      "register_admin_notfication releaseAdminConnection error");
-    return ret;
-  }
-  serverLog(LL_NOTICE, 
-      "register_admin_notfication releaseAdminConnection success");
+	serverLog(LL_ERROR, "WAITING_UNLOCK_ERROR ");
+	g_main_loop_unref(task_node->loop);
+	task_node->loop = NULL;
+	releaseAdminConnectionData(admin_connection);
+	setAdminResultGetLogsErr(admin_connection->ble_result, 1);
+	bleSetBleResult(ble_data, admin_connection->ble_result);
+	ret = releaseAdminConnection(&admin_connection);
+	if (ret) {
+		serverLog(LL_ERROR, "register_admin_notfication releaseAdminConnection error");
+		return ret;
+	}
+	serverLog(LL_NOTICE, "register_admin_notfication releaseAdminConnection success");
 
-  ret = gattlib_adapter_close(ble_data->adapter);
-  if (ret)
-  {
-    serverLog(LL_ERROR, "gattlib_adapter_close error ");
-    return ret;
-  }
-  serverLog(LL_NOTICE, 
-      "register_admin_notfication gattlib_adapter_close success");
-
+	ret = gattlib_adapter_close(ble_data->adapter);
+	if (ret) {
+		serverLog(LL_ERROR, "gattlib_adapter_close error ");
+		return ret;
+	}
+	serverLog(LL_NOTICE, "register_admin_notfication gattlib_adapter_close success");
+	return 0;
 }
 
-static int handleGetLogsResponce(const uint8_t* data, int data_length,void* user_data)
-{
-  serverLog(LL_NOTICE, "handleGetLogsResponce--------------------------------");
-  task_node_t *task_node = (task_node_t *)user_data;
-  ble_data_t *ble_data = task_node->ble_data;
-  admin_connection_t *admin_connection = 
-                              (admin_connection_t *)ble_data->ble_connection;
-  int responceLen;
-  uint8_t *responceBytes = NULL;
+static int handleGetLogsResponce(const uint8_t* data, int data_length,void* user_data) {
+	serverLog(LL_NOTICE, "handleGetLogsResponce--------------------------------");
+	task_node_t *task_node = (task_node_t *)user_data;
+	ble_data_t *ble_data = task_node->ble_data;
+	admin_connection_t *admin_connection = 
+		(admin_connection_t *)ble_data->ble_connection;
+	int responceLen;
+	uint8_t *responceBytes = NULL;
 
-  save_message_data(data, data_length, user_data);
+	save_message_data(data, data_length, user_data);
 
-  if (admin_connection->step_max_size == admin_connection->step_cur_size)
-  {
-    int ret;
-    serverLog(LL_NOTICE, "handle_unlock_responce RECV step2 data finished");
-    admin_connection->admin_step = BLE_ADMIN_GETLOGS_RESULT;
+	if (admin_connection->step_max_size == admin_connection->step_cur_size)
+	{
+		int ret;
+		serverLog(LL_NOTICE, "handle_unlock_responce RECV step2 data finished");
+		admin_connection->admin_step = BLE_ADMIN_GETLOGS_RESULT;
 
-    size_t messageLen = 
-      admin_connection->step_max_size - admin_connection->n_size_byte;
-    uint8_t *data_start = admin_connection->step_data + admin_connection->n_size_byte;
-    uint8_t messageBytes[messageLen];
-    memcpy(messageBytes, data_start, messageLen);
-    
-    responceLen = AdminConnection_decryptNative(
-      admin_connection->lock->connectionID, messageBytes, messageLen, &responceBytes);
-    if (!responceLen)
-    { 
-      serverLog(LL_ERROR, "AdminConnection_decryptNative error");
-      admin_connection->receive_err = 1;
-      goto GETLOGS_RESPONCE_EXIT;
-    }
-    serverLog(LL_NOTICE, "AdminConnection_decryptNative success");
-    
-    IgGetLogsResponse admin_getlogs_responce;
-    ig_GetLogsResponse_init(&admin_getlogs_responce);
-    IgSerializerError err = ig_GetLogsResponse_decode(
-      responceBytes, responceLen, &admin_getlogs_responce, 0
-    );
-    if (err)
-    {
-      serverLog(LL_NOTICE, "ig_GetLogsResponse_decode err %d", err);
-      admin_connection->receive_err = 1;
-      goto GETLOGS_RESPONCE_EXIT;
-    }
-    serverLog(LL_NOTICE, "has unlock response %d error %d",
-              admin_getlogs_responce.has_result, admin_getlogs_responce.result);
-    if (admin_connection->has_admin_result && admin_getlogs_responce.has_result)
-    {
-      serverLog(LL_NOTICE, "set admin result to success");
-      admin_connection->admin_result->getlogs_result= admin_getlogs_responce.result;
-    }
-     // 返回参数给调用进程
-    serverLog(LL_NOTICE, "handle_step3_message bleSetBleResult to ble data");
-    setAdminResultCMDResponse(
-      admin_connection->admin_result, &admin_getlogs_responce, sizeof(IgGetLogsResponse));
+		size_t messageLen = 
+			admin_connection->step_max_size - admin_connection->n_size_byte;
+		uint8_t *data_start = admin_connection->step_data + admin_connection->n_size_byte;
+		uint8_t messageBytes[messageLen];
+		memcpy(messageBytes, data_start, messageLen);
 
-    bleSetBleResult(
-      ble_data, admin_connection->admin_result, sizeof(ble_admin_result_t));
-    // ig_GetLogsResponse_deinit(&admin_getlogs_responce);
-    AdminConnection_endConnection((admin_connection->lock)->connectionID);
+		responceLen = AdminConnection_decryptNative(
+				admin_connection->lock->connectionID, messageBytes, messageLen, &responceBytes);
+		if (!responceLen)
+		{ 
+			serverLog(LL_ERROR, "AdminConnection_decryptNative error");
+			admin_connection->receive_err = 1;
+			goto GETLOGS_RESPONCE_EXIT;
+		}
+		serverLog(LL_NOTICE, "AdminConnection_decryptNative success");
 
-    serverLog(LL_NOTICE, "AdminConnection_endConnection success");
+		IgGetLogsResponse admin_getlogs_responce;
+		ig_GetLogsResponse_init(&admin_getlogs_responce);
+		IgSerializerError err = ig_GetLogsResponse_decode(
+				responceBytes, responceLen, &admin_getlogs_responce, 0
+				);
+		if (err)
+		{
+			serverLog(LL_NOTICE, "ig_GetLogsResponse_decode err %d", err);
+			admin_connection->receive_err = 1;
+			goto GETLOGS_RESPONCE_EXIT;
+		}
+		serverLog(LL_NOTICE, "has unlock response %d error %d",
+				admin_getlogs_responce.has_result, admin_getlogs_responce.result);
+		if (admin_connection->has_ble_result && admin_getlogs_responce.has_result)
+		{
+			serverLog(LL_NOTICE, "set admin result to success");
+			admin_connection->ble_result->getlogs_result= admin_getlogs_responce.result;
+		}
+		// 返回参数给调用进程
+		serverLog(LL_NOTICE, "handle_step3_message bleSetBleResult to ble data");
+		setAdminResultCMDResponse(
+				admin_connection->ble_result, &admin_getlogs_responce, sizeof(IgGetLogsResponse));
 
-    serverLog(LL_NOTICE, "GetLogs_RESULT_EXIT--------------------------------");
-    
+		bleSetBleResult( ble_data, admin_connection->ble_result);
+		// ig_GetLogsResponse_deinit(&admin_getlogs_responce);
+		AdminConnection_endConnection((admin_connection->lock)->connectionID);
+
+		serverLog(LL_NOTICE, "AdminConnection_endConnection success");
+
+		serverLog(LL_NOTICE, "GetLogs_RESULT_EXIT--------------------------------");
+
 GETLOGS_RESPONCE_EXIT:
-    if (responceBytes) free(responceBytes);
-    g_main_loop_quit(task_node->loop);
+		if (responceBytes) free(responceBytes);
+		g_main_loop_quit(task_node->loop);
 
-  }
+	}
 }
 
 
@@ -1542,270 +1471,228 @@ fsm_table_t admin_getlockstatus_fsm_table[ADMIN_GET_LOCK_STATUS_SM_TABLE_LEN] = 
   {BLE_ADMIN_BEGIN,         register_admin_notfication,   BLE_ADMIN_STEP1},
   {BLE_ADMIN_STEP1,         waiting_admin_step1,          BLE_ADMIN_STEP2},
   {BLE_ADMIN_STEP2,         write_admin_step2,            BLE_ADMIN_ESTABLISHED},
-  {BLE_ADMIN_ESTABLISHED,   waiting_admin_step3,          BLE_ADMIN_UNLOCK_REQUEST},
-  {BLE_ADMIN_UNLOCK_REQUEST,   writeGetLockStatusRequest,         BLE_ADMIN_UNLOCK_RESULT},
-  {BLE_ADMIN_UNLOCK_RESULT,  waitingGetLockStatusResult,        BLE_ADMIN_UNLOCK_DONE},
+  {BLE_ADMIN_ESTABLISHED,   waiting_admin_step3,          BLE_ADMIN_GETLOCKSTATUS_REQUEST},
+  {BLE_ADMIN_GETLOCKSTATUS_REQUEST,		writeGetLockStatusRequest,         BLE_ADMIN_GETLOCKSTATUS_RESULT},
+  {BLE_ADMIN_GETLOCKSTATUS_RESULT,		waitingGetLockStatusResult,        BLE_ADMIN_UNLOCK_DONE},
 };
 
-fsm_table_t *getAdminGetLockStatusFsmTable()
-{
-  return admin_getlockstatus_fsm_table;
+fsm_table_t *getAdminGetLockStatusFsmTable() {
+	return admin_getlockstatus_fsm_table;
 }
 
-int getAdminGetLockStatusFsmTableLen()
-{
-  return ADMIN_GET_LOCK_STATUS_SM_TABLE_LEN;
+int getAdminGetLockStatusFsmTableLen() {
+	return ADMIN_GET_LOCK_STATUS_SM_TABLE_LEN;
 }
 
-static int writeGetLockStatusRequest(void *arg)
-{
-  serverLog(LL_NOTICE, "writeGetLockStatusRequest start --------");
-  int ret = 0;
-  task_node_t *task_node = (task_node_t *)arg;
-  ble_data_t *ble_data = task_node->ble_data;
-  admin_connection_t *admin_connection = 
-                              (admin_connection_t *)ble_data->ble_connection;
-  srand(time(0));
-  int requestID = rand() % 2147483647;
-  time_t cur_timestamp = time(NULL);
-  size_t buf_size = 32;
-  size_t encode_size = 0;
-  uint8_t buf[buf_size];
-  int retvalLen;
-  uint8_t *retvalBytes = NULL;
-  uint8_t *encryptPayloadBytes = NULL;
+static int writeGetLockStatusRequest(void *arg) {
+	serverLog(LL_NOTICE, "writeGetLockStatusRequest start --------");
+	int ret = 0;
+	task_node_t *task_node = (task_node_t *)arg;
+	ble_data_t *ble_data = task_node->ble_data;
+	admin_connection_t *admin_connection = 
+		(admin_connection_t *)ble_data->ble_connection;
+	srand(time(0));
+	int requestID = rand() % 2147483647;
+	time_t cur_timestamp = time(NULL);
+	size_t buf_size = 32;
+	size_t encode_size = 0;
+	uint8_t buf[buf_size];
+	int retvalLen;
+	uint8_t *retvalBytes = NULL;
+	uint8_t *encryptPayloadBytes = NULL;
 	size_t encryptPayloadBytes_len;
 
-  IgGetLockStatusRequest getlockstatus_request;
-  ig_GetLockStatusRequest_init(&getlockstatus_request);
-  ig_GetLockStatusRequest_set_operation_id(&getlockstatus_request, requestID);
-  ig_GetLockStatusRequest_set_password(
-    &getlockstatus_request, admin_connection->lock->password, admin_connection->lock->password_size);
+	IgGetLockStatusRequest getlockstatus_request;
+	ig_GetLockStatusRequest_init(&getlockstatus_request);
+	ig_GetLockStatusRequest_set_operation_id(&getlockstatus_request, requestID);
+	ig_GetLockStatusRequest_set_password(&getlockstatus_request, admin_connection->lock->password, admin_connection->lock->password_size);
 
-  IgSerializerError IgErr = ig_GetLockStatusRequest_encode(
-		&getlockstatus_request, buf, buf_size, &encode_size);
-  if (IgErr)
-	{
-    serverLog(LL_ERROR, "ig_GetLockStatusRequest_encode err");
-    goto GETLOCKSTATUS_REQUEST_ERROR;
-	}
-  serverLog(LL_NOTICE, "ig_GetLockStatusRequest_encode success size:" );
-
-  retvalLen = AdminConnection_encryptNative(
-    admin_connection->lock->connectionID, buf, encode_size, &retvalBytes);
-  if (!retvalLen) 
-  {
-    serverLog(LL_ERROR, "failed in AdminConnection_encryptNative");
-    goto GETLOCKSTATUS_REQUEST_ERROR;
-  }
-  
-  if (!build_msg_payload(
-		&encryptPayloadBytes, &encryptPayloadBytes_len, retvalBytes, retvalLen))
-	{
-    serverLog(LL_ERROR, "failed in build_msg_payload");
+	IgSerializerError IgErr = ig_GetLockStatusRequest_encode(&getlockstatus_request, buf, buf_size, &encode_size);
+	if (IgErr) {
+		serverLog(LL_ERROR, "ig_GetLockStatusRequest_encode err[%d].", IgErr);
 		goto GETLOCKSTATUS_REQUEST_ERROR;
 	}
-  serverLog(LL_NOTICE, "build_msg_payload success");
+	serverLog(LL_NOTICE, "ig_GetLockStatusRequest_encode success size:[%d].", encode_size);
 
-  ret = write_char_by_uuid_multi_atts(
-		admin_connection->gatt_connection, &admin_connection->admin_uuid, 
-    encryptPayloadBytes, encryptPayloadBytes_len);
-	if (ret != GATTLIB_SUCCESS) {
-    serverLog(LL_ERROR, "write_char_by_uuid_multi_atts failed in writing th packags");
+	retvalLen = AdminConnection_encryptNative(admin_connection->lock->connectionID, buf, encode_size, &retvalBytes);
+	if (!retvalLen) {
+		serverLog(LL_ERROR, "failed in AdminConnection_encryptNative, err[%d].", retvalLen);
 		goto GETLOCKSTATUS_REQUEST_ERROR;
 	}
-  serverLog(LL_NOTICE, "write_char_by_uuid_multi_atts success");
-  
-  free(encryptPayloadBytes);
-  encryptPayloadBytes = NULL;
-  free(retvalBytes);
-  retvalBytes = NULL;
-  ig_GetLockStatusRequest_deinit(&getlockstatus_request);
-  admin_connection->admin_step = BLE_ADMIN_GETLOCKSTATUS_REQUEST;
 
+	if (!build_msg_payload(&encryptPayloadBytes, &encryptPayloadBytes_len, retvalBytes, retvalLen)) {
+		serverLog(LL_ERROR, "failed in build_msg_payload");
+		goto GETLOCKSTATUS_REQUEST_ERROR;
+	}
+	serverLog(LL_NOTICE, "build_msg_payload success");
 
-  ret = releaseAdminConnection(&admin_connection);
-  if (ret)
-  {
-    serverLog(LL_ERROR, "waiting_unlock_result releaseAdminConnection error");
-    return ret;
-  }
-  ret = gattlib_adapter_close(ble_data->adapter);
-  if (ret)
-  {
-    serverLog(LL_ERROR, "gattlib_adapter_close error ");
-    return ret;
-  }
-  ble_data->adapter = NULL;
-  return 0;
+	ret = write_char_by_uuid_multi_atts(
+			admin_connection->gatt_connection, &admin_connection->admin_uuid, 
+			encryptPayloadBytes, encryptPayloadBytes_len);
+	if (GATTLIB_SUCCESS != ret) {
+		serverLog(LL_ERROR, "write_char_by_uuid_multi_atts err[%d].", ret);
+		goto GETLOCKSTATUS_REQUEST_ERROR;
+	}
+	serverLog(LL_NOTICE, "write_char_by_uuid_multi_atts success");
+
+	free(encryptPayloadBytes);
+	encryptPayloadBytes = NULL;
+	free(retvalBytes);
+	retvalBytes = NULL;
+	ig_GetLockStatusRequest_deinit(&getlockstatus_request);
+	admin_connection->admin_step = BLE_ADMIN_GETLOCKSTATUS_REQUEST;
+	return 0;
 
 GETLOCKSTATUS_REQUEST_ERROR:
-  serverLog(LL_ERROR, "GETLOCKSTATUS_REQUEST_ERROR");
-  ig_GetLockStatusRequest_deinit(&getlockstatus_request);
-  if (encryptPayloadBytes)
-  {
-    free(encryptPayloadBytes);
-    encryptPayloadBytes = NULL;
-  }
-  if (retvalBytes)
-  {
-    free(retvalBytes);
-    retvalBytes = NULL;
-  }
-  setAdminResultUnlockErr(admin_connection->admin_result, 1);
-  bleSetBleResult(ble_data, admin_connection->admin_result, sizeof(ble_admin_result_t));
-  ret = releaseAdminConnection(&admin_connection);
-  if (ret)
-  {
-    serverLog(LL_ERROR, 
-      "register_admin_notfication releaseAdminConnection error");
-    return ret;
-  }
-  serverLog(LL_NOTICE, 
-      "register_admin_notfication releaseAdminConnection success");
+	serverLog(LL_ERROR, "GETLOCKSTATUS_REQUEST_ERROR");
+	ig_GetLockStatusRequest_deinit(&getlockstatus_request);
+	if (encryptPayloadBytes) {
+		free(encryptPayloadBytes);
+		encryptPayloadBytes = NULL;
+	}
+	if (retvalBytes) {
+		free(retvalBytes);
+		retvalBytes = NULL;
+	}
+	//setAdminResultUnlockErr(admin_connection->ble_result, 1);
+	setAdminResultErr(admin_connection->ble_result, 1);
+	bleSetBleResult(ble_data, admin_connection->ble_result);
+	ret = releaseAdminConnection(&admin_connection);
+	if (ret) {
+		serverLog(LL_ERROR, "register_admin_notfication releaseAdminConnection error");
+		return ret;
+	}
+	serverLog(LL_NOTICE, "register_admin_notfication releaseAdminConnection success");
 
-  ret = gattlib_adapter_close(ble_data->adapter);
-  if (ret)
-  {
-    serverLog(LL_ERROR, "gattlib_adapter_close error ");
-    return ret;
-  }
-  serverLog(LL_NOTICE, 
-      "register_admin_notfication gattlib_adapter_close success");
-  return 1;
+	ret = gattlib_adapter_close(ble_data->adapter);
+	if (ret) {
+		serverLog(LL_ERROR, "gattlib_adapter_close error[%d]", ret);
+		return ret;
+	}
+	serverLog(LL_NOTICE, "register_admin_notfication gattlib_adapter_close success.");
+	return 1;
 }
 
-static int waitingGetLockStatusResult(void *arg)
-{
-  serverLog(LL_NOTICE, "waitingGetLockStatusResult -------------------------------");
-  task_node_t *task_node = (task_node_t *)arg;
-  ble_data_t *ble_data = (ble_data_t *)(task_node->ble_data);
-  admin_connection_t *admin_connection = 
-                            (admin_connection_t *)ble_data->ble_connection;
+static int waitingGetLockStatusResult(void *arg) {
+	serverLog(LL_NOTICE, "waitingGetLockStatusResult -------------------------------");
+	task_node_t *task_node = (task_node_t *)arg;
+	ble_data_t *ble_data = (ble_data_t *)(task_node->ble_data);
+	admin_connection_t *admin_connection = (admin_connection_t *)ble_data->ble_connection;
 
-  serverLog(LL_NOTICE, "waitingGetLockStatusResult new loop waiting");
-  g_main_loop_run(task_node->loop);
-  if (admin_connection->waiting_err || admin_connection->receive_err)
-    goto WAITING_GETLOCKSTATUS_ERROR;
-  g_source_remove(task_node->timeout_id);
-  g_main_loop_unref(task_node->loop);
-  task_node->loop = NULL;
+	serverLog(LL_NOTICE, "waitingGetLockStatusResult new loop waiting");
+	g_main_loop_run(task_node->loop);
+	if (admin_connection->waiting_err || admin_connection->receive_err) {
+		goto WAITING_GETLOCKSTATUS_ERROR;
+	}
+	g_source_remove(task_node->timeout_id);
+	g_main_loop_unref(task_node->loop);
+	task_node->loop = NULL;
 
-  serverLog(LL_NOTICE, "waitingGetLockStatusResult exit task_node->loop");
+	serverLog(LL_NOTICE, "waitingGetLockStatusResult exit task_node->loop");
 
-  releaseAdminConnectionData(admin_connection);
-  int ret = releaseAdminConnection(&admin_connection);
-  if (ret)
-  {
-    serverLog(LL_ERROR, "waiting_unlock_result releaseAdminConnection error");
-    return ret;
-  }
-  ret = gattlib_adapter_close(ble_data->adapter);
-  if (ret)
-  {
-    serverLog(LL_ERROR, "gattlib_adapter_close error ");
-    return ret;
-  }
-  ble_data->adapter = NULL;
-  return 0;
+	releaseAdminConnectionData(admin_connection);
+	int ret = releaseAdminConnection(&admin_connection);
+	if (ret) {
+		serverLog(LL_ERROR, "waiting_unlock_result releaseAdminConnection error[%d]", ret);
+		return ret;
+	}
+	ret = gattlib_adapter_close(ble_data->adapter);
+	if (ret) {
+		serverLog(LL_ERROR, "gattlib_adapter_close error[%d]", ret);
+		return ret;
+	}
+	ble_data->adapter = NULL;
+	return 0;
 
 WAITING_GETLOCKSTATUS_ERROR:
-  serverLog(LL_ERROR, "WAITING_UNLOCK_ERROR ");
-  g_main_loop_unref(task_node->loop);
-  task_node->loop = NULL;
-  releaseAdminConnectionData(admin_connection);
-  setAdminResultErr(admin_connection->admin_result, 1);
-  bleSetBleResult(ble_data, admin_connection->admin_result, sizeof(ble_admin_result_t));
-  ret = releaseAdminConnection(&admin_connection);
-  if (ret)
-  {
-    serverLog(LL_ERROR, 
-      "register_admin_notfication releaseAdminConnection error");
-    return ret;
-  }
-  serverLog(LL_NOTICE, 
-      "register_admin_notfication releaseAdminConnection success");
+	serverLog(LL_ERROR, "WAITING_GETLOCKSTATUS_ERROR ");
+	g_main_loop_unref(task_node->loop);
+	task_node->loop = NULL;
+	releaseAdminConnectionData(admin_connection);
+	setAdminResultErr(admin_connection->ble_result, 1);
+	bleSetBleResult(ble_data, admin_connection->ble_result);
+	ret = releaseAdminConnection(&admin_connection);
+	if (ret) {
+		serverLog(LL_ERROR, "register_admin_notfication releaseAdminConnection error");
+		return ret;
+	}
+	serverLog(LL_NOTICE, "register_admin_notfication releaseAdminConnection success");
 
-  ret = gattlib_adapter_close(ble_data->adapter);
-  if (ret)
-  {
-    serverLog(LL_ERROR, "gattlib_adapter_close error ");
-    return ret;
-  }
-  serverLog(LL_NOTICE, 
-      "register_admin_notfication gattlib_adapter_close success");
-
+	ret = gattlib_adapter_close(ble_data->adapter);
+	if (ret) {
+		serverLog(LL_ERROR, "gattlib_adapter_close error ");
+		return ret;
+	}
+	serverLog(LL_NOTICE, "register_admin_notfication gattlib_adapter_close success");
+	return 0;
 }
 
 static int handleGetLockStatusResponce(const uint8_t* data, int data_length,void* user_data)
 {
-  serverLog(LL_NOTICE, "handleGetLockStatusResponce--------------------------------");
-  task_node_t *task_node = (task_node_t *)user_data;
-  ble_data_t *ble_data = task_node->ble_data;
-  admin_connection_t *admin_connection = 
-                              (admin_connection_t *)ble_data->ble_connection;
-  int responceLen;
-  uint8_t *responceBytes = NULL;
+	serverLog(LL_NOTICE, "handleGetLockStatusResponce--------------------------------");
+	task_node_t *task_node = (task_node_t *)user_data;
+	ble_data_t *ble_data = task_node->ble_data;
+	admin_connection_t *admin_connection = (admin_connection_t *)ble_data->ble_connection;
+	int responceLen;
+	uint8_t *responceBytes = NULL;
 
-  save_message_data(data, data_length, user_data);
+	save_message_data(data, data_length, user_data);
 
-  if (admin_connection->step_max_size == admin_connection->step_cur_size)
-  {
-    int ret;
-    serverLog(LL_NOTICE, "handle_unlock_responce RECV step2 data finished");
-    admin_connection->admin_step = BLE_ADMIN_GETLOCKSTATUS_RESULT;
+	if (admin_connection->step_max_size == admin_connection->step_cur_size) {
+		int ret;
+		serverLog(LL_NOTICE, "handle_unlock_responce RECV step2 data finished");
+		admin_connection->admin_step = BLE_ADMIN_GETLOCKSTATUS_RESULT;
 
-    size_t messageLen = 
-      admin_connection->step_max_size - admin_connection->n_size_byte;
-    uint8_t *data_start = admin_connection->step_data + admin_connection->n_size_byte;
-    uint8_t messageBytes[messageLen];
-    memcpy(messageBytes, data_start, messageLen);
-    
-    responceLen = AdminConnection_decryptNative(
-      admin_connection->lock->connectionID, messageBytes, messageLen, &responceBytes);
-    if (!responceLen)
-    { 
-      serverLog(LL_ERROR, "AdminConnection_decryptNative error");
-      admin_connection->receive_err = 1;
-      goto GETLOCKSTATUS_RESPONCE_EXIT;
-    }
-    serverLog(LL_NOTICE, "AdminConnection_decryptNative responceLen %d", responceLen);
-    
-    IgGetLockStatusResponse admin_getlockstatus_responce;
-    ig_GetLockStatusResponse_init(&admin_getlockstatus_responce);
-    IgSerializerError err = ig_GetLockStatusResponse_decode(
-      responceBytes, responceLen, &admin_getlockstatus_responce, 0
-    );
-    if (err)
-    {
-      serverLog(LL_NOTICE, "ig_GetLockStatusResponse_decode err %d", err);
-      admin_connection->receive_err = 1;
-      goto GETLOCKSTATUS_RESPONCE_EXIT;
-    }
+		size_t messageLen = admin_connection->step_max_size - admin_connection->n_size_byte;
+		uint8_t *data_start = admin_connection->step_data + admin_connection->n_size_byte;
+		uint8_t messageBytes[messageLen];
+		memcpy(messageBytes, data_start, messageLen);
 
-    serverLog(LL_NOTICE, "has unlock response %d error %d",
-              admin_getlockstatus_responce.has_result, admin_getlockstatus_responce.result);
-    if (admin_connection->has_admin_result && admin_getlockstatus_responce.has_result)
-    {
-      serverLog(LL_NOTICE, "set admin result to success");
-      admin_connection->admin_result->getlockstatus_result= admin_getlockstatus_responce.result;
-    }
-     // 返回参数给调用进程
-    serverLog(LL_NOTICE, "handle_step3_message bleSetBleResult to ble data");
-    bleSetBleResult(
-      ble_data, admin_connection->admin_result, sizeof(ble_admin_result_t));
-    
-    AdminConnection_endConnection((admin_connection->lock)->connectionID);
+		responceLen = AdminConnection_decryptNative(admin_connection->lock->connectionID, messageBytes, messageLen, &responceBytes);
+		if (!responceLen) { 
+			serverLog(LL_ERROR, "AdminConnection_decryptNative return responceLen=0 err.");
+			admin_connection->receive_err = 1;
+			goto GETLOCKSTATUS_RESPONCE_EXIT;
+		}
+		serverLog(LL_NOTICE, "AdminConnection_decryptNative responceLen[%d]", responceLen);
 
-    serverLog(LL_NOTICE, "AdminConnection_endConnection success");
+		IgGetLockStatusResponse status_resp;
+		ig_GetLockStatusResponse_init(&status_resp);
+		IgSerializerError err = ig_GetLockStatusResponse_decode(responceBytes, responceLen, &status_resp, 0);
+		if (err) {
+			serverLog(LL_NOTICE, "ig_GetLockStatusResponse_decode err[%d]", err);
+			admin_connection->receive_err = 1;
+			goto GETLOCKSTATUS_RESPONCE_EXIT;
+		}
 
-    serverLog(LL_NOTICE, "GetLogs_RESULT_EXIT--------------------------------");
-    
+		serverLog(LL_NOTICE, "get status resp: has_result[%d],error[%d],has_lock_open[%d],lock_open[%d],has_cell_network_status[%d],cell_network_status[%d], has_door_open[%d], door_open[%d], has_operation_id[%d], operation_id[%d].",
+				status_resp.has_result, 
+				status_resp.result,
+				status_resp.has_lock_open,
+				status_resp.lock_open,
+				status_resp.has_cell_network_status,
+				status_resp.cell_network_status,
+				status_resp.has_door_open,
+				status_resp.door_open,
+				status_resp.has_operation_id,
+				status_resp.operation_id);
+		if (admin_connection->has_ble_result && status_resp.has_result) {
+			serverLog(LL_NOTICE, "set admin result to success");
+			admin_connection->ble_result->getlockstatus_result = status_resp.result;
+		}
+		// 返回参数给调用进程
+		serverLog(LL_NOTICE, "handle_step3_message bleSetBleResult to ble data");
+		bleSetBleResult(ble_data, admin_connection->ble_result);
+
+		AdminConnection_endConnection((admin_connection->lock)->connectionID);
+
+		serverLog(LL_NOTICE, "AdminConnection_endConnection success");
+		serverLog(LL_NOTICE, "GetLogs_RESULT_EXIT--------------------------------");
+
 GETLOCKSTATUS_RESPONCE_EXIT:
-    if (responceBytes) free(responceBytes);
-    g_main_loop_quit(task_node->loop);
-
-  }
+		if (responceBytes) free(responceBytes);
+		g_main_loop_quit(task_node->loop);
+	}
 }
 
 // ------------------------ create pin request -----------------------------
@@ -1968,8 +1855,8 @@ PIN_REQUEST_ERROR:
 		free(retvalBytes);
 		retvalBytes = NULL;
 	}
-	setAdminResultCreatePinRequestErr(admin_connection->admin_result, 1);
-	bleSetBleResult(ble_data, admin_connection->admin_result, sizeof(ble_admin_result_t));
+	setAdminResultCreatePinRequestErr(admin_connection->ble_result, 1);
+	bleSetBleResult(ble_data, admin_connection->ble_result);
 	ig_CreatePinRequest_deinit(request);
 	ret = releaseAdminConnection(&admin_connection);
 	if (ret)
@@ -2001,7 +1888,7 @@ static int waitingCreatePinRequestResult(void *arg)
 		(admin_connection_t *)ble_data->ble_connection;
 	IgCreatePinRequest *request = admin_connection->cmd_request;
 
-	serverLog(LL_NOTICE, "waitingGetLockStatusResult new loop waiting");
+	serverLog(LL_NOTICE, "waitingCreatePinRequestResult new loop waiting");
 	g_main_loop_run(task_node->loop);
 	if (admin_connection->waiting_err || admin_connection->receive_err)
 		goto WAITING_CREATE_PIN_ERROR;
@@ -2033,8 +1920,8 @@ WAITING_CREATE_PIN_ERROR:
 	task_node->loop = NULL;
 	releaseAdminConnectionData(admin_connection);
 
-	setAdminResultCreatePinRequestErr(admin_connection->admin_result, 1);
-	bleSetBleResult(ble_data, admin_connection->admin_result, sizeof(ble_admin_result_t));
+	setAdminResultCreatePinRequestErr(admin_connection->ble_result, 1);
+	bleSetBleResult(ble_data, admin_connection->ble_result);
 	ig_CreatePinRequest_deinit(request);
 	ret = releaseAdminConnection(&admin_connection);
 	if (ret)
@@ -2105,20 +1992,19 @@ static int handleCreatePinResponce(const uint8_t* data, int data_length,void* us
 
 		serverLog(LL_NOTICE, "has create pin result %d result %d",
 				admin_create_pin_responce.has_result, admin_create_pin_responce.result);
-		if (admin_connection->has_admin_result && admin_create_pin_responce.has_result)
+		if (admin_connection->has_ble_result && admin_create_pin_responce.has_result)
 		{
 			serverLog(LL_NOTICE, "set admin result to success");
-			admin_connection->admin_result->create_pin_request_result = admin_create_pin_responce.result;
+			admin_connection->ble_result->create_pin_request_result = admin_create_pin_responce.result;
 		}
 		else {
-			admin_connection->admin_result->create_pin_request_result = admin_create_pin_responce.result;
+			admin_connection->ble_result->create_pin_request_result = admin_create_pin_responce.result;
 		}
 		// 返回参数给调用进程
 		serverLog(LL_NOTICE, "handle_step3_message bleSetBleResult to ble data");
 		setAdminResultCMDResponse(
-				admin_connection->admin_result, &admin_create_pin_responce, sizeof(IgCreatePinResponse));
-		bleSetBleResult(
-				ble_data, admin_connection->admin_result, sizeof(ble_admin_result_t));
+				admin_connection->ble_result, &admin_create_pin_responce, sizeof(IgCreatePinResponse));
+		bleSetBleResult( ble_data, admin_connection->ble_result);
 
 		AdminConnection_endConnection((admin_connection->lock)->connectionID);
 
@@ -2244,32 +2130,26 @@ static int writeDeletePinRequest(void *arg)
 DELETE_PIN_ERROR:
 	serverLog(LL_ERROR, "DELETE_PIN_ERROR");
 	ig_DeletePinRequest_deinit(&delete_pin_request);
-	if (encryptPayloadBytes)
-	{
+	if (encryptPayloadBytes) {
 		free(encryptPayloadBytes);
 		encryptPayloadBytes = NULL;
 	}
-	if (retvalBytes)
-	{
+	if (retvalBytes) {
 		free(retvalBytes);
 		retvalBytes = NULL;
 	}
-	setAdminResultDeletePinRequestErr(admin_connection->admin_result, 1);
-	bleSetBleResult(ble_data, admin_connection->admin_result, sizeof(ble_admin_result_t));
+	setAdminResultDeletePinRequestErr(admin_connection->ble_result, 1);
+	bleSetBleResult(ble_data, admin_connection->ble_result);
 	ig_DeletePinRequest_deinit(request);
 	ret = releaseAdminConnection(&admin_connection);
-	if (ret)
-	{
-		serverLog(LL_ERROR, 
-				"releaseAdminConnection error");
+	if (ret) {
+		serverLog(LL_ERROR, "releaseAdminConnection error");
 		return ret;
 	}
-	serverLog(LL_NOTICE, 
-			"releaseAdminConnection success");
+	serverLog(LL_NOTICE, "releaseAdminConnection success");
 
 	ret = gattlib_adapter_close(ble_data->adapter);
-	if (ret)
-	{
+	if (ret) {
 		serverLog(LL_ERROR, "gattlib_adapter_close error ");
 		return ret;
 	}
@@ -2322,8 +2202,8 @@ WAITING_DELETE_PIN_ERROR:
 	serverLog(LL_ERROR, "releaseAdminConnectionData ");
 	releaseAdminConnectionData(admin_connection);
 	serverLog(LL_ERROR, "setAdminResultDeletePinRequestErr ");
-	setAdminResultDeletePinRequestErr(admin_connection->admin_result, 1);
-	bleSetBleResult(ble_data, admin_connection->admin_result, sizeof(ble_admin_result_t));
+	setAdminResultDeletePinRequestErr(admin_connection->ble_result, 1);
+	bleSetBleResult(ble_data, admin_connection->ble_result);
 	serverLog(LL_ERROR, "ig_DeletePinRequest_deinit ");
 	ig_DeletePinRequest_deinit(request);
 	serverLog(LL_ERROR, "releaseAdminConnection ");
@@ -2396,20 +2276,19 @@ static int handleDeletePinResponce(const uint8_t* data, int data_length,void* us
 
 		serverLog(LL_NOTICE, "has delete pin has result %d result %d",
 				responce.has_result, responce.result);
-		if (admin_connection->has_admin_result && responce.has_result)
+		if (admin_connection->has_ble_result && responce.has_result)
 		{
 			serverLog(LL_NOTICE, "set admin result to success");
-			admin_connection->admin_result->create_pin_request_result = responce.result;
+			admin_connection->ble_result->create_pin_request_result = responce.result;
 		}
 		else {
-			admin_connection->admin_result->create_pin_request_result = responce.result;
+			admin_connection->ble_result->create_pin_request_result = responce.result;
 		}
 		// 返回参数给调用进程
 		serverLog(LL_NOTICE, "handle_step3_message bleSetBleResult to ble data");
 		setAdminResultCMDResponse(
-				admin_connection->admin_result, &responce, sizeof(IgDeletePinResponse));
-		bleSetBleResult(
-				ble_data, admin_connection->admin_result, sizeof(ble_admin_result_t));
+				admin_connection->ble_result, &responce, sizeof(IgDeletePinResponse));
+		bleSetBleResult( ble_data, admin_connection->ble_result);
 
 		AdminConnection_endConnection((admin_connection->lock)->connectionID);
 
@@ -2430,7 +2309,7 @@ fsm_table_t admin_get_battery_level_fsm_table[ADMIN_DELETE_PIN_REQUEST_SM_TABLE_
   {BLE_ADMIN_BEGIN,         register_admin_notfication,   BLE_ADMIN_STEP1},
   {BLE_ADMIN_STEP1,         waiting_admin_step1,          BLE_ADMIN_STEP2},
   {BLE_ADMIN_STEP2,         write_admin_step2,            BLE_ADMIN_ESTABLISHED},
-  {BLE_ADMIN_ESTABLISHED,   waiting_admin_step3,          BLE_ADMIN_UNLOCK_REQUEST},
+  {BLE_ADMIN_ESTABLISHED,   waiting_admin_step3,          BLE_ADMIN_GETBATTERYLEVEL_REQUEST},
   {BLE_ADMIN_GETBATTERYLEVEL_REQUEST,   writeGetBatteryLevelRequest,   BLE_ADMIN_GETBATTERYLEVEL_RESULT},
   {BLE_ADMIN_GETBATTERYLEVEL_RESULT,  waitingGetBatteryLevelResult,        BLE_ADMIN_GETBATTERYLEVEL_DONE},
 };
@@ -2453,7 +2332,6 @@ static int writeGetBatteryLevelRequest(void *arg)
   ble_data_t *ble_data = task_node->ble_data;
   admin_connection_t *admin_connection = 
                               (admin_connection_t *)ble_data->ble_connection;
-  IgDeletePinRequest *request = admin_connection->cmd_request;
 
   srand(time(0));
   int requestID = rand() % 2147483647;
@@ -2466,45 +2344,42 @@ static int writeGetBatteryLevelRequest(void *arg)
   uint8_t *encryptPayloadBytes = NULL;
 	size_t encryptPayloadBytes_len;
 
-  IgDeletePinRequest delete_pin_request;
-  ig_DeletePinRequest_init(&delete_pin_request);
+  IgGetBatteryLevelRequest request;
+  ig_GetBatteryLevelRequest_init(&request);
   serverLog(LL_NOTICE, "requestID: %d", requestID);
-  ig_DeletePinRequest_set_operation_id(
-    &delete_pin_request, requestID);
-  ig_DeletePinRequest_set_password(
-    &delete_pin_request, admin_connection->lock->password, admin_connection->lock->password_size);
-  if (!request ||  !ig_DeletePinRequest_is_valid(request))
+  ig_GetBatteryLevelRequest_set_operation_id(
+    &request, requestID);
+  ig_GetBatteryLevelRequest_set_password(
+    &request, admin_connection->lock->password, admin_connection->lock->password_size);
+  if (!ig_GetBatteryLevelRequest_is_valid(&request))
   {
-    serverLog(LL_ERROR, "request NULL or request don't have pin");
-    goto DELETE_PIN_ERROR;
+    serverLog(LL_ERROR, "request invalid");
+    goto GET_BATTERY_ERROR;
   }
-
-  ig_DeletePinRequest_set_old_pin(
-    &delete_pin_request, request->old_pin, request->old_pin_size);
   
-  IgSerializerError IgErr = ig_DeletePinRequest_encode(
-		&delete_pin_request, buf, buf_size, &encode_size);
+  IgSerializerError IgErr = ig_GetBatteryLevelRequest_encode(
+		&request, buf, buf_size, &encode_size);
   if (IgErr)
 	{
-    serverLog(LL_ERROR, "ig_DeletePinRequest_encode err %d", IgErr);
-    goto DELETE_PIN_ERROR;
+    serverLog(LL_ERROR, "ig_GetBatteryLevelRequest_encode err %d", IgErr);
+    goto GET_BATTERY_ERROR;
 	}
-  serverLog(LL_NOTICE, "ig_DeletePinRequest_encode success size:" );
+  serverLog(LL_NOTICE, "ig_GetBatteryLevelRequest_encode success size: %d", encode_size);
 
   retvalLen = AdminConnection_encryptNative(
     admin_connection->lock->connectionID, buf, encode_size, &retvalBytes);
   if (!retvalLen) 
   {
     serverLog(LL_ERROR, "failed in AdminConnection_encryptNative");
-    goto DELETE_PIN_ERROR;
+    goto GET_BATTERY_ERROR;
   }
-  serverLog(LL_NOTICE, "AdminConnection_encryptNative success" );
+  serverLog(LL_NOTICE, "AdminConnection_encryptNative success, %d", retvalLen );
   
   if (!build_msg_payload(
 		&encryptPayloadBytes, &encryptPayloadBytes_len, retvalBytes, retvalLen))
 	{
     serverLog(LL_ERROR, "failed in build_msg_payload");
-		goto DELETE_PIN_ERROR;
+		goto GET_BATTERY_ERROR;
 	}
   serverLog(LL_NOTICE, "build_msg_payload success");
 
@@ -2513,7 +2388,7 @@ static int writeGetBatteryLevelRequest(void *arg)
     encryptPayloadBytes, encryptPayloadBytes_len);
 	if (ret != GATTLIB_SUCCESS) {
     serverLog(LL_ERROR, "write_char_by_uuid_multi_atts failed in writing th packags");
-		goto DELETE_PIN_ERROR;
+		goto GET_BATTERY_ERROR;
 	}
   serverLog(LL_NOTICE, "write_char_by_uuid_multi_atts success");
   
@@ -2521,15 +2396,14 @@ static int writeGetBatteryLevelRequest(void *arg)
   encryptPayloadBytes = NULL;
   free(retvalBytes);
   retvalBytes = NULL;
-  ig_DeletePinRequest_deinit(&delete_pin_request);
-  ig_DeletePinRequest_deinit(request);
-  admin_connection->admin_step = BLE_ADMIN_DELETEPINREQUEST_REQUEST;
+  ig_GetBatteryLevelRequest_deinit(&request);
+  admin_connection->admin_step = BLE_ADMIN_GETBATTERYLEVEL_REQUEST;
   return 0;
 
 // 出错处理
-DELETE_PIN_ERROR:
+GET_BATTERY_ERROR:
   serverLog(LL_ERROR, "DELETE_PIN_ERROR");
-  ig_DeletePinRequest_deinit(&delete_pin_request);
+  ig_GetBatteryLevelRequest_deinit(&request);
   if (encryptPayloadBytes)
   {
     free(encryptPayloadBytes);
@@ -2542,7 +2416,6 @@ DELETE_PIN_ERROR:
   }
   setAdminResultDeletePinRequestErr(admin_connection->admin_result, 1);
   bleSetBleResult(ble_data, admin_connection->admin_result, sizeof(ble_admin_result_t));
-  ig_DeletePinRequest_deinit(request);
   ret = releaseAdminConnection(&admin_connection);
   if (ret)
   {
@@ -2636,7 +2509,7 @@ WAITING_DELETE_PIN_ERROR:
 
 static int handleGetBatteryLevelResponce(const uint8_t* data, int data_length,void* user_data)
 {
-  serverLog(LL_NOTICE, "handleDeletePinResponce--------------------------------");
+  serverLog(LL_NOTICE, "handleGetBatteryLevelResponce--------------------------------");
   task_node_t *task_node = (task_node_t *)user_data;
   ble_data_t *ble_data = task_node->ble_data;
   admin_connection_t *admin_connection = 
@@ -2649,7 +2522,7 @@ static int handleGetBatteryLevelResponce(const uint8_t* data, int data_length,vo
   if (admin_connection->step_max_size == admin_connection->step_cur_size)
   {
     int ret;
-    serverLog(LL_NOTICE, "handleDeletePinResponce RECV step2 data finished");
+    serverLog(LL_NOTICE, "handleGetBatteryLevelResponce RECV step2 data finished");
     admin_connection->admin_step = BLE_ADMIN_DELETEPINREQUEST_RESULT;
 
     size_t messageLen = 
@@ -2668,9 +2541,9 @@ static int handleGetBatteryLevelResponce(const uint8_t* data, int data_length,vo
     }
     serverLog(LL_NOTICE, "AdminConnection_decryptNative responceLen %d", responceLen);
     
-    IgDeletePinResponse responce;
-    ig_DeletePinResponse_init(&responce);
-    IgSerializerError err = ig_DeletePinResponse_decode(
+    IgGetBatteryLevelResponse responce;
+    ig_GetBatteryLevelResponse_init(&responce);
+    IgSerializerError err = ig_GetBatteryLevelResponse_decode(
       responceBytes, responceLen, &responce, 0
     );
     if (err)
@@ -2680,7 +2553,7 @@ static int handleGetBatteryLevelResponce(const uint8_t* data, int data_length,vo
       goto DELETE_PINREQUEST_RESPONCE_EXIT;
     }
 
-    serverLog(LL_NOTICE, "has unlock response %d error %d",
+    serverLog(LL_NOTICE, "has get battery level response %d error %d",
               responce.has_result, responce.result);
     if (admin_connection->has_admin_result && responce.has_result)
     {
@@ -2709,8 +2582,7 @@ DELETE_PINREQUEST_RESPONCE_EXIT:
   }
 }
 
-// ------------------------ get battery level -----------------------------
-
+// ------------------------ set time -----------------------------
 fsm_table_t admin_set_time_fsm_table[ADMIN_SET_TIME_SM_TABLE_LEN] = {
   {BLE_ADMIN_BEGIN,         register_admin_notfication,   BLE_ADMIN_STEP1},
   {BLE_ADMIN_STEP1,         waiting_admin_step1,          BLE_ADMIN_STEP2},
@@ -2826,8 +2698,8 @@ SET_TIME_ERROR:
     free(retvalBytes);
     retvalBytes = NULL;
   }
-  setAdminResultSetTimeErr(admin_connection->admin_result, 1);
-  bleSetBleResult(ble_data, admin_connection->admin_result, sizeof(ble_admin_result_t));
+  setAdminResultSetTimeErr(admin_connection->ble_result, 1);
+  bleSetBleResult(ble_data, admin_connection->ble_result);
   ig_SetTimeRequest_deinit(request);
   ret = releaseAdminConnection(&admin_connection);
   if (ret)
@@ -2894,8 +2766,8 @@ WAITING_SET_TIME_ERROR:
   serverLog(LL_ERROR, "releaseAdminConnectionData ");
   releaseAdminConnectionData(admin_connection);
   serverLog(LL_ERROR, "setAdminResultDeletePinRequestErr ");
-  setAdminResultSetTimeErr(admin_connection->admin_result, 1);
-  bleSetBleResult(ble_data, admin_connection->admin_result, sizeof(ble_admin_result_t));
+  setAdminResultSetTimeErr(admin_connection->ble_result, 1);
+  bleSetBleResult(ble_data, admin_connection->ble_result);
   serverLog(LL_ERROR, "ig_DeletePinRequest_deinit ");
   ig_SetTimeRequest_deinit(request);
   serverLog(LL_ERROR, "releaseAdminConnection ");
@@ -2915,8 +2787,7 @@ WAITING_SET_TIME_ERROR:
     serverLog(LL_ERROR, "gattlib_adapter_close error ");
     return ret;
   }
-  serverLog(LL_NOTICE, 
-      "register_admin_notfication gattlib_adapter_close success");
+  serverLog(LL_NOTICE, "register_admin_notfication gattlib_adapter_close success");
 
 }
 
@@ -2968,20 +2839,19 @@ static int handleSetTimeResponce(const uint8_t* data, int data_length,void* user
 
     serverLog(LL_NOTICE, "has unlock response %d error %d",
               responce.has_result, responce.result);
-    if (admin_connection->has_admin_result && responce.has_result)
+    if (admin_connection->has_ble_result && responce.has_result)
     {
       serverLog(LL_NOTICE, "set admin result to success");
-      admin_connection->admin_result->create_pin_request_result = responce.result;
+      admin_connection->ble_result->create_pin_request_result = responce.result;
     }
     else {
-       admin_connection->admin_result->create_pin_request_result = responce.result;
+       admin_connection->ble_result->create_pin_request_result = responce.result;
     }
      // 返回参数给调用进程
     serverLog(LL_NOTICE, "handle_step3_message bleSetBleResult to ble data");
     setAdminResultCMDResponse(
-      admin_connection->admin_result, &responce, sizeof(IgSetTimeResponse));
-    bleSetBleResult(
-      ble_data, admin_connection->admin_result, sizeof(ble_admin_result_t));
+      admin_connection->ble_result, &responce, sizeof(IgSetTimeResponse));
+    bleSetBleResult( ble_data, admin_connection->ble_result);
     
     AdminConnection_endConnection((admin_connection->lock)->connectionID);
 
@@ -3149,15 +3019,14 @@ static int handle_unpair_responce(const uint8_t* data, int data_length,void* use
     }
     serverLog(LL_NOTICE, "has unpair response %d %d",unpair_resppnce.has_result, unpair_resppnce.result);
     
-    if (admin_connection->has_admin_result && unpair_resppnce.has_result)
+    if (admin_connection->has_ble_result && unpair_resppnce.has_result)
     {
       serverLog(LL_NOTICE, "set admin result to success");
-      admin_connection->admin_result->unpair_result= unpair_resppnce.result;
+      admin_connection->ble_result->unpair_result= unpair_resppnce.result;
     }
      // 返回参数给调用进程
     serverLog(LL_NOTICE, "handle_unpair_response bleSetBleResult to ble data");
-    bleSetBleResult(
-      ble_data, admin_connection->admin_result, sizeof(ble_admin_result_t));
+    bleSetBleResult( ble_data, admin_connection->ble_result);
     
   UNPAIR_RESULT_EXIT:
     g_main_loop_quit(task_node->loop);
@@ -3224,119 +3093,119 @@ int bleSetAdminParam(ble_admin_param_t *admin_param, igm_lock_t *lock)
 }
 
 int bleSetAdminRequest(
-  ble_admin_param_t *admin_param, void *cmd_request, size_t cmd_request_size)
+		ble_admin_param_t *admin_param, void *cmd_request, size_t cmd_request_size)
 {
-  if (!cmd_request) return 1;
-  if (admin_param->cmd_request)
-  {
-    free(admin_param->cmd_request);
-    admin_param->cmd_request_size = 0;
-  } 
-  admin_param->cmd_request = malloc(cmd_request_size);
-  memset(admin_param->cmd_request, 0, cmd_request_size);
-  admin_param->cmd_request_size = cmd_request_size;
-  memcpy(admin_param->cmd_request, cmd_request, cmd_request_size);
-  return 0;
+	if (!cmd_request) return 1;
+	if (admin_param->cmd_request)
+	{
+		free(admin_param->cmd_request);
+		admin_param->cmd_request_size = 0;
+	} 
+	admin_param->cmd_request = malloc(cmd_request_size);
+	memset(admin_param->cmd_request, 0, cmd_request_size);
+	admin_param->cmd_request_size = cmd_request_size;
+	memcpy(admin_param->cmd_request, cmd_request, cmd_request_size);
+	return 0;
 }
 
 // -------------------------- result operation----------------------------------
-
-int initAdminResult(ble_admin_result_t *result)
-{
-  memset(result, 0, sizeof(ble_admin_result_t));
-  return 0;
+int initAdminResult(ble_admin_result_t *result) {
+	memset(result, 0, sizeof(ble_admin_result_t));
+	return 0;
 }
 
-int setAdminResultAddr(ble_admin_result_t *result, 
-  char *addr, size_t addr_len)
-{
-  memset(result->addr,0, MAX_DEVICE_ADDR);
-  memcpy(result->addr, addr, addr_len>MAX_DEVICE_ADDR?MAX_DEVICE_ADDR:addr_len);
-  return 0;
+int setAdminResultAddr(ble_admin_result_t *result, char *addr, size_t addr_len) {
+	memset(result->addr,0, MAX_DEVICE_ADDR);
+	memcpy(result->addr, addr, addr_len>MAX_DEVICE_ADDR?MAX_DEVICE_ADDR:addr_len);
+	return 0;
 }
 
-int isAdminSuccess(ble_admin_result_t *result)
-{
-  return !result->admin_result;
+int isAdminSuccess(ble_admin_result_t *result) {
+	return !result->result;
 }
 
-void bleReleaseAdminResult(ble_admin_result_t **pp_result)
-{
-  if (!pp_result) return;
-  if (!*pp_result) return;
-  free(*pp_result);
-  *pp_result = NULL;
+void bleReleaseAdminResult(ble_admin_result_t **pp_result) {
+	if (!pp_result) return;
+	if (!*pp_result) return;
+	free(*pp_result);
+	*pp_result = NULL;
 }
 
-void setAdminResultErr(ble_admin_result_t *result, int err)
-{
-  result->admin_result = err;
-  return;
+void setAdminResultErr(ble_admin_result_t *ble_result, int err) {
+	if(NULL == ble_result){
+		printf("in setAdminResultErr result is NULL!\n");
+		return;
+	}
+	ble_result->result = err;
+	return;
 }
 
-void setAdminResultGetLogsErr(ble_admin_result_t *result, int err)
-{
-  result->getlogs_result = err;
-  return;
+void setAdminResultGetLogsErr(ble_admin_result_t *result, int err) {
+	if(NULL == result) {
+		printf("in setAdminResultGetLogsErr result is NULL!\n");
+		return;
+	}
+
+	result->getlogs_result = err;
+	return;
 }
 
-void setAdminResultLockErr(ble_admin_result_t *result, int err)
-{
-  result->lock_result = err;
-  return;
+void setAdminResultLockErr(ble_admin_result_t *result, int err) {
+	if(NULL == result) {
+		printf("in setAdminResultLockErr result is NULL!\n");
+		return;
+	}
+	result->lock_result = err;
+	return;
 }
 
-void setAdminResultUnlockErr(ble_admin_result_t *result, int err)
-{
-  result->unlock_result = err;
-  return;
+void setAdminResultUnlockErr(ble_admin_result_t *result, int err) {
+	if(NULL == result) {
+		printf("in setAdminResultUnlockErr result is NULL!\n");
+		return;
+	}
+	result->unlock_result = err;
+	return;
 }
 
-void setAdminResultCreatePinRequestErr(ble_admin_result_t *result, int err)
-{
-  result->create_pin_request_result = err;
-  return;
+void setAdminResultCreatePinRequestErr(ble_admin_result_t *result, int err) {
+	result->create_pin_request_result = err;
+	return;
 }
 
-void setAdminResultDeletePinRequestErr(ble_admin_result_t *result, int err)
-{
-  result->delete_pin_request_result = err;
-  return;
+void setAdminResultDeletePinRequestErr(ble_admin_result_t *result, int err) {
+	result->delete_pin_request_result = err;
+	return;
 }
 
-void setAdminResultSetTimeErr(ble_admin_result_t *result, int err)
-{
-  result->set_time_result = err;
-  return;
+void setAdminResultSetTimeErr(ble_admin_result_t *result, int err) {
+	result->set_time_result = err;
+	return;
 }
 
-void setAdminResultCMDResponse(
-      ble_admin_result_t *result, void *cmd_response, size_t cmd_response_size)
-{
-  if (result->cmd_response) 
-    releaseAdminResultCMDResponse(result);
-  result->cmd_response = malloc(cmd_response_size);
-  memset(result->cmd_response, 0, cmd_response_size);
-  memcpy(result->cmd_response, cmd_response, cmd_response_size);
-  return;
+void setAdminResultCMDResponse( ble_admin_result_t *result, void *cmd_response, size_t cmd_response_size) {
+	if (result->cmd_response) 
+		releaseAdminResultCMDResponse(result);
+	result->cmd_response = malloc(cmd_response_size);
+	memset(result->cmd_response, 0, cmd_response_size);
+	memcpy(result->cmd_response, cmd_response, cmd_response_size);
+	return;
 }
 
-void releaseAdminResultCMDResponse(ble_admin_result_t *result)
-{
-  if (!result) return;
-  if (!result->cmd_response) return;
+void releaseAdminResultCMDResponse(ble_admin_result_t *result) {
+	if (!result) return;
+	if (!result->cmd_response) return;
 
-  free(result->cmd_response);
-  result->cmd_response = NULL;
-  result->cmd_response_size = 0;
+	free(result->cmd_response);
+	result->cmd_response = NULL;
+	result->cmd_response_size = 0;
 }
 
-void releaseAdminResult(ble_admin_result_t **pp_result)
-{
-  // 主要释放里面内容,不释放自己
-  if (!pp_result) return;
-  if (!*pp_result) return;
-  releaseAdminResultCMDResponse(*pp_result);
+void releaseAdminResult(ble_admin_result_t **pp_result) {
+	// 主要释放里面内容,不释放自己
+	if (!pp_result) return;
+	if (!*pp_result) return;
+	releaseAdminResultCMDResponse(*pp_result);
 }
 
 

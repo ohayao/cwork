@@ -19,8 +19,8 @@
 #include "../../src/bridge/https_client/https.h"
 
 //临时定义发布和订阅的TOPIC
-#define PUB_TOPIC "igh/dev/IGN123456789"
-#define SUB_TOPIC "igh/srv/IGN123456789"
+#define PUB_TOPIC "igh/dev/DCA63210C7DA"
+#define SUB_TOPIC "igh/srv/DCA63210C7DA"
 
 //定义订阅和发布web端TOPIC
 #define SUB_WEBDEMO "/WEBSOCKET_DEMO_SUB"
@@ -30,6 +30,27 @@ LIST_HEAD(waiting_task_head);
 LIST_HEAD(doing_task_head);
  
 sysinfo_t g_sysif;
+
+char* get_file_content(char *path);
+void write_file_content(char *path,char *content);
+
+char* get_file_content(char *path){
+    char* buf;
+    FILE *csr=fopen(path,"r");
+    fseek(csr,0,SEEK_END);
+    int len=ftell(csr);
+    buf=(char*)malloc(len+1);
+    rewind(csr);
+    fread(buf,1,len,csr);
+    buf[len]=0;
+    fclose(csr);
+    return buf;
+}
+void write_file_content(char *path,char *content){
+    FILE *csr=fopen(path,"w");
+    fwrite(content,sizeof(char),strlen(content),csr);
+    fclose(csr);
+}
 
 int download_ca();
 int download_ca(){
@@ -62,7 +83,26 @@ int download_ca(){
     strncpy(biridgeToken,response+18,strlen(response)-20);
     printf("BirdgeTOken=[%s]\n",biridgeToken);
     printf("=====>>>>>Step3. Download CA \n");
-    printf("======================TODO================\n");
+    char* localCSR=get_file_content("/root/project/gomvc_blog/ign/webign.csr");
+    memset(data,0,sizeof(data));
+    memset(response,0,sizeof(response));
+    HTTP_INFO hi3;
+    url="https://tkm70zar9f.execute-api.ap-southeast-1.amazonaws.com/development/devices/bridge/DCA63210C7DA";
+    cJSON *root;
+    root=cJSON_CreateObject();
+    cJSON_AddStringToObject(root,"csr",localCSR);
+    char *sdata=cJSON_PrintUnformatted(root);
+    cJSON_Delete(root);
+    printf("________________Request Body Content\n%s\n",sdata);
+    ret=http_post_with_auth(&hi3,url,biridgeToken,sdata,response,sizeof(response));
+    if(ret!=200) return -3;
+    root=cJSON_Parse(response);
+    if(root==NULL) return -4;
+    cJSON *pem=cJSON_GetObjectItem(root,"pem");
+    printf("pem=%s\n",pem->valuestring);
+    write_file_content("./test_test_test_test.csr",pem->valuestring);
+    cJSON_Delete(root);
+    printf("=====>>>>>DOWNLOAD-CSR Over!!!!!\n");
     return 0;
 }
 
@@ -99,7 +139,7 @@ int FSMHandle(task_node_t* tn) {
 
 //create birdge profile
 ign_BridgeProfile Create_IgnBridgeProfile(char *bridgeID);
-ign_BridgeProfile Create_IgnBridgeProfile(char *bridgeID){
+    ign_BridgeProfile Create_IgnBridgeProfile(char *bridgeID){
     ign_BridgeProfile bp={};
     bp.os_info=ign_OSType_LINUX;
     char temp[100];
@@ -109,7 +149,7 @@ ign_BridgeProfile Create_IgnBridgeProfile(char *bridgeID){
     memcpy(bp.bt_id.bytes,temp,strlen(temp));
 
     memset(temp,0,sizeof(temp));
-    strcpy(temp,"mac_addr");
+    strcpy(temp,"DCA63210C7DA");
     bp.mac_addr.size=strlen(temp);
     memcpy(bp.mac_addr.bytes,temp,strlen(temp));
 
@@ -203,6 +243,124 @@ int BLEParing(void* tn){
     return 0;
 }
 
+int Sync_Battery();
+int Sync_Battery(){
+    ign_MsgInfo battery={};
+    battery.event_type=ign_EventType_DEMO_UPDATE_LOCK_BATTERY;
+    battery.time=get_ustime();
+    battery.msg_id=GetMsgID();
+    ign_BridgeEventData bed={};
+    sprintf(bed.demo_lockId,"IGM303a316e7");
+    bed.has_profile=true;
+    bed.profile=Create_IgnBridgeProfile("DCA63210C7DA");
+
+    bed.has_demo_update_lock_battery=true;
+    ign_DemoUpdateLockBattery dulb={};
+    dulb.battery=66;
+    bed.demo_update_lock_battery=dulb;
+
+    battery.has_bridge_data=true;
+    battery.bridge_data=bed;
+    
+
+    int publish_result;
+    uint8_t buf[1024];
+    memset(buf,0,sizeof(buf));
+    pb_ostream_t out=pb_ostream_from_buffer(buf,sizeof(buf));
+    if(pb_encode(&out,ign_MsgInfo_fields,&battery)){
+        size_t len=out.bytes_written;
+
+        if((publish_result=util_sendMessage(g_sysif.mqtt_c,PUB_TOPIC,1,buf,(int)len))!=MQTTCLIENT_SUCCESS){
+            printf("SEND MQTT BATTERY ERROR WITH CODE[%d]\n",publish_result);
+        }else{
+            printf("SEND MQTT BATTERY SUCCESS\n");
+        }
+    }else{
+        printf("ENCODE MQTT BATTERY ERROR\n");
+    }
+    return 0;
+}
+int Sync_Status();
+int Sync_Status(){
+ign_MsgInfo battery={};
+    battery.event_type=ign_EventType_DEMO_UPDATE_LOCK_STATUS;
+    battery.time=get_ustime();
+    battery.msg_id=GetMsgID();
+    ign_BridgeEventData bed={};
+    sprintf(bed.demo_lockId,"IGM303a316e7");
+    bed.has_profile=true;
+    bed.profile=Create_IgnBridgeProfile("DCA63210C7DA");
+
+    bed.has_demo_update_lock_status=true;
+    ign_DemoUpdateLockStatus duls={};
+    duls.status=1;
+    bed.demo_update_lock_status=duls;
+
+    battery.has_bridge_data=true;
+    battery.bridge_data=bed;
+    
+
+    int publish_result;
+    uint8_t buf[1024];
+    memset(buf,0,sizeof(buf));
+    pb_ostream_t out=pb_ostream_from_buffer(buf,sizeof(buf));
+    if(pb_encode(&out,ign_MsgInfo_fields,&battery)){
+        size_t len=out.bytes_written;
+
+        if((publish_result=util_sendMessage(g_sysif.mqtt_c,PUB_TOPIC,1,buf,(int)len))!=MQTTCLIENT_SUCCESS){
+            printf("SEND MQTT STATUS ERROR WITH CODE[%d]\n",publish_result);
+        }else{
+            printf("SEND MQTT STATUS SUCCESS\n");
+        }
+    }else{
+        printf("ENCODE MQTT STATUS ERROR\n");
+    }
+    return 0;
+
+}
+int Sync_Activities();
+int Sync_Activities(){
+    ign_MsgInfo battery={};
+    battery.event_type=ign_EventType_DEMO_UPDATE_LOCK_ACTIVITIES;
+    battery.time=get_ustime();
+    battery.msg_id=GetMsgID();
+    ign_BridgeEventData bed={};
+    sprintf(bed.demo_lockId,"IGM303a316e7");
+    bed.has_profile=true;
+    bed.profile=Create_IgnBridgeProfile("DCA63210C7DA");
+
+    bed.has_demo_update_lock_activities=true;
+    ign_DemoUpdateLockActivities dula={};
+    char logs[500];
+    memset(logs,0,sizeof(logs));
+    strcpy(logs,"log log log log");
+    dula.log.size=strlen(logs);
+    memcpy(dula.log.bytes,logs,strlen(logs));
+    bed.demo_update_lock_activities=dula;
+
+    battery.has_bridge_data=true;
+    battery.bridge_data=bed;
+    
+
+    int publish_result;
+    uint8_t buf[1024];
+    memset(buf,0,sizeof(buf));
+    pb_ostream_t out=pb_ostream_from_buffer(buf,sizeof(buf));
+    if(pb_encode(&out,ign_MsgInfo_fields,&battery)){
+        size_t len=out.bytes_written;
+
+        if((publish_result=util_sendMessage(g_sysif.mqtt_c,PUB_TOPIC,1,buf,(int)len))!=MQTTCLIENT_SUCCESS){
+            printf("SEND MQTT ACTIVITIES ERROR WITH CODE[%d]\n",publish_result);
+        }else{
+            printf("SEND MQTT ACTIVITIES SUCCESS\n");
+        }
+    }else{
+        printf("ENCODE MQTT ACTIVITIES ERROR\n");
+    }
+    return 0;
+
+}
+
 
 int Init(void* tn) {
     // get WiFi & user info from Mobile App
@@ -287,7 +445,7 @@ int HeartBeat(){
     hb.msg_id=get_ustime();
     ign_BridgeEventData bed={};
     bed.has_profile=true;
-    bed.profile=Create_IgnBridgeProfile("IGN123456789");
+    bed.profile=Create_IgnBridgeProfile("DCA63210C7DA");
     hb.has_bridge_data=true;
     hb.bridge_data=bed;
 
@@ -364,13 +522,13 @@ void WaitMQTT(sysinfo_t *si){
                                     printf("%02d bt_id=%s\n",i,glocks[i].bt_id);
                                 }
                             }
-
+       printf("=======> RECV UPDATE_USER_INFO\n");
        ign_MsgInfo tmsg={};
        tmsg.event_type=ign_EventType_UPDATE_USER_INFO;
        tmsg.has_bridge_data=true;
        ign_BridgeEventData tbed={};
        tbed.has_profile=true;
-       tbed.profile=Create_IgnBridgeProfile("IGN123456789");
+       tbed.profile=Create_IgnBridgeProfile("DCA63210C7DA");
        tmsg.bridge_data=tbed;
        ign_ServerEventData tsd={};
        tsd.lock_entries_count=5;
@@ -416,6 +574,19 @@ void WaitMQTT(sysinfo_t *si){
                                 printf("%x",b);
                             }
                             printf("\n");
+                            if(imsg.has_server_data&&imsg.server_data.has_demo_job){
+                                switch(imsg.server_data.demo_job.op_cmd){
+                                case ign_DemoLockCommand_GET_BATTERY:
+                                    Sync_Battery();
+                                    break;
+                                case ign_DemoLockCommand_GET_LOCK_STATUS:
+                                    Sync_Status();
+                                    break;
+                                case ign_DemoLockCommand_GET_LOGS:
+                                    Sync_Activities();
+                                    break;
+                                }
+                            }
                             //util_sendMessage(g_sysif.mqtt_c,SUB_WEBDEMO,1,msg->payload,msg->payloadlen);
                             goto gomqttfree;
                         break;
@@ -508,7 +679,8 @@ int WaitBtn(sysinfo_t *si){
 }
 
 int main() {
-    download_ca();
+    int res=download_ca();
+    printf("download_ca res=%d\n",res);
     serverLog(LL_NOTICE,"Ready to start.");
     //daemon(1, 0);
     //sysinfo_t *si = malloc(sizeof(sysinfo_t));

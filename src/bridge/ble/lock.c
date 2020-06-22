@@ -140,8 +140,8 @@ int setLockConnectionID(igm_lock_t *lock, int ID) {
 }
 
 int releaseLockAminKey(igm_lock_t *lock) {
+	serverLog(LL_NOTICE, "releaseLockAminKey");
 	if (lock && lock->has_admin_key && lock->admin_key && lock->admin_key_len) {
-		serverLog(LL_NOTICE, "releaseLockAminKey");
 		lock->has_admin_key = 0;
 		lock->admin_key_len = 0;
 		free(lock->admin_key);
@@ -151,8 +151,8 @@ int releaseLockAminKey(igm_lock_t *lock) {
 }
 
 int releaseLockPassword(igm_lock_t *lock) {
+	serverLog(LL_NOTICE, "releaseLockPassword");
 	if (lock && lock->has_password && lock->password_size && lock->password) {
-		serverLog(LL_NOTICE, "releaseLockPassword");
 		lock->has_password = 0;
 		lock->password_size = 0;
 		free(lock->password);
@@ -162,8 +162,8 @@ int releaseLockPassword(igm_lock_t *lock) {
 }
 
 int releaseLockCmd(igm_lock_t *lock) {
-	if (lock && lock->has_lock_cmd&& lock->lock_cmd_size && lock->lock_cmd) {
-		serverLog(LL_NOTICE, "releaseLockCmd");
+	serverLog(LL_NOTICE, "releaseLockCmd");
+	if (lock && lock->has_lock_cmd && lock->lock_cmd_size && lock->lock_cmd) {
 		lock->has_lock_cmd = 0;
 		lock->lock_cmd_size = 0;
 		free(lock->lock_cmd);

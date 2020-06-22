@@ -79,7 +79,7 @@ int bleSetAdminRequest(
 
 typedef struct BLEAdminResult {
   char addr[MAX_DEVICE_ADDR];
-  int admin_result;               // ***_result, 简单判断是否有出错
+  int result;               // ***_result, 简单判断是否有出错
   int lock_result;
   int unlock_result;
   int unpair_result;

@@ -92,6 +92,7 @@ int  http_write_header(HTTP_INFO *hi);
 int  http_write(HTTP_INFO *hi, char *data, int len);
 int  http_write_end(HTTP_INFO *hi);
 int  http_read_chunked(HTTP_INFO *hi, char *response, int size);
-int http_get_with_auth(HTTP_INFO *hi, char *url,char *authorization, char *response, int size);
+int  http_get_with_auth(HTTP_INFO *hi, char *url,char *authorization, char *response, int size);
+int  http_post_with_auth(HTTP_INFO *hi,char *url,char *authorization, char *data,char *response,int size);
 #endif //HTTPS_CLIENT_HTTPS_H
 

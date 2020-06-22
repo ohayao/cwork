@@ -47,26 +47,24 @@ bool build_msg_payload(uint8_t **p_payloadBytes, size_t *payload_len, uint8_t *s
 
 
 int write_char_by_uuid_multi_atts (
-	gatt_connection_t* gatt_connection, uuid_t* uuid, const uint8_t* buffer, 
-	size_t buffer_len)
+		gatt_connection_t* gatt_connection, uuid_t* uuid, const uint8_t* buffer, 
+		size_t buffer_len) 
 {
-  int BLE_ATT_MAX_BYTES = 20;
+	int BLE_ATT_MAX_BYTES = 20;
 	int ret = GATTLIB_SUCCESS;
 	uint8_t tmp_bytes[BLE_ATT_MAX_BYTES];
 	size_t size_left;
 	int i;
-	for (i = 0; i < buffer_len; i += BLE_ATT_MAX_BYTES)
-	{
+	for (i = 0; i < buffer_len; i += BLE_ATT_MAX_BYTES) {
 		size_left = buffer_len-i>=BLE_ATT_MAX_BYTES?BLE_ATT_MAX_BYTES:buffer_len-i;
 		memset(tmp_bytes, 0, BLE_ATT_MAX_BYTES);
 		memcpy(tmp_bytes, buffer+i, size_left);
-		ret = gattlib_write_char_by_uuid(
-			gatt_connection, uuid, tmp_bytes, size_left);
+		ret = gattlib_write_char_by_uuid(gatt_connection, uuid, tmp_bytes, size_left);
 		if (ret != GATTLIB_SUCCESS) {
-      serverLog(LL_ERROR, "write_char_by_uuid_multi_atts: gattlib_write_char_by_uuid failed in writint ");
+			serverLog(LL_ERROR, "write_char_by_uuid_multi_atts: gattlib_write_char_by_uuid err[%d]", ret);
 			return ret;
 		}
-    // serverLog(LL_NOTICE, "write_char_by_uuid_multi_atts: gattlib_write_char_by_uuid success in writing");
+		// serverLog(LL_NOTICE, "write_char_by_uuid_multi_atts: gattlib_write_char_by_uuid success in writing");
 	}
 	return ret;
 }

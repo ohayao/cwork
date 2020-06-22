@@ -2,6 +2,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <bridge/bridge_main/log.h>
+#include "bridge/ble/ble_admin.h"
 
 int bleInitData(ble_data_t *data)
 {
@@ -72,25 +73,23 @@ int bleGetBleResult(ble_data_t *data, void *result)
   return 0;
 }
 
-int bleReleaseBleResult(ble_data_t *data)
-{
-  if (data->ble_result)
-  {
-    data->ble_result_len = 0;
-    free(data->ble_result);
-    data->ble_result = NULL;
-  }
-  return 0;
+int bleReleaseBleResult(ble_data_t *data) {
+	if (data->ble_result) {
+		data->ble_result_len = 0;
+		free(data->ble_result);
+		data->ble_result = NULL;
+	}
+	return 0;
 }
 
-int bleSetBleResult(ble_data_t *data, void *ble_result, int ble_result_len)
-{
-  bleReleaseBleResult(data);
-  data->ble_result = calloc(ble_result_len, 1);
-  // TODO 申请内存可能出错
-  data->ble_result_len = ble_result_len;
-  memcpy(data->ble_result, ble_result, data->ble_result_len);
-  return 0;
+int bleSetBleResult(ble_data_t *data, void *ble_result) {
+	unsigned int ble_result_len = sizeof(ble_admin_result_t);
+	bleReleaseBleResult(data);
+	data->ble_result = calloc(ble_result_len, 1);
+	// TODO 申请内存可能出错
+	data->ble_result_len = ble_result_len;
+	memcpy(data->ble_result, ble_result, data->ble_result_len);
+	return 0;
 }
 
 int bleInitResults(ble_data_t *data, int n_results, int size_of_result)

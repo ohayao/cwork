@@ -1,14 +1,20 @@
 #ifndef __IGN__
 #define __IGN__
 
-#include <pthread.h>
-#include <stdlib.h>
+#include <stdio.h>
+#include <ctype.h>
+#include <string.h>
+#include <strings.h>
+#include <time.h>
 #include <unistd.h>
 #include <stdarg.h>
-#include <stdatomic.h>
-#include <time.h>
 #include <sys/time.h>
-#include <string.h>
+#include <syslog.h>
+#include <stdlib.h>
+#include <assert.h> 
+
+#include <pthread.h>
+#include <stdatomic.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/ioctl.h>
@@ -61,7 +67,7 @@ INC:
 	return g_msg_id;
 }
 
-int Init_MQTT(MQTTClient* p_mqtt);
+//int Init_MQTT(MQTTClient* p_mqtt);
 
 int hexStrToByte(const char* source, uint8_t* dest, int sourceLen) {
     short i;
