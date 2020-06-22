@@ -25,6 +25,7 @@
 
 // #include "MQTTClient.h"
 
+#define BLE_SCAN_TIMEOUT   4
 
 atomic_int g_msg_id;
 
