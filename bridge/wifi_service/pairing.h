@@ -30,7 +30,7 @@ typedef struct
 }recv_data;
 
 
-void recvData(recv_data *recv_pairing_data, uint8_t * data);
+void recvData(recv_data *recv_pairing_data, uint8_t * data, uint16_t data_length);
 
 
 #endif

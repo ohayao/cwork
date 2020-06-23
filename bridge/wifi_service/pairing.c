@@ -56,6 +56,13 @@ int allocRecvData(recv_data *recv_pairing_data, int data_len)
   return 0;
 }
 
+int setRecvDataStatus(recv_data *recv_pairing_data, RCEV_STATUS status)
+{
+  if (!recv_pairing_data) return 1;
+  recv_pairing_data->recv_status = status;
+  return 0;
+}
+
 // 1: 已经分配
 // 0: 没有分配
 int isRecvDataAlloc(recv_data *recv_pairing_data)
@@ -63,7 +70,26 @@ int isRecvDataAlloc(recv_data *recv_pairing_data)
   return recv_pairing_data->data == NULL;
 }
 
-void recvData(recv_data *recv_pairing_data, uint8_t * data)
+int isRecvFullPkg(recv_data *recv_pairing_data)
+{
+  return recv_pairing_data->recv_len == recv_pairing_data->recv_len;
+}
+
+int copyData(recv_data *recv_pairing_data, uint8_t *data, uint16_t data_length)
+{
+  if (!recv_pairing_data) return 1;
+  if (!recv_pairing_data->data) return 2;
+  if (recv_pairing_data->data_len < recv_pairing_data->recv_len+data_length)
+    return 3;
+  memcpy(
+    recv_pairing_data->data+recv_pairing_data->recv_len, 
+    data, data_length
+  );
+  recv_pairing_data->recv_len += data_length;
+  return 0;
+}
+
+void recvData(recv_data *recv_pairing_data, uint8_t * data, uint16_t data_length)
 {
   serverLog(LL_NOTICE, "int recvData -------------------");
   int err = 0;
@@ -72,7 +98,9 @@ void recvData(recv_data *recv_pairing_data, uint8_t * data)
   {
     case NONE:
     {
+      // 创建新的存储空间, 准备接收
       serverLog(LL_NOTICE, "recvData NONE-------------------");
+      // 所获得的, 是 整个蓝牙包 (长度+加密报文)
       uint16_t data_length = getDataLength(data, &recv_pairing_data->n_size_byte);
       if (allocRecvData(recv_pairing_data, data_length))
       {
@@ -80,12 +108,24 @@ void recvData(recv_data *recv_pairing_data, uint8_t * data)
         // TODO: some fix method?
         return;
       }
-      memcpy(recv_pairing_data->data, data, recv_pairing_data->data_len);
+      copyData(recv_pairing_data, data, data_length);
+      // 设置为已经开始接收数据
+      setRecvDataStatus(recv_pairing_data, GOT_PREV_DATA);
     }
     case GOT_PREV_DATA:
+      serverLog(LL_NOTICE, "recvData GOT_PREV_DATA-------------------");
       /* code */
+      if (copyData(recv_pairing_data, data, data_length))
+      {
+        serverLog(LL_ERROR, "copyData err");
+      }
+      if (recv_pairing_data && isRecvFullPkg(recv_pairing_data))
+      {
+        setRecvDataStatus(recv_pairing_data, FINISHED_SUCCESS);
+      }
       break;
     case FINISHED_SUCCESS:
+      serverLog(LL_NOTICE, "recvData FINISHED_SUCCESS-------------------");
       /* code */
       break;
     case FINISHED_ERROR:
