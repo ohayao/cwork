@@ -5,11 +5,21 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
-
+typedef enum {
+	C_SUBSCRIBE = 0,
+  C_WRITE_STEP1,
+  S_REPLY_STEP2,
+  C_WRITE_STEP3,
+  S_REPLY_STEP4,
+  C_WRITE_COMMIT,
+  ERR_EVENT,
+} PAIRING_EVENT;
 
 typedef enum {
 	PAIRING_BEGIN = 0,
+  PAIRING_STEP1,
 	PAIRING_STEP2,
+  PAIRING_STEP3,
 	PAIRING_STEP4,
 	PAIRING_COMPLETE,
 	PAIRING_IDLE,
@@ -29,10 +39,11 @@ typedef struct
 	uint16_t n_size_byte;
 	uint16_t recv_len;
 	RCEV_STATUS recv_status;
-}recv_data;
+}RecvData;
 
-
-void recvData(recv_data *recv_pairing_data, uint8_t * data, uint16_t data_length);
+int getRecvData(RecvData **p_recv_data);
+int freeRecvData(RecvData **p_recv_data);
+void recvData(RecvData *recv_pairing_data, uint8_t * data, uint16_t data_length);
 
 
 #endif

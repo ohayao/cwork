@@ -1,17 +1,18 @@
-#include <bridge/ble/ble_pairing.h>
-#include <bridge/bridge_main/task.h>
-#include <bridge/bridge_main/log.h>
+
 #include <pthread.h>
 #include <unistd.h>
-#include "bridge/lock/messages/PairingStep1.h"
-#include <bridge/lock/messages/PairingStep2.h>
-#include <bridge/lock/messages/PairingStep3.h>
-#include <bridge/lock/messages/PairingStep4.h>
-#include <bridge/lock/messages/PairingCommit.h>
-#include <bridge/lock/connection/pairing_connection.h>
-#include <bridge/ble/ble_operation.h>
 #include <string.h>
 #include <stdlib.h>
+#include "bridge/lock/messages/PairingStep1.h"
+#include "bridge/lock/messages/PairingStep2.h"
+#include "bridge/lock/messages/PairingStep3.h"
+#include "bridge/lock/messages/PairingStep4.h"
+#include "bridge/lock/messages/PairingCommit.h"
+#include "bridge/lock/connection/pairing_connection.h"
+#include "bridge/ble/ble_operation.h"
+#include "bridge/ble/ble_pairing.h"
+#include "bridge/bridge_main/task.h"
+#include "bridge/bridge_main/log.h"
 
 static char pairing_str[] = "5c3a659e-897e-45e1-b016-007107c96df6";
 // 产生一个错误的返回.

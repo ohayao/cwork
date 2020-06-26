@@ -21,7 +21,7 @@ uint16_t getDataLength(uint8_t data[], uint16_t *n_size_byte)
 	}
 }
 
-int freeRecvAllocData(recv_data *recv_pairing_data)
+int freeRecvAllocData(RecvData *recv_pairing_data)
 {
   if (!recv_pairing_data) 
   {
@@ -40,7 +40,7 @@ int freeRecvAllocData(recv_data *recv_pairing_data)
   return 0;
 }
 
-int allocRecvData(recv_data *recv_pairing_data, int data_len)
+int allocRecvData(RecvData *recv_pairing_data, int data_len)
 {
   if (!recv_pairing_data) {
     serverLog(LL_ERROR, "allocRecvData recv_pairing_data NULL");
@@ -58,7 +58,7 @@ int allocRecvData(recv_data *recv_pairing_data, int data_len)
   return 0;
 }
 
-int setRecvDataStatus(recv_data *recv_pairing_data, RCEV_STATUS status)
+int setRecvDataStatus(RecvData *recv_pairing_data, RCEV_STATUS status)
 {
   if (!recv_pairing_data) return 1;
   recv_pairing_data->recv_status = status;
@@ -67,17 +67,17 @@ int setRecvDataStatus(recv_data *recv_pairing_data, RCEV_STATUS status)
 
 // 1: 已经分配
 // 0: 没有分配
-int isRecvDataAlloc(recv_data *recv_pairing_data)
+int isRecvDataAlloc(RecvData *recv_pairing_data)
 {
   return recv_pairing_data->data == NULL;
 }
 
-int isRecvFullPkg(recv_data *recv_pairing_data)
+int isRecvFullPkg(RecvData *recv_pairing_data)
 {
   return recv_pairing_data->recv_len == recv_pairing_data->recv_len;
 }
 
-int copyData(recv_data *recv_pairing_data, uint8_t *data, uint16_t data_length)
+int copyData(RecvData *recv_pairing_data, uint8_t *data, uint16_t data_length)
 {
   if (!recv_pairing_data) return 1;
   if (!recv_pairing_data->data) return 2;
@@ -92,7 +92,7 @@ int copyData(recv_data *recv_pairing_data, uint8_t *data, uint16_t data_length)
 }
 
 // 
-void recvData(recv_data *recv_pairing_data, uint8_t * data, uint16_t data_length)
+void recvData(RecvData *recv_pairing_data, uint8_t * data, uint16_t data_length)
 {
   serverLog(LL_NOTICE, "int recvData -------------------");
   int err = 0;
