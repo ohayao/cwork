@@ -1,6 +1,8 @@
 #include "bridge/wifi_service/pairing.h"
 #include "bridge/bridge_main/log.h"
 
+static PAIRING_STATUS flag_pairing_status;
+
 //传递数据, 获得这段数据的长度
 uint16_t getDataLength(uint8_t data[], uint16_t *n_size_byte)
 {
@@ -89,11 +91,12 @@ int copyData(recv_data *recv_pairing_data, uint8_t *data, uint16_t data_length)
   return 0;
 }
 
+// 
 void recvData(recv_data *recv_pairing_data, uint8_t * data, uint16_t data_length)
 {
   serverLog(LL_NOTICE, "int recvData -------------------");
   int err = 0;
-  uint16_t data_length = 0;
+  uint16_t pkg_len = 0;
   switch (recv_pairing_data->recv_status)
   {
     case NONE:
@@ -101,13 +104,14 @@ void recvData(recv_data *recv_pairing_data, uint8_t * data, uint16_t data_length
       // 创建新的存储空间, 准备接收
       serverLog(LL_NOTICE, "recvData NONE-------------------");
       // 所获得的, 是 整个蓝牙包 (长度+加密报文)
-      uint16_t data_length = getDataLength(data, &recv_pairing_data->n_size_byte);
-      if (allocRecvData(recv_pairing_data, data_length))
+      pkg_len = getDataLength(data, &recv_pairing_data->n_size_byte);
+      if (allocRecvData(recv_pairing_data, pkg_len))
       {
         serverLog(LL_ERROR, "recvData alloc data err");
         // TODO: some fix method?
         return;
       }
+      // 把当前的数据复制上去
       copyData(recv_pairing_data, data, data_length);
       // 设置为已经开始接收数据
       setRecvDataStatus(recv_pairing_data, GOT_PREV_DATA);

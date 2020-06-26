@@ -1,5 +1,5 @@
 #include "bridge/gattlib/gattlib.h"
-#include "bridge/wifi_service/SeWifiInfoRequest.h"
+#include "bridge/wifi_service/SetWifiInfoRequest.h"
 #include "bridge/bridge_main/log.h"
 #include "bridge/ble/lock.h"
 

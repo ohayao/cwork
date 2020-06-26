@@ -1,6 +1,6 @@
 #include <stdio.h>
 
-#include "bridge/wifi/SeWifiInfoRequest.h"
+#include "bridge/wifi_service/SetWifiInfoRequest.h"
 #include "bridge/bridge_main/log.h"
 
 int main(int argc, char *argv[])

@@ -11,6 +11,7 @@ set(TEST_DEPENDENCIES
   ign_proto
   ign_lib
   ign_wifi_service
+  ign_wifi_fsm1
 )
 
 
@@ -87,7 +88,14 @@ target_link_libraries(admin_get_battery_level
   ${TEST_DEPENDENCIES}
 )
 
+# 测试 set wifi 要用的
 add_executable(set_wifi_info ./set_wifi_info.c)
 target_link_libraries(set_wifi_info
+  ${TEST_DEPENDENCIES}
+)
+
+# 测试状态基
+add_executable(pairing_fsm ./pairing_fsm.c)
+target_link_libraries(pairing_fsm
   ${TEST_DEPENDENCIES}
 )

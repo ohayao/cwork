@@ -26,19 +26,32 @@ add_library(bluez_gdbus
 )
 
 set(WIFI_SERVICE_HDR
-  ./SeWifiInfoRequest.h
+  ./SetWifiInfoRequest.h
 )
 
 set(WIFI_SERVICE_SRC
-  ./SeWifiInfoRequest.c
+  ./SetWifiInfoRequest.c
 )
 
 add_library(ign_wifi_service
   ${WIFI_SERVICE_HDR} ${WIFI_SERVICE_SRC}
 )
 
+# fsm lib
+set(WIFI_FSM_HDR
+  ./fsm1.h
+)
 
-add_executable(server ./server.c ./error.c ./SeWifiInfoRequest.c ./pairing.c)
+set(WIFI_FSM_SRC
+  ./fsm1.c
+)
+
+add_library(ign_wifi_fsm1
+  ${WIFI_FSM_HDR} ${WIFI_FSM_SRC}
+)
+
+
+add_executable(server ./server.c ./error.c ./SetWifiInfoRequest.c ./pairing.c)
 target_link_libraries(server
   ${GLIB_LDFLAGS} ${GIO_UNIX_LDFLAGS} ${DBUS_LDFLAGS} 
   bluez_gdbus ign_wifi_service ${WIFI_DEPENDENCIES}

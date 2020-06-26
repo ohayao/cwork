@@ -39,7 +39,7 @@
 #include "gdbus/gdbus.h"
 
 #include "bridge/wifi_service/error.h"
-#include "bridge/wifi_service/SeWifiInfoRequest.h"
+#include "bridge/wifi_service/SetWifiInfoRequest.h"
 
 #define GATT_MGR_IFACE			"org.bluez.GattManager1"
 #define GATT_SERVICE_IFACE		"org.bluez.GattService1"
@@ -53,6 +53,8 @@
 
 /* Random UUID for testing purpose */
 #define READ_WRITE_DESCRIPTOR_UUID	"8260c653-1a54-426b-9e36-e84c238bc669"
+
+
 
 static GMainLoop *main_loop;
 static GSList *services;
@@ -90,6 +92,10 @@ struct descriptor {
  */
 static const char *wifi_info_props[] = { "write-without-response", "notify", NULL };
 static const char *desc_props[] = { "read", "write", NULL };
+
+
+// functions
+static void chr_write(struct characteristic *chr, const uint8_t *value, int len);
 
 static gboolean desc_get_uuid(const GDBusPropertyTable *property,
 					DBusMessageIter *iter, void *user_data)
@@ -263,16 +269,16 @@ static gboolean chr_get_value(const GDBusPropertyTable *property,
 }
 
 static gboolean chrc_get_notifying(const GDBusPropertyTable *property,
-					DBusMessageIter *iter, void *data)
+					DBusMessageIter *iter, void *user_data)
 {
 	printf("chrc_get_notifying\n");
-	struct characteristic *chrc = data;
+	struct characteristic *chrc = user_data;
 	dbus_bool_t value;
 
 	value = chrc->notifying ? TRUE : FALSE;
 
 	dbus_message_iter_append_basic(iter, DBUS_TYPE_BOOLEAN, &value);
-
+	printf("chrc_get_notifying  ------------------ \n");
 	return TRUE;
 }
 
@@ -298,16 +304,7 @@ static gboolean chr_get_props(const GDBusPropertyTable *property,
 }
 
 
-static void chr_write(struct characteristic *chr, const uint8_t *value, int len)
-{
-	printf("chr_write\n");
-	g_free(chr->value);
-	chr->value = g_memdup(value, len);
-	chr->vlen = len;
-	printf("g_dbus_emit_property_changed\n");
-	g_dbus_emit_property_changed(connection, chr->path, GATT_CHR_IFACE,
-								"Value");
-}
+
 
 static void chr_set_value(const GDBusPropertyTable *property,
 				DBusMessageIter *iter,
@@ -491,16 +488,31 @@ static DBusMessage *chr_read_value(DBusConnection *conn, DBusMessage *msg,
 	return reply;
 }
 
+static void chr_write(struct characteristic *chr, const uint8_t *value, int len)
+{
+	printf("chr_write state machine start");
+	g_free(chr->value);
+	chr->value = g_memdup(value, len);
+	chr->vlen = len;
+	printf("g_dbus_emit_property_changed\n");
+	g_dbus_emit_property_changed(connection, chr->path, GATT_CHR_IFACE,
+								"Value");
+}
+
+// 因为 process_message method->function的调用, 就是调的这个函数, 所以我直接在这里写状态机
+// 
 static DBusMessage *chr_write_value(DBusConnection *conn, DBusMessage *msg,
 							void *user_data)
 {
+	// 初始化变量状态
 	struct characteristic *chr = user_data;
 	DBusMessageIter iter;
-	const uint8_t *value;
-	const uint8_t *wifi_info;
-	int len;
+	const uint8_t *value = NULL;
+	const uint8_t *wifi_info = NULL;
+	int len = 0;
 	const char *device;
 
+	// 初始化一个迭代器样的东西, 对于这个消息
 	dbus_message_iter_init(msg, &iter);
 
 	if (parse_value(&iter, &value, &len))
@@ -517,11 +529,14 @@ static DBusMessage *chr_write_value(DBusConnection *conn, DBusMessage *msg,
 		return g_dbus_create_error(msg, DBUS_ERROR_INVALID_ARGS,
 							"Invalid arguments");
 	}
+
 	if (!len) {
 		printf("len is zero\n");
 		return dbus_message_new_method_return(msg);
 	}
 	printf("value len %d----------\n", len);
+
+	// 这里就是状态机开始?
 	chr_write(chr, value, len);
 
 	return dbus_message_new_method_return(msg);
@@ -531,8 +546,7 @@ static DBusMessage *chr_acquire_notify(DBusConnection *conn, DBusMessage *msg,
 							void *user_data)
 {
 	printf("chr_acquire_notify 1\n");
-	struct descriptor *desc = user_data;
-	struct characteristic *chrc = desc->chr;
+	struct characteristic *chrc = user_data;
 	DBusMessageIter iter;
 	DBusMessage *reply;
 
@@ -561,8 +575,7 @@ static DBusMessage *chr_start_notify(DBusConnection *conn, DBusMessage *msg,
 							void *user_data)
 {
 	printf("chr_start_notify 1 \n");
-	struct descriptor *desc = user_data;
-	struct characteristic *chrc = desc->chr;
+	struct characteristic *chrc = user_data;
 	if (!chrc->notifying)
 		return g_dbus_create_reply(msg, DBUS_TYPE_INVALID);
 	printf("chr_start_notify 2 \n");
@@ -578,16 +591,22 @@ static DBusMessage *chr_stop_notify(DBusConnection *conn, DBusMessage *msg,
 							void *user_data)
 {
 	printf("chr_stop_notify 1 \n");
-	struct descriptor *desc = user_data;
-	struct characteristic *chrc = desc->chr;
+	struct characteristic *chrc = user_data;
+	printf("path: %s \n", chrc->path);
 	if (chrc->notifying)
+	{
+		printf("chrc->notifying \n");
 		return g_dbus_create_reply(msg, DBUS_TYPE_INVALID);
-
+	}
+		
+	
 	chrc->notifying = false;
 
+	printf("g_dbus_create_reply \n");
 	g_dbus_emit_property_changed(conn, chrc->path, GATT_CHR_IFACE,
 							"Notifying");
-	
+
+	printf("g_dbus_create_reply ---------------\n");
 	return g_dbus_create_reply(msg, DBUS_TYPE_INVALID);
 }
 

@@ -5,13 +5,15 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
+
+
 typedef enum {
 	PAIRING_BEGIN = 0,
 	PAIRING_STEP2,
 	PAIRING_STEP4,
 	PAIRING_COMPLETE,
 	PAIRING_IDLE,
-}PAIRING_STATUS;
+} PAIRING_STATUS;
 
 typedef enum{
 	NONE = 0,					// 没有任何接收数据

@@ -156,6 +156,9 @@ sudo ./bridge/test/admin_get_battery_level D9:78:2F:E3:1A:5C d4c33574f65b83cc8d2
 
 11. 测试 set_wifi_info
 sudo ./bridge/test/set_wifi_info B8:27:EB:42:03:2D Google 12345678
+// 需要打开 discoverable on
+// advertise on
+DC:A6:32:10:C7:DC
 
 ### BLE 相关用法
 1. void addDiscoverTask(int msg_id)

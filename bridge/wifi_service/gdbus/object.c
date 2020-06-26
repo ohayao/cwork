@@ -261,6 +261,8 @@ static DBusHandlerResult process_message(DBusConnection *connection,
 	printf("process_message method->function\n");
 	reply = method->function(connection, message, iface_user_data);
 
+	// start notify 会调用 chr_start_notify
+	// stop notify 会调用 chr_stop_notify
 	printf("method->flags & G_DBUS_METHOD_FLAG_NOREPLY\n");
 	if (method->flags & G_DBUS_METHOD_FLAG_NOREPLY ||
 					dbus_message_get_no_reply(message)) {
@@ -1793,13 +1795,24 @@ void g_dbus_emit_property_changed_full(DBusConnection *connection,
 	struct generic_data *data;
 	struct interface_data *iface;
 
+	
 	if (path == NULL)
+	{
+		printf("path == NULL\n", path);
 		return;
+	}
+	printf("path %s\n", path);
 
+	printf("pdbus_connection_get_object_path_data\n");
 	if (!dbus_connection_get_object_path_data(connection, path,
 					(void **) &data) || data == NULL)
+	{
+		printf("return \n");
 		return;
+	}
+		
 
+	printf("find_interface\n");
 	iface = find_interface(data->interfaces, interface);
 	if (iface == NULL)
 		return;
@@ -1808,9 +1821,11 @@ void g_dbus_emit_property_changed_full(DBusConnection *connection,
 	 * If ObjectManager is attached, don't emit property changed if
 	 * interface is not yet published
 	 */
+	printf("g_slist_find\n");
 	if (root && g_slist_find(data->added, iface))
 		return;
 
+	printf("find_property\n");
 	property = find_property(iface->properties, name);
 	if (property == NULL) {
 		error("Could not find property %s in %p", name,
@@ -1818,6 +1833,7 @@ void g_dbus_emit_property_changed_full(DBusConnection *connection,
 		return;
 	}
 
+	printf("g_slist_find(iface->pending_prop, (void *) property) != NULL\n");
 	if (g_slist_find(iface->pending_prop, (void *) property) != NULL)
 		return;
 
@@ -1825,6 +1841,7 @@ void g_dbus_emit_property_changed_full(DBusConnection *connection,
 	iface->pending_prop = g_slist_prepend(iface->pending_prop,
 						(void *) property);
 
+	printf("flags & G_DBUS_PROPERTY_CHANGED_FLAG_FLUSH\n");
 	if (flags & G_DBUS_PROPERTY_CHANGED_FLAG_FLUSH)
 		process_property_changes(data);
 	else

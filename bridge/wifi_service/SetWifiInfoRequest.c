@@ -1,4 +1,4 @@
-#include "SeWifiInfoRequest.h"
+#include "bridge/wifi_service/SetWifiInfoRequest.h"
 #include <string.h>
 #include "bridge/lock/external/cbor/cbor.h"
 
