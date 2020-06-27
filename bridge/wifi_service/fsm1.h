@@ -27,8 +27,7 @@ typedef struct FSM
 // 获得一个FSM
 int getFSM(FSM **p_fsm);
 int freeFSM(FSM **p_fsm);
-int initFSM(FSM *fsm, FSMTransform *fsm_trans_table, uint8_t max_state_num, uint8_t cur_state);
-
+int initFSMCurState(FSM *fsm, uint8_t cur_state);
 // 获得一个FSMTransform table
 // 因为一个事件只有一个处理方式, 而且每个事件, 都是不同的
 int getFSMTransTable(FSM *fsm, uint8_t max_trans_num);

@@ -5,6 +5,30 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
+#define IG_KEY_EXCHANGE_PUBLIC_LENGTH 64
+#define IG_KEY_EXCHANGE_PRIVATE_LENGTH 32
+#define IG_KEY_LENGTH 16
+#define IG_PIN_KEY_LENGTH 16
+#define IG_PASSWORD_LENGTH 8
+#define IG_MASTER_PIN_MIN_LENGTH 4
+#define IG_MASTER_PIN_DEFAULT_LENGTH 8
+#define IG_MASTER_PIN_MAX_LENGTH 10
+#define IG_PIN_INPUT_MAX_LENGTH 16
+#define IG_PIN_MAX_LENGTH 9
+#define IG_PIN_MIN_LENGTH 4
+#define IG_ACCESS_RIGHTS_SIZE 8
+#define IG_ERROR_MAX_CONNECTIONS 1001
+
+typedef enum IgErrorCode {
+	IG_ERROR_NONE = 0,
+	IG_ERROR_GENERIC_FAIL = 1,
+	IG_ERROR_INVALID_CONN_ID = 2,
+	IG_ERROR_DATA_TOO_SHORT = 3,
+	IG_ERROR_INVALID_MESSAGE = 4,
+	IG_ERROR_INVALID_PARAMS = 5,
+	IG_ERROR_INTERNAL_ERROR = 6,
+} IgErrorCode;
+
 typedef enum {
 	C_SUBSCRIBE = 0,
   C_WRITE_STEP1,
@@ -36,14 +60,20 @@ typedef struct
 {
 	uint8_t *data;
 	uint16_t data_len;
-	uint16_t n_size_byte;
 	uint16_t recv_len;
+	// 
+	uint16_t n_size_byte;
+	uint16_t pkg_len;
 	RCEV_STATUS recv_status;
 }RecvData;
 
 int getRecvData(RecvData **p_recv_data);
 int freeRecvData(RecvData **p_recv_data);
+int initRecvData(RecvData *recv_data);
 void recvData(RecvData *recv_pairing_data, uint8_t * data, uint16_t data_length);
+int getPkgFromRecvData(RecvData *recv_pairing_data, uint8_t *step_pkg_data);
+int getRecvPkgLen(RecvData *recv_pairing_data, size_t *return_size);
 
 
+uint32_t ig_pairing_step2_size();
 #endif

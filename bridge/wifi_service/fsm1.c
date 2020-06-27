@@ -8,6 +8,7 @@ static inline void transState(FSM *fsm, uint8_t state)
 {
     fsm->cur_state = state;
 }
+
 int freeFSM(FSM **p_fsm)
 {
     if (!p_fsm)
@@ -41,26 +42,32 @@ int getFSM(FSM **p_fsm)
     return 0;
 }
 
-int initFSM(FSM *fsm, FSMTransform *fsm_trans_table, uint8_t max_state_num, uint8_t cur_state)
+int initFSMCurState(FSM *fsm, uint8_t cur_state)
 {
     if (!fsm) return 1;
-    fsm->fsm_trans_table = fsm_trans_table;
-    fsm->cur_state = cur_state;
-    fsm->max_state_num = max_state_num;
+    fsm->cur_state = cur_state;;
     return 0;
 }
 
 int handleEvent(FSM *fsm, uint8_t event, void *arg)
 {
+    serverLog(LL_NOTICE, "------------------- handleEvent");
+    if (event == ERROR_EVENT)
+    {
+        serverLog(LL_ERROR, "event is ERROR_EVENT");
+        return 1;
+    }
     int ret = 1;
     FSMTransform *trans_table = fsm->fsm_trans_table;
     ActionFunc event_act_func = NULL;
     uint8_t next_state;
     uint8_t cur_state = fsm->cur_state;
     uint8_t flag = 0;
-      
+    serverLog(LL_NOTICE, "cur_state %d event %d", cur_state, event);
+    serverLog(LL_NOTICE, "max_state_num %d", fsm->max_state_num);
     for (uint8_t i = 0; i < fsm->max_state_num; i++)// 遍历状态表
     {
+        serverLog(LL_NOTICE, "event %d cur_state %d", event, cur_state);
         if (event == trans_table[i].event && cur_state == trans_table[i].cur_state)
         {
             flag = 1;
@@ -98,6 +105,7 @@ int getFSMTransTable(FSM *fsm, uint8_t max_trans_num)
     }
     // 分配 max_trans_num 个 转换状态
     fsm->fsm_trans_table = malloc(sizeof(FSMTransform) * max_trans_num);
+    fsm->max_state_num = max_trans_num;
     return 0;
 }
 
@@ -140,6 +148,7 @@ int fillFSMTransItem(FSM *fsm, FSMTransform *trans_item)
         trans_item,
         sizeof(FSMTransform)
     );
+
     return 0;
 }
 
