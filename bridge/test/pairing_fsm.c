@@ -10,6 +10,7 @@
 #include "bridge/lock/connection/pairing_connection.h"
 #include "bridge/ble/ble_operation.h"
 #include "bridge/wifi_service/pairing.h"
+#include "bridge/wifi_service/igloo/igloo.h"
 
 
 
@@ -40,26 +41,18 @@ int handleWriteStep1(void *arg)
     return 1;
   }
   serverLog(LL_NOTICE, "getPkgFromRecvData success");
+
+  uint8_t *data_out = NULL; 
+  uint32_t data_out_len = 100;
+  uint32_t bytes_written = 0;
+  data_out = malloc(data_out_len);
+  // ret = ig_pairing_step2(step1_payload_bytes, step1_len, data_out, data_out_len, &bytes_written);
   
-  IgPairingStep1 step1;
-  ig_PairingStep1_init(&step1);
-  IgSerializerError step1_err = ig_PairingStep1_decode(step1_payload_bytes, step1_len, &step1, 0);
-  if (step1_err )
-  {
-    serverLog(LL_ERROR, "ig_PairingStep1_decode error");
-    return 1;
+  if (ret) {
+    serverLog(LL_ERROR, "ig_pairing_step2 err");
   }
-  serverLog(LL_NOTICE, "ig_PairingStep1_decode success");
-
-  if (!ig_PairingStep1_is_valid(&step1))
-  {
-    serverLog(LL_ERROR, "ig_PairingStep1_is_valid, not valid");
-    return 1;
-  }
-  serverLog(LL_NOTICE, "ig_PairingStep1_is_valid, valid");
-
-
-  serverLog(LL_NOTICE, "handleWriteStep1  end -----------------------");
+  serverLog(LL_NOTICE, "ig_pairing_step2 success");
+  
   return ret;
 }
 
