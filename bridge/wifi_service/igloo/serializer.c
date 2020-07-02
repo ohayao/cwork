@@ -1,4 +1,4 @@
-#include "external/cbor/cbor.h"
+#include "bridge/lock/external/cbor/cbor.h"
 #include "serializer.h"
 
 IgSerializerError ig_get_payload_length(uint8_t *buf,size_t buf_size,size_t *retval)

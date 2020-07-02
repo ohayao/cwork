@@ -48,12 +48,12 @@ void leftRotate(RBTTree *rbt_tree, RBTNode *node_x)
 {
     if (!rbt_tree)
     {
-        serverLog(LL_ERROR, "rbt_tree null");
+        serverLog(LL_ERROR, "leftRotate rbt_tree null");
         return;
     }
     if (!node_x)
     {
-        serverLog(LL_ERROR, "node_x null");
+        serverLog(LL_ERROR, "leftRotate node_x null");
         return;
     }
 
@@ -93,12 +93,12 @@ void rightRotate(RBTTree *rbt_tree, RBTNode *node_x)
 {
     if (!rbt_tree)
     {
-        serverLog(LL_ERROR, "rbt_tree null");
+        serverLog(LL_ERROR, "rightRotate rbt_tree null");
         return;
     }
     if (!node_x)
     {
-        serverLog(LL_ERROR, "node_x null");
+        serverLog(LL_ERROR, "rightRotate node_x null");
         return;
     }
     RBTNode *node_y = node_x->left;
@@ -129,9 +129,96 @@ void rightRotate(RBTTree *rbt_tree, RBTNode *node_x)
     node_x->p = node_y;
 }
 
+void reorient(RBTTree *rbt_tree, RBTNode *node_x, int k)
+{
+    node_x->color = RED;
+    node_x->left->color = node_x->right->color = BLACK;
+
+    if(node_x->p->color == RED){
+        node_x->p->p->color = RED;//此时x, p, x.p.p都为红
+        if(node_x->p->key < node_x->p->p->key){
+            if(k > node_x->p->key){
+                node_x->color = BLACK;
+                leftRotate(rbt_tree, node_x->p);
+                rightRotate(rbt_tree, node_x->p);
+            }
+            else {
+                node_x->color = BLACK;
+                rightRotate(rbt_tree, node_x->p->p);
+            }
+        }
+    }
+    else // 父亲的顶点为 黑色
+    {
+        if(k < node_x->p->key){
+            
+            node_x->color = BLACK;
+            rightRotate(rbt_tree,node_x->p);
+            leftRotate(rbt_tree,node_x->p);
+        }else{
+            node_x->p->color = BLACK;
+            leftRotate(rbt_tree, node_x->p->p);
+        }
+    }
+    rbt_tree->root->color = BLACK;
+}
+
 RBTTree *insert(RBTTree *rbt_tree, int k)
 {
-    RBTNode *x, *p;
+    RBTNode *node_x = NULL, *node_p = NULL;
+    node_x = rbt_tree->root;
+    node_p = node_x;
+    
+    // 找到相关的点
+    while (node_x != rbt_tree->nil)
+    {
+        // 
+        if (node_x != rbt_tree->nil)
+        {
+            if(node_x->left->color == RED && node_x->right->color == RED)
+            {
+                // 两兄弟都是红色
+                reorient(rbt_tree, node_x, k);
+            }
+
+            node_p = node_x;
+            if (k < node_x->key)
+            {
+                node_x = node_x->left;
+            }
+            else if (k > node_x->key)
+            {
+                node_x = node_x->right;
+            }
+            else {
+                serverLog(LL_ERROR, "insert key has");
+                return rbt_tree;
+            }
+        }
+    } // while
+    serverLog(LL_NOTICE, "123");
+    node_x = (RBTNode *)malloc(sizeof(RBTNode));
+    assert( node_x != NULL);
+    node_x->key = k;
+    node_x->color = RED;
+    node_x->left = node_x->right = rbt_tree->nil;
+    node_x->p = node_p;
+
+    //让x的父亲指向x
+    if(rbt_tree->root == rbt_tree->nil)
+    {    
+        rbt_tree->root = node_x;
+    } 
+    else if(k < node_p->key)
+    {
+        node_p->left = node_x;
+    }    
+    else
+    {   
+        node_p->right = node_x;
+    }
+
+    reorient(rbt_tree, node_x, k);
 }
 
 int main()
@@ -144,5 +231,6 @@ int main()
     }
     serverLog(LL_NOTICE, "initRBT success");
 
+    rbt_tree = insert(rbt_tree, 11);
 }
 

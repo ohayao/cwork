@@ -6,7 +6,7 @@
 //#include "components/libraries/timer/app_timer.h"
 //#include "components/boards/boards.h"
 //#include "components/drivers_nrf/delay/nrf_delay.h"
-// #include "external/cifra/aes.h"
+#include "bridge/lock/cifra/aes.h"
 // #include "external/cifra/modes.h"
 // #include "external/cifra/hmac.h"
 // #include "external/cifra/sha2.h"
@@ -18,6 +18,7 @@
 // #include "components/libraries/crypto/nrf_crypto.h"
 
 #include "serializer.h"
+/*
 #include "bridge/lock/messages/PairingStep1.h"
 #include "bridge/lock/messages/PairingStep2.h"
 #include "bridge/lock/messages/PairingStep3.h"
@@ -31,7 +32,21 @@
 #include "bridge/lock/messages/GuestConnectionStep3.h"
 #include "bridge/lock/messages/GuestConnectionStep4.h"
 #include "bridge/lock/messages/GuestToken.h"
+*/
 
+#include "bridge/lock/messages/PairingStep1.h"
+#include "bridge/lock/messages/PairingStep2.h"
+#include "bridge/lock/messages/PairingStep3.h"
+#include "bridge/lock/messages/PairingStep4.h"
+#include "bridge/lock/messages/PairingCommit.h"
+#include "bridge/lock/messages/AdminConnectionStep1.h"
+#include "bridge/lock/messages/AdminConnectionStep2.h"
+#include "bridge/lock/messages/AdminConnectionStep3.h"
+#include "bridge/lock/messages/GuestConnectionStep1.h"
+#include "bridge/lock/messages/GuestConnectionStep2.h"
+#include "bridge/lock/messages/GuestConnectionStep3.h"
+#include "bridge/lock/messages/GuestConnectionStep4.h"
+#include "bridge/lock/messages/GuestToken.h"
 #define DEAD_BEEF                       0xDEADBEEF                              /**< Value used as error code on stack dump, can be used to identify stack location on stack unwind. */
 
 #define kMaxConnections 64

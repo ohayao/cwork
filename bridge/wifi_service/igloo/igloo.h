@@ -3,7 +3,8 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-
+#include "nrf_crypto_keys.h"
+#include "nrf_crypto_ecdh.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -176,9 +177,14 @@ IgErrorCode ig_encrypt_log_data(uint8_t *data_in, uint32_t data_in_len, uint8_t 
 
 //void decrypt_data(uint32_t conn_id, uint8_t *data_in, uint32_t data_in_len, uint8_t *data_out, uint32_t data_out_len, uint8_t *nonce, uint32_t *bytes_written);
 
+#define STRING_CONCATENATE_IMPL(lhs, rhs) lhs ## rhs
+#define STRING_CONCATENATE(lhs, rhs) STRING_CONCATENATE_IMPL(lhs, rhs)
 
-#define NRF_CRYPTO_ECC_PUBLIC_KEY_SIZE(type)                       \
-    (STRING_CONCATENATE(NRF_CRYPTO_ECC_PUBLIC_KEY_SIZE_, type))
+#if defined(NRF_CRYPTO_BACKEND_CC310_LIB) && (NRF_CRYPTO_BACKEND_CC310_LIB == 1)
+	#define NRF_CRYPTO_ECC_PUBLIC_KEY_SIZE(type) (NRF_CRYPTO_ECC_PUBLIC_KEY_MAX_SIZE)
+#else
+	#define NRF_CRYPTO_ECC_PUBLIC_KEY_SIZE(type) (STRING_CONCATENATE(NRF_CRYPTO_ECC_PUBLIC_KEY_SIZE_, type))
+#endif
 
 
 #define NRF_CRYPTO_ECC_PUBLIC_KEY_SIZE_SECP160R1   (40)
@@ -191,12 +197,9 @@ IgErrorCode ig_encrypt_log_data(uint8_t *data_in, uint32_t data_in_len, uint8_t 
 #define NRF_CRYPTO_ECC_PUBLIC_KEY_SIZE_SECP224K1   (56)
 #define NRF_CRYPTO_ECC_PUBLIC_KEY_SIZE_SECP256K1   (64)
 
-typedef struct
-{
-    uint8_t * p_value;
-    uint32_t  length;
-
-} nrf_value_length_t;
+#ifndef __ALIGN
+	#define __ALIGN(n)          __attribute__((aligned(n)))
+#endif
 
 #define NRF_CRYPTO_ECC_PUBLIC_KEY_CREATE(name, type)                                    \
 __ALIGN(4) static uint8_t                                                               \
@@ -205,6 +208,15 @@ nrf_value_length_t name =                                                       
 {                                                                                       \
     .p_value = name ## _buffer,                                                         \
     .length = NRF_CRYPTO_ECC_PUBLIC_KEY_SIZE(type)                                      \
+}
+
+#define NRF_CRYPTO_ECC_PRIVATE_KEY_CREATE(name, type)                                   \
+__ALIGN(4) static uint8_t                                                               \
+    name ## _buffer[NRF_CRYPTO_ECC_PRIVATE_KEY_SIZE(type)];                             \
+nrf_value_length_t name =                                                               \
+{                                                                                       \
+    .p_value = name ## _buffer,                                                         \
+    .length = NRF_CRYPTO_ECC_PRIVATE_KEY_SIZE(type)                                     \
 }
 
 #ifdef __cplusplus
