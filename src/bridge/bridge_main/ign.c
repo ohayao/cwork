@@ -334,6 +334,16 @@ int Init_Ble(sysinfo_t* si) {
 	memcpy(li->lock_ekey, admin_key, strlen(admin_key));
 	memcpy(li->lock_passwd, passwd, strlen(passwd));
 
+    char *addr_name = NULL;
+    void *adapter = NULL;
+    int ret;
+    ret = gattlib_adapter_open(addr_name, &adapter);
+    if (ret) {
+        serverLog(LL_ERROR, "discoverLock ERROR: Failed to open adapter.\n");
+        // TODO: our own error;
+        return ret;
+    }
+
 	//@@@ need async connect!!!
 	/*
 	int ret = create_gatt_connection(li->lock_addr, &(li->gatt_connection), &(li->gatt_adapter));
@@ -350,23 +360,13 @@ int Init_Ble(sysinfo_t* si) {
 		//goto ADMIN_ERROR_EXIT;
 	}
 	serverLog(LL_NOTICE, "gattlib_string_to_uuid to admin_uuid success." );
-	*/
-
-    char *addr_name = NULL;
-    void *adapter = NULL;
-    int ret;
-    ret = gattlib_adapter_open(addr_name, &adapter);
-    if (ret) {
-        serverLog(LL_ERROR, "discoverLock ERROR: Failed to open adapter.\n");
-        // TODO: our own error;
-        return ret;
-    }
 
     ret = gattlib_adapter_scan_enable(adapter, ble_discovered_device, BLE_SCAN_TIMEOUT, NULL);
     if (ret) {
         serverLog(LL_NOTICE, "ERROR: Failed to scan.");
         //goto EXIT;
     }
+	*/
 
 	si->lockinfo = (LockInfo_t**) malloc(sizeof(LockInfo_t*)*5);
 	si->lockinfo[0] = li;
@@ -374,8 +374,27 @@ int Init_Ble(sysinfo_t* si) {
 	return 0;
 }
 
+int ScanBLE() {
+    //do scan BLE ,bred
+
+    //if have the BLE addr, do init for demo
+    int ret = Init_Ble(&g_sysif);
+	if(ret) {
+        serverLog(LL_ERROR, "Init_Ble err[%d].", ret);
+		return -1;
+	}
+
+    return 0;
+}
+
+int WifiConnection(){
+    // benny
+    return 0;
+}
+
 int Init(void* tn) {
 	int ret = 0;
+
     ret = GetMacAddr(g_sysif.mac, sizeof(g_sysif.mac));
     if(ret < 0) {
         serverLog(LL_ERROR, "Init GetMacAddr err[%d].", ret);
@@ -388,8 +407,17 @@ int Init(void* tn) {
     printf("Init Mac as Device ID[%s], TOPIC_PUB[%s], TOPIC_SUB[%s].", g_sysif.mac, TOPIC_PUB, TOPIC_SUB);
     serverLog(LL_NOTICE, "Init Mac as Device ID[%s], TOPIC_PUB[%s], TOPIC_SUB[%s].", g_sysif.mac, TOPIC_PUB, TOPIC_SUB);
 
+    do{
+        ret = WifiConnection();
+        sleep(0.5);
+        //benny, if connection fail, set the light : can not connect wifi
+    } while(0 != ret);
+    serverLog(LL_NOTICE, "init Wifi connection success");
+
 	do {
 		ret = Init_MQTT(&g_sysif.mqtt_c);
+        sleep(0.5);
+        //benny, if connection fail, set the light : can not connect internet
 	} while (0 != ret);
     serverLog(LL_NOTICE, "init mqtt Clients success");
 	
@@ -399,8 +427,8 @@ int Init(void* tn) {
         return -2;
     }
     serverLog(LL_NOTICE, "Subscribe [%s] success!!!", TOPIC_SUB);
-    
 
+    //demo use
     ret = MQTTClient_subscribe(g_sysif.mqtt_c, PUB_WEBDEMO, 1);
 	if(MQTTCLIENT_SUCCESS != ret){
         serverLog(LL_ERROR, "Subscribe [%s] error with code [%d].", PUB_WEBDEMO, ret);
@@ -408,14 +436,16 @@ int Init(void* tn) {
     }
     serverLog(LL_NOTICE, "Subscribe [%s] success!!!", PUB_WEBDEMO);
 
-    ret = Init_Ble(&g_sysif);
+    //scan BLE, bred
+    ret = ScanBLE();
 	if(ret) {
-        serverLog(LL_ERROR, "Init_Ble err[%d].", ret);
+        serverLog(LL_ERROR, "ScanBle err[%d].", ret);
 		return -4;
 	}
-    //InitBtn(si);
+
     return 0;
 }
+
 
 
 //处理web端消息
@@ -738,6 +768,7 @@ int testLock(igm_lock_t *lock) {
 
 void WaitMQTT(sysinfo_t *si) {
 	printf("do Waiting MQTT...\n");
+    int ret = 0;
 	while(1){
 		//if (NULL == si->mqtt_c)
 		char *topic = NULL;
@@ -745,7 +776,6 @@ void WaitMQTT(sysinfo_t *si) {
 		MQTTClient_message *msg = NULL;
 		int rc = MQTTClient_receive(si->mqtt_c, &topic, &topicLen, &msg, 1e3);
 		if (0 != rc) {
-			//err log
 			serverLog(LL_ERROR, "MQTTClient_receive err[%d], topic[%s].", rc, topic);
 		}
 		if(msg){
@@ -758,9 +788,14 @@ void WaitMQTT(sysinfo_t *si) {
 				memset(glocks,0,sizeof(glocks));
 				glock_index=0;
 				ign_MsgInfo imsg={};
-				pb_istream_t in=pb_istream_from_buffer(msg->payload,(size_t)msg->payloadlen);
+				pb_istream_t in = pb_istream_from_buffer(msg->payload,(size_t)msg->payloadlen);
 				//imsg.server_data.lock_entries.funcs.decode=&get_server_event_data;
-				if(pb_decode(&in, ign_MsgInfo_fields, &imsg)){
+				ret = pb_decode(&in, ign_MsgInfo_fields, &imsg);
+				if(ret) {
+			        serverLog(LL_ERROR, "pb_decode err[%d].", ret);
+					printf("MQTT MSG DECODE ERROR[%d]!\n", ret);
+				}else{
+                    //create node,add into list, bred
 					switch(imsg.event_type){
 						case ign_EventType_HEARTBEAT:
 							printf("RECV MQTT HB msg\n");
@@ -942,8 +977,6 @@ void WaitMQTT(sysinfo_t *si) {
 gomqttfree:            
 					MQTTClient_freeMessage(&msg);
 					MQTTClient_free(topic);
-				}else{
-					printf("MQTT MSG DECODE ERROR!!!!\n");
 				}
 			} 
 		} else {
@@ -992,9 +1025,6 @@ int WaitBtn(void *arg){
 
 	return 0;
 }
-
-
-
 
 
 void visitScanResult(ble_data_t *ble_data)
@@ -1238,10 +1268,17 @@ int main() {
  
     pthread_t mqtt_thread = Thread_start(WaitMQTT, &g_sysif);
     serverLog(LL_NOTICE,"new thread to WaitMQTT[%u].", mqtt_thread);
-    // pthread_t ble_thread = Thread_start(WaitBLE, &g_sysif);
-    // serverLog(LL_NOTICE,"new thread to WaitMQTT[%u].", ble_thread);
-    // pthread_t bt_thread = Thread_start(WaitBtn, &g_sysif);
-    // serverLog(LL_NOTICE,"new thread to WaitMQTT[%u].", bt_thread);
+    
+    //benny, Btn monitor to update wifi info and do reconnection
+    pthread_t bt_thread = Thread_start(WaitBtn, &g_sysif);
+    serverLog(LL_NOTICE,"new thread to WaitMQTT[%u].", bt_thread);
+
+
+
+    //check req list, start a new thread to work, bred
+    //after work delete node
+
+
     // addDiscoverTask();
     while(1) {
         //if empty, sleep(0.5);
