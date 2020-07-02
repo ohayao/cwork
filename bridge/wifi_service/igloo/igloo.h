@@ -177,6 +177,36 @@ IgErrorCode ig_encrypt_log_data(uint8_t *data_in, uint32_t data_in_len, uint8_t 
 //void decrypt_data(uint32_t conn_id, uint8_t *data_in, uint32_t data_in_len, uint8_t *data_out, uint32_t data_out_len, uint8_t *nonce, uint32_t *bytes_written);
 
 
+#define NRF_CRYPTO_ECC_PUBLIC_KEY_SIZE(type)                       \
+    (STRING_CONCATENATE(NRF_CRYPTO_ECC_PUBLIC_KEY_SIZE_, type))
+
+
+#define NRF_CRYPTO_ECC_PUBLIC_KEY_SIZE_SECP160R1   (40)
+#define NRF_CRYPTO_ECC_PUBLIC_KEY_SIZE_SECP192R1   (48)
+#define NRF_CRYPTO_ECC_PUBLIC_KEY_SIZE_SECP224R1   (56)
+#define NRF_CRYPTO_ECC_PUBLIC_KEY_SIZE_SECP256R1   (64)
+#define NRF_CRYPTO_ECC_PUBLIC_KEY_SIZE_SECP384R1   (96)
+#define NRF_CRYPTO_ECC_PUBLIC_KEY_SIZE_SECP521R1   (132)
+#define NRF_CRYPTO_ECC_PUBLIC_KEY_SIZE_SECP192K1   (48)
+#define NRF_CRYPTO_ECC_PUBLIC_KEY_SIZE_SECP224K1   (56)
+#define NRF_CRYPTO_ECC_PUBLIC_KEY_SIZE_SECP256K1   (64)
+
+typedef struct
+{
+    uint8_t * p_value;
+    uint32_t  length;
+
+} nrf_value_length_t;
+
+#define NRF_CRYPTO_ECC_PUBLIC_KEY_CREATE(name, type)                                    \
+__ALIGN(4) static uint8_t                                                               \
+    name ## _buffer[NRF_CRYPTO_ECC_PUBLIC_KEY_SIZE(type)];                              \
+nrf_value_length_t name =                                                               \
+{                                                                                       \
+    .p_value = name ## _buffer,                                                         \
+    .length = NRF_CRYPTO_ECC_PUBLIC_KEY_SIZE(type)                                      \
+}
+
 #ifdef __cplusplus
 }
 #endif
