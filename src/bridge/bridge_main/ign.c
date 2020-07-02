@@ -404,7 +404,7 @@ int Init(void* tn) {
 	memset(TOPIC_SUB, 0, sizeof(TOPIC_SUB));
 	snprintf(TOPIC_PUB, sizeof(TOPIC_PUB), "%s%s", PUB_TOPIC_PREFIX, g_sysif.mac);
 	snprintf(TOPIC_SUB, sizeof(TOPIC_SUB), "%s%s", SUB_TOPIC_PREFIX, g_sysif.mac);
-    printf("Init Mac as Device ID[%s], TOPIC_PUB[%s], TOPIC_SUB[%s].", g_sysif.mac, TOPIC_PUB, TOPIC_SUB);
+    printf("Init Mac as Device ID[%s], TOPIC_PUB[%s], TOPIC_SUB[%s].\n", g_sysif.mac, TOPIC_PUB, TOPIC_SUB);
     serverLog(LL_NOTICE, "Init Mac as Device ID[%s], TOPIC_PUB[%s], TOPIC_SUB[%s].", g_sysif.mac, TOPIC_PUB, TOPIC_SUB);
 
     do{
@@ -791,7 +791,7 @@ void WaitMQTT(sysinfo_t *si) {
 				pb_istream_t in = pb_istream_from_buffer(msg->payload,(size_t)msg->payloadlen);
 				//imsg.server_data.lock_entries.funcs.decode=&get_server_event_data;
 				ret = pb_decode(&in, ign_MsgInfo_fields, &imsg);
-				if(ret) {
+				if(true != ret) {
 			        serverLog(LL_ERROR, "pb_decode err[%d].", ret);
 					printf("MQTT MSG DECODE ERROR[%d]!\n", ret);
 				}else{
@@ -830,6 +830,14 @@ void WaitMQTT(sysinfo_t *si) {
 									tl++;
 									strcpy(tsd.lock_entries[i].bt_id,imsg.server_data.lock_entries[i].bt_id);
 									strcpy(tsd.lock_entries[i].ekey.bytes,imsg.server_data.lock_entries[i].ekey.bytes);
+									if(0 == tsd.lock_entries[i].ekey.size) {
+										serverLog(LL_ERROR, "get lock[%s] ekey is empty err!", tsd.lock_entries[i].bt_id);
+									}
+									printf("[%d], bt_id[%s], ekey[", i, imsg.server_data.lock_entries[i].bt_id);
+									for(int k=0;k<imsg.server_data.lock_entries[i].ekey.size; k++) {
+										printf("%x", imsg.server_data.lock_entries[i].ekey.bytes[k]);
+									}
+									printf("]");
 								}
 							}
 							tsd.lock_entries_count=tl;
@@ -1020,7 +1028,7 @@ int WaitBtn(void *arg){
 	//add Init into doing_list
 	for(;;) {
 		sleep(1);
-		serverLog(LL_DEBUG, "waiting for Btn...");
+		serverLog(LL_NOTICE, "waiting for Btn...");
 	}
 
 	return 0;
