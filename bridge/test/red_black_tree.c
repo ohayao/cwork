@@ -111,8 +111,28 @@ void rightRotate(RBTTree *rbt_tree, RBTNode *node_x)
     {
         node_x->left->p = node_x;
     }
+    node_y->p = node_x->p;
+    if (node_y->p == rbt_tree->nil)
+    {
+        rbt_tree->root = node_y;
+    }
+    else if (node_y->key < node_y->p->key)
+    {
+        node_y->p->left = node_y;
+    }
+    else
+    {
+        node_y->p->right = node_y;
+    }
+    
+    node_y->right = node_x;
+    node_x->p = node_y;
 }
 
+RBTTree *insert(RBTTree *rbt_tree, int k)
+{
+    RBTNode *x, *p;
+}
 
 int main()
 {

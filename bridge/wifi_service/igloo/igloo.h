@@ -176,6 +176,7 @@ IgErrorCode ig_encrypt_log_data(uint8_t *data_in, uint32_t data_in_len, uint8_t 
 
 //void decrypt_data(uint32_t conn_id, uint8_t *data_in, uint32_t data_in_len, uint8_t *data_out, uint32_t data_out_len, uint8_t *nonce, uint32_t *bytes_written);
 
+
 #ifdef __cplusplus
 }
 #endif
