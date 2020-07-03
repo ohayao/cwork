@@ -21,6 +21,7 @@
 #include <bridge/proto/pb_decode.h>
 #include "bridge/lock/messages/CreatePinRequest.h"
 #include "bridge/lock/messages/DeletePinRequest.h"
+//#include "bridge/https_client/https.h"
 
 static sysinfo_t g_sysif;
 static char TOPIC_SUB[32];
@@ -34,6 +35,122 @@ ign_BridgeProfile Create_IgnBridgeProfile(sysinfo_t* ps);
 void addDiscoverTask(int msg_id);
 void addAdminDoLockTask(igm_lock_t *lock);
 int Init_MQTT(MQTTClient* p_mqtt);
+
+char* get_file_content(char *path){
+    char* buf;
+    FILE *csr=fopen(path,"r");
+    fseek(csr,0,SEEK_END);
+    int len=ftell(csr);
+    buf=(char*)malloc(len+1);
+    rewind(csr);
+    fread(buf,1,len,csr);
+    buf[len]=0;
+    fclose(csr);
+    return buf;
+}
+void write_file_content(char *path,char *content){
+    FILE *csr=fopen(path,"w");
+    fwrite(content,sizeof(char),strlen(content),csr);
+    fclose(csr);
+}
+
+/*
+int download_ca(){
+    char *url;
+    char data[1024], response[4096];
+    int  i, ret, size;
+
+    printf("=====>>>>>Step1. Get User login token\n");
+    HTTP_INFO hi1;
+    http_init(&hi1, TRUE);
+    url = "https://tkm70zar9f.execute-api.ap-southeast-1.amazonaws.com/development/login";
+    sprintf(data,"{\"email\":\"cs.lim+bridge@igloohome.co\",\"password\":\"igloohome\"}");
+    ret = http_post(&hi1, url, data, response, sizeof(response));
+    http_close(&hi1);
+    if(ret!=200) return -1;
+    char userToken[2048];
+    memset(userToken,0,sizeof(userToken));
+    strncpy(userToken,response+16,strlen(response)-18);
+    printf("UserToken=[%s]\n",userToken);
+    printf("=====>>>>>Step2. Get Bridge token\n");
+    memset(data,0,sizeof(data));
+    memset(response,0,sizeof(response));
+    HTTP_INFO hi2;
+    url="https://tkm70zar9f.execute-api.ap-southeast-1.amazonaws.com/development/token";
+    ret=http_get_with_auth(&hi2,url,userToken,response,sizeof(response));
+    http_close(&hi2);
+    if(ret!=200) return -2;
+    char biridgeToken[2048];
+    memset(biridgeToken,0,sizeof(biridgeToken));
+    strncpy(biridgeToken,response+18,strlen(response)-20);
+    printf("BirdgeTOken=[%s]\n",biridgeToken);
+    printf("=====>>>>>Step3. Download CA \n");
+    char* localCSR=get_file_content("/root/project/gomvc_blog/ign/webign.csr");
+    memset(data,0,sizeof(data));
+    memset(response,0,sizeof(response));
+    HTTP_INFO hi3;
+    url="https://tkm70zar9f.execute-api.ap-southeast-1.amazonaws.com/development/devices/bridge/DCA63210C7DA";
+    cJSON *root;
+    root=cJSON_CreateObject();
+    cJSON_AddStringToObject(root,"csr",localCSR);
+    char *sdata=cJSON_PrintUnformatted(root);
+    cJSON_Delete(root);
+    printf("________________Request Body Content\n%s\n",sdata);
+    ret=http_post_with_auth(&hi3,url,biridgeToken,sdata,response,sizeof(response));
+    if(ret!=200) return -3;
+    root=cJSON_Parse(response);
+    if(root==NULL) return -4;
+    cJSON *pem=cJSON_GetObjectItem(root,"pem");
+    printf("pem=%s\n",pem->valuestring);
+    write_file_content("./test_test_test_test.csr",pem->valuestring);
+    cJSON_Delete(root);
+    printf("=====>>>>>DOWNLOAD-CSR Over!!!!!\n");
+    return 0;
+}
+*/
+
+int Sync_Activities(){
+    ign_MsgInfo battery={};
+    battery.event_type=ign_EventType_DEMO_UPDATE_LOCK_ACTIVITIES;
+    battery.time=get_ustime();
+    battery.msg_id=GetMsgID();
+    ign_BridgeEventData bed={};
+    sprintf(bed.demo_lockId,"IGM303a316e7");
+    bed.has_profile=true;
+    bed.profile=Create_IgnBridgeProfile(&g_sysif);
+
+    bed.has_demo_update_lock_activities=true;
+    ign_DemoUpdateLockActivities dula={};
+    char logs[500];
+    memset(logs,0,sizeof(logs));
+    strcpy(logs,"log log log log");
+    dula.log.size=strlen(logs);
+    memcpy(dula.log.bytes,logs,strlen(logs));
+    bed.demo_update_lock_activities=dula;
+
+    battery.has_bridge_data=true;
+    battery.bridge_data=bed;
+
+    int publish_result;
+    uint8_t buf[1024];
+    memset(buf,0,sizeof(buf));
+    pb_ostream_t out=pb_ostream_from_buffer(buf,sizeof(buf));
+    if(pb_encode(&out,ign_MsgInfo_fields,&battery)){
+        size_t len=out.bytes_written;
+
+        if(MQTTCLIENT_SUCCESS != (publish_result=MQTT_sendMessage(g_sysif.mqtt_c,TOPIC_PUB,1,buf,(int)len))){
+            printf("SEND MQTT ACTIVITIES ERROR WITH CODE[%d]\n",publish_result);
+        }else{
+            printf("SEND MQTT ACTIVITIES SUCCESS\n");
+        }
+    }else{
+        printf("ENCODE MQTT ACTIVITIES ERROR\n");
+    }
+    return 0;
+
+}
+
+
 
 int FSMHandle(task_node_t* tn) {
     if(NULL == tn->task_sm_table) {
@@ -400,6 +517,13 @@ int Init(void* tn) {
         serverLog(LL_ERROR, "Init GetMacAddr err[%d].", ret);
         return -1;
     }
+
+/*
+    ret = download_ca();
+    if(ret) {
+        serverLog(LL_ERROR, "download_ca err[%d]", ret);
+    }
+*/
 	memset(TOPIC_PUB, 0, sizeof(TOPIC_PUB));
 	memset(TOPIC_SUB, 0, sizeof(TOPIC_SUB));
 	snprintf(TOPIC_PUB, sizeof(TOPIC_PUB), "%s%s", PUB_TOPIC_PREFIX, g_sysif.mac);
@@ -445,8 +569,6 @@ int Init(void* tn) {
 
     return 0;
 }
-
-
 
 //处理web端消息
 int DoWebMsg(char *topic,void *payload){

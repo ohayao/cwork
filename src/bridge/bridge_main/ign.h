@@ -32,18 +32,29 @@ atomic_int g_msg_id;
 //LIST_HEAD(task_head);
 //INIT_LIST_HEAD(task_head);
 
-
 int GetMacAddr(char * mac, int len_limit) {
     struct ifreq ifreq;
-    int sock;
+    int sock, ret;
 
     if ((sock = socket (AF_INET, SOCK_STREAM, 0)) < 0) {
         return -1;
     }
     strcpy (ifreq.ifr_name, "eth0");    //Currently, only get eth0
-    if (ioctl (sock, SIOCGIFHWADDR, &ifreq) < 0) {
-        return -2;
+    ret = ioctl (sock, SIOCGIFHWADDR, &ifreq);
+    if (ret) {
+        printf("get eth0 err[%d]\n", ret);
+    } else {
+        printf("get eth0 succ\n", ret);
     }
+
+    strcpy (ifreq.ifr_name, "wlp3s0");    //Currently, only get eth0
+    ret = ioctl (sock, SIOCGIFHWADDR, &ifreq);
+    if (ret) {
+        printf("get wlp3s0 err[%d]\n", ret);
+    } else {
+        printf("get wlp3s0 succ\n", ret);
+    }
+
     if (NULL == ifreq.ifr_hwaddr.sa_data) {
         return -3;
     }
@@ -56,7 +67,6 @@ int GetMacAddr(char * mac, int len_limit) {
         (unsigned char) ifreq.ifr_hwaddr.sa_data[4], 
         (unsigned char) ifreq.ifr_hwaddr.sa_data[5]);
 }
-
 
 unsigned int GetMsgID() {
 INC:
