@@ -565,25 +565,20 @@ int testDeletePin(igm_lock_t *lock, IgDeletePinRequest *request) {
 
     tn->task_type = TASK_BLE_ADMIN_CREATE_PIN_REQUEST;
 
-    for (int j = 0; j < fsm_max_n; j++)
-    {
+    for (int j = 0; j < fsm_max_n; j++) {
         if (current_state == tn->task_sm_table[j].cur_state) {
             // 增加一个判断当前函数, 是否当前函数出错. 0 表示没问题
             int event_result = tn->task_sm_table[j].eventActFun(tn);
-            if (event_result)
-            {
+            if (event_result) {
                 printf("[%d] step error.\n", j);
                 error = 1;
                 break;
-            }
-            else
-            {
+            } else {
                 current_state = tn->task_sm_table[j].next_state;
             }
         }
     }
-    if (error)
-    {
+    if (error) {
         printf("lock error.\n");
         return error;
     }
@@ -1012,7 +1007,7 @@ int WaitBtn(void *arg){
 	//if btn
 	//add Init into doing_list
 	for(;;) {
-		sleep(1);
+		sleep(5);
 		serverLog(LL_NOTICE, "waiting for Btn...");
 	}
 

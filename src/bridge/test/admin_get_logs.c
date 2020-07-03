@@ -27,42 +27,36 @@
 #include "bridge/lock/messages/GetLogsResponse.h"
 
 
-void saveTaskData(task_node_t *ptn)
-{
+void saveTaskData(task_node_t *ptn) {
     if (!ptn) return;
 
-    if(ptn->ble_data && ptn->ble_data_len)
-    {
+    if(ptn->ble_data && ptn->ble_data_len) {
         ble_data_t *ble_data = ptn->ble_data;
         int task_type = ptn->task_type;
-        switch (task_type)
-        {
-        case TASK_BLE_ADMIN_GETLOGS:
-        {
-            serverLog(LL_NOTICE, "saving ble TASK_BLE_ADMIN_UNLOCK data");
-            ble_admin_result_t *admin_get_logs_result = (ble_admin_result_t *)ble_data->ble_result;
-            int unlock_error = admin_get_logs_result->lock_result;
-            if (unlock_error)
-            {
-                serverLog(LL_ERROR, "get lock logs error");
-            }
-            else
-            {
-                serverLog(LL_ERROR, "get lock logs success");
-                IgGetLogsResponse *get_logs_response = admin_get_logs_result->cmd_response;
-                serverLog(LL_ERROR, "get lock logs success data size %d", get_logs_response->data_size);
-            }   
-            break;
-        }
-        default:
-            break;
+        switch (task_type) {
+            case TASK_BLE_ADMIN_GETLOGS:
+                {
+                    printf( "get ble response data of TASK_BLE_ADMIN_GETLOGS\n");
+                    ble_admin_result_t *admin_get_logs_result = (ble_admin_result_t *)ble_data->ble_result;
+                    int unlock_error = admin_get_logs_result->lock_result;
+                    if (unlock_error) {
+                        printf( "get lock logs error\n");
+                    } else {
+                        printf( "get lock logs success\n");
+                        IgGetLogsResponse *get_logs_response = admin_get_logs_result->cmd_response;
+                        printf( "get lock logs success data size [%lu]\n", get_logs_response->data_size);
+                    }   
+                    break;
+                }
+            default:
+                break;
         }
     }
 }
 
 
 int testGetLogs(igm_lock_t *lock) {
-    serverLog(LL_NOTICE,"get logs cmd ask invoker to release the lock.");
+    printf("get logs cmd ask invoker to release the lock.\n");
       
     ble_admin_param_t *admin_param = (ble_admin_param_t *)malloc(sizeof(ble_admin_param_t));
     bleInitAdminParam(admin_param);
@@ -85,26 +79,21 @@ int testGetLogs(igm_lock_t *lock) {
 
     tn->task_type = TASK_BLE_ADMIN_GETLOGS;
 
-    for (int j = 0; j < fsm_max_n; j++)
-    {
+    for (int j = 0; j < fsm_max_n; j++) {
         if (current_state == tn->task_sm_table[j].cur_state) {
             // 增加一个判断当前函数, 是否当前函数出错. 0 表示没问题
 			int event_result = tn->task_sm_table[j].eventActFun(tn);
-            if (event_result)
-            {
-                serverLog(LL_ERROR, "%d step error", j);
+            if (event_result) {
+                printf( "%d step error\n", j);
                 error = 1;
                 break;
-            }
-            else
-            {
+            } else {
                 current_state = tn->task_sm_table[j].next_state;
             }
 		}
     }
-    if (error)
-    {
-        serverLog(LL_ERROR, "lock error");
+    if (error) {
+        printf( "lock error\n");
         return error;
     }
 
@@ -123,37 +112,38 @@ int testGetLogs(igm_lock_t *lock) {
     tn = NULL;
     free(admin_param);
     admin_param = NULL;
-    serverLog(LL_NOTICE, "lock end-------");
+    printf( "lock end-------\n");
     return 0;
 }
 
 int main(int argc, char *argv[]) {
     if (argc != 4) {
-      serverLog(LL_NOTICE, "%s <device_address> <admin_key> <passwd> \n", argv[0]);
-      return 1;
+        printf( "%s <device_address> <admin_key> <passwd> \n", argv[0]);
+        return 1;
     }
-    serverLog(LL_NOTICE,"test ble unlock ing to start.");
-    
-    serverLog(LL_NOTICE,"select the lock you want to unlock.");
+    printf("test ble unlock ing to start.\n");
+
+    printf("select the lock you want to unlock.\n");
     igm_lock_t *lock=NULL;
     getLock(&lock);
     initLock(lock);
     setLockAddr(lock, argv[1], strlen(argv[1]));
-    serverLog(LL_NOTICE, "setLockAddr success");
+    printf( "setLockAddr success\n");
 
     uint8_t tmp_buff[100];
     memset(tmp_buff, 0, sizeof(tmp_buff));
     int admin_len = hexStrToByte(argv[2], tmp_buff, strlen(argv[2]));
     setLockAdminKey(lock, tmp_buff, admin_len);
-    serverLog(LL_NOTICE, "setLockAdminKey success");
+    printf( "setLockAdminKey success\n");
 
     memset(tmp_buff, 0, sizeof(tmp_buff));
     int password_size = hexStrToByte(argv[3], tmp_buff, strlen(argv[3]));
     setLockPassword(lock, tmp_buff, password_size);
-    serverLog(LL_NOTICE, "setLockPassword success");
+    printf( "setLockPassword success\n");
 
-    serverLog(LL_NOTICE, "lock cmd test go");
+    printf( "lock cmd test go\n");
     int res = testGetLogs(lock);
+
     releaseLock(&lock);
     return 0;
 }
