@@ -58,22 +58,19 @@ task_node_t *GetDHeadNode() {
 }
 
 // task_node 是当前的 node
-task_node_t *NextDTask(task_node_t *task_node)
-{
-	if (!task_node)
-	{
+task_node_t *NextDTask(task_node_t *task_node) {
+	if (!task_node) {
 		return NULL;
 	}
 	task_node_t *result;
 	list_head_t* cur = &(task_node->list);
-	_lockD();
-	if (list_is_last(cur, &doing_task_head))
-	{
-		_unlockD();
+	//?? _lockD();
+	if (list_is_last(cur, &doing_task_head)) {
+		//_unlockD();
 		return NULL;
 	}
 	result = list_entry(cur->next, task_node_t, list);
-	_unlockD();
+	//_unlockD();
 	return result;
 }
 
@@ -180,8 +177,7 @@ task_node_t *InsertBle2DTail(
 		msg_id, cs, NULL, 0, ble_data, ble_data_len, task_sm_table, sm_table_len, task_type);
 }
 
-void DeleteDTask(task_node_t **ptn)
-{
+void DeleteDTask(task_node_t **ptn) {
 	task_node_t *tn = *ptn;
 	_lockD();
 	list_del(&tn->list);

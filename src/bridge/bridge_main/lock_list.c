@@ -81,17 +81,18 @@ void DeleteTask(igm_lock_t** pp_lock) {
 	*pp_lock = NULL;
 }
 
-void printLockList()
-{
-	if (isLocksListEmpty()) return;
+void printLockList() {
+	if (isLocksListEmpty()) 
+        return;
+
 	list_head_t *pos = NULL;
 	igm_lock_t *pnode = NULL;
-	_lock();
+	//???_lock();
 	list_for_each(pos, &locks_head) {
 		pnode = list_entry(pos, igm_lock_t, list);
 		printLock(pnode);
 	}
-	_unlock();
+	//???_unlock();
 	return;
 }
 

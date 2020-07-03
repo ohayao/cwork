@@ -36,24 +36,25 @@ void addDiscoverTask(int msg_id);
 void addAdminDoLockTask(igm_lock_t *lock);
 int Init_MQTT(MQTTClient* p_mqtt);
 
-char* get_file_content(char *path){
-    char* buf;
-    FILE *csr=fopen(path,"r");
-    fseek(csr,0,SEEK_END);
-    int len=ftell(csr);
-    buf=(char*)malloc(len+1);
-    rewind(csr);
-    fread(buf,1,len,csr);
-    buf[len]=0;
-    fclose(csr);
-    return buf;
+int SendMQTTMsg(ign_MsgInfo* msg, char* topic) {
+    int ret = 0;
+    uint8_t buf[1024];
+    memset(buf, 0, sizeof(buf));
+    pb_ostream_t out = pb_ostream_from_buffer(buf,sizeof(buf));
+    if(pb_encode(&out, ign_MsgInfo_fields, msg)){
+        size_t len=out.bytes_written;
+        if(MQTTCLIENT_SUCCESS != (ret = MQTT_sendMessage(g_sysif.mqtt_c, topic, 1, buf, (int)len))){
+			serverLog(LL_ERROR, "MQTT_sendMessage err[%d], do reconnection.", ret);
+			do {
+				ret = Init_MQTT(&g_sysif.mqtt_c);
+			} while (0 != ret);
+        }
+    }else{
+        serverLog(LL_ERROR, "pb_encode failed.");
+        printf("ENCODE UPDATEUSERINFO ERROR\n");
+    }
+    return 0;
 }
-void write_file_content(char *path,char *content){
-    FILE *csr=fopen(path,"w");
-    fwrite(content,sizeof(char),strlen(content),csr);
-    fclose(csr);
-}
-
 /*
 int download_ca(){
     char *url;
@@ -109,48 +110,30 @@ int download_ca(){
 }
 */
 
-int Sync_Activities(){
-    ign_MsgInfo battery={};
-    battery.event_type=ign_EventType_DEMO_UPDATE_LOCK_ACTIVITIES;
-    battery.time=get_ustime();
-    battery.msg_id=GetMsgID();
-    ign_BridgeEventData bed={};
-    sprintf(bed.demo_lockId,"IGM303a316e7");
-    bed.has_profile=true;
-    bed.profile=Create_IgnBridgeProfile(&g_sysif);
+int Sync_Activities(char* lock_id, char* logs){
+    ign_MsgInfo log_msg = {};
+    log_msg.event_type=ign_EventType_DEMO_UPDATE_LOCK_ACTIVITIES;
+    log_msg.time=get_ustime();
+    log_msg.msg_id=GetMsgID();
 
-    bed.has_demo_update_lock_activities=true;
+    log_msg.has_bridge_data=true;
+    ign_BridgeEventData *pbed = &log_msg.bridge_data;
+    strncpy(pbed->demo_lockId, lock_id, sizeof(pbed->demo_lockId));
+    pbed->has_profile=true;
+    pbed->profile=Create_IgnBridgeProfile(&g_sysif);
+
+    pbed->has_demo_update_lock_activities=true;
     ign_DemoUpdateLockActivities dula={};
-    char logs[500];
-    memset(logs,0,sizeof(logs));
-    strcpy(logs,"log log log log");
+    //char logs[500];
+    //memset(logs,0,sizeof(logs));
+    //strcpy(logs,"log log log log");
     dula.log.size=strlen(logs);
     memcpy(dula.log.bytes,logs,strlen(logs));
-    bed.demo_update_lock_activities=dula;
+    pbed->demo_update_lock_activities=dula;
 
-    battery.has_bridge_data=true;
-    battery.bridge_data=bed;
-
-    int publish_result;
-    uint8_t buf[1024];
-    memset(buf,0,sizeof(buf));
-    pb_ostream_t out=pb_ostream_from_buffer(buf,sizeof(buf));
-    if(pb_encode(&out,ign_MsgInfo_fields,&battery)){
-        size_t len=out.bytes_written;
-
-        if(MQTTCLIENT_SUCCESS != (publish_result=MQTT_sendMessage(g_sysif.mqtt_c,TOPIC_PUB,1,buf,(int)len))){
-            printf("SEND MQTT ACTIVITIES ERROR WITH CODE[%d]\n",publish_result);
-        }else{
-            printf("SEND MQTT ACTIVITIES SUCCESS\n");
-        }
-    }else{
-        printf("ENCODE MQTT ACTIVITIES ERROR\n");
-    }
+    SendMQTTMsg(&log_msg, TOPIC_PUB);
     return 0;
-
 }
-
-
 
 int FSMHandle(task_node_t* tn) {
     if(NULL == tn->task_sm_table) {
@@ -250,104 +233,48 @@ int HeartBeat(){
     hb.event_type=ign_EventType_HEARTBEAT;
     hb.time=get_ustime();
     hb.msg_id=GetMsgID();//get_ustime();
-    ign_BridgeEventData bed={};
-    bed.has_profile=true;
-    bed.profile=Create_IgnBridgeProfile(&g_sysif);
     hb.has_bridge_data=true;
-    hb.bridge_data=bed;
+    hb.bridge_data.has_profile=true;
+    hb.bridge_data.profile=Create_IgnBridgeProfile(&g_sysif);
 
-    int publish_result;
-    uint8_t buf[1024];
-    memset(buf,0,sizeof(buf));
-    pb_ostream_t out=pb_ostream_from_buffer(buf,sizeof(buf));
-    if(pb_encode(&out,ign_MsgInfo_fields,&hb)){
-        size_t len=out.bytes_written;
-        if(MQTTCLIENT_SUCCESS != (publish_result=MQTT_sendMessage(g_sysif.mqtt_c,TOPIC_PUB,1,buf,(int)len))){
-            printf("SEND MQTT HB ERROR WITH CODE[%d]\n",publish_result);
-			serverLog(LL_ERROR, "MQTT_sendMessage err[%d], do reconnection.", publish_result);
-			int ret = 0;
-			do {
-				ret = Init_MQTT(&g_sysif.mqtt_c);
-			} while (0 != ret);
-        }else{
-            printf("SEND MQTT HB SUCCESS\n");
-        }
-    }else{
-        printf("ENCODE MQTT HB ERROR\n");
-    }
+    SendMQTTMsg(&hb, TOPIC_PUB);
     return 0;
 }
 
-int Sync_Battery(int battery_l){
+int Sync_Battery(char* lock_id, int battery_l){
     ign_MsgInfo battery={};
     battery.event_type=ign_EventType_DEMO_UPDATE_LOCK_BATTERY;
     battery.time=get_ustime();
     battery.msg_id=GetMsgID();
-    ign_BridgeEventData bed={};
-    //sprintf(bed.demo_lockId,"IGM3037f4b09");
-    sprintf(bed.demo_lockId,"IGM401e9575d");
-    bed.has_profile=true;
-	bed.profile=Create_IgnBridgeProfile(&g_sysif);
-
-    bed.has_demo_update_lock_battery=true;
-    ign_DemoUpdateLockBattery dulb={};
-    dulb.battery=battery_l;
-    bed.demo_update_lock_battery=dulb;
 
     battery.has_bridge_data=true;
-    battery.bridge_data=bed;
-    
+    ign_BridgeEventData *pbed= &battery.bridge_data;
+    strncpy(pbed->demo_lockId, lock_id, sizeof(pbed->demo_lockId));
+    pbed->has_profile=true;
+	pbed->profile=Create_IgnBridgeProfile(&g_sysif);
 
-    int publish_result;
-    uint8_t buf[1024];
-    memset(buf,0,sizeof(buf));
-    pb_ostream_t out=pb_ostream_from_buffer(buf,sizeof(buf));
-    if(pb_encode(&out,ign_MsgInfo_fields,&battery)){
-        size_t len=out.bytes_written;
-
-        if(MQTTCLIENT_SUCCESS != (publish_result=MQTT_sendMessage(g_sysif.mqtt_c,TOPIC_PUB,1,buf,(int)len))){
-            printf("SEND MQTT BATTERY ERROR WITH CODE[%d]\n",publish_result);
-        }else{
-            printf("SEND MQTT BATTERY SUCCESS\n");
-        }
-    }else{
-        printf("ENCODE MQTT BATTERY ERROR\n");
-    }
+    pbed->has_demo_update_lock_battery = true;
+    pbed->demo_update_lock_battery.battery = battery_l;
+   
+    SendMQTTMsg(&battery, TOPIC_PUB);
     return 0;
 }
 
-int Sync_Status(int lock_status){
-	ign_MsgInfo battery={};
-    battery.event_type=ign_EventType_DEMO_UPDATE_LOCK_STATUS;
-    battery.time=get_ustime();
-    battery.msg_id=GetMsgID();
-    ign_BridgeEventData bed={};
-    sprintf(bed.demo_lockId,"IGM401e9575d");
-    bed.has_profile=true;
-	bed.profile=Create_IgnBridgeProfile(&g_sysif);
+int Sync_Status(char* lock_id, int lock_status){
+	ign_MsgInfo status={};
+    status.event_type=ign_EventType_DEMO_UPDATE_LOCK_STATUS;
+    status.time=get_ustime();
+    status.msg_id=GetMsgID();
+    
+    status.has_bridge_data=true;
+    ign_BridgeEventData *pbed = &status.bridge_data;
+    strncpy(pbed->demo_lockId, lock_id, sizeof(pbed->demo_lockId));
+    pbed->has_profile=true;
+	pbed->profile=Create_IgnBridgeProfile(&g_sysif);
+    pbed->has_demo_update_lock_status=true;
+    pbed->demo_update_lock_status.status = lock_status;
 
-    bed.has_demo_update_lock_status=true;
-    ign_DemoUpdateLockStatus duls={};
-    duls.status=lock_status;//1;
-    bed.demo_update_lock_status=duls;
-
-    battery.has_bridge_data=true;
-    battery.bridge_data=bed;
-
-    int publish_result;
-    uint8_t buf[1024];
-    memset(buf,0,sizeof(buf));
-    pb_ostream_t out=pb_ostream_from_buffer(buf,sizeof(buf));
-    if(pb_encode(&out,ign_MsgInfo_fields,&battery)){
-        size_t len=out.bytes_written;
-        if(MQTTCLIENT_SUCCESS != (publish_result=MQTT_sendMessage(g_sysif.mqtt_c,TOPIC_PUB,1,buf,(int)len))){
-            printf("SEND MQTT STATUS ERROR WITH CODE[%d]\n",publish_result);
-        }else{
-            printf("SEND MQTT STATUS SUCCESS\n");
-        }
-    }else{
-        printf("ENCODE MQTT STATUS ERROR\n");
-    }
+    SendMQTTMsg(&status, TOPIC_PUB);
     return 0;
 }
 
@@ -372,59 +299,12 @@ int GetUserInfo(void* si) {
 	msg.event_type=ign_EventType_GET_USER_INFO;
 	msg.time=get_ustime();
 	msg.msg_id=GetMsgID();//get_ustime();
-	ign_BridgeEventData bed={};
-	bed.has_profile=true;
-	bed.profile=Create_IgnBridgeProfile(&g_sysif);
+
 	msg.has_bridge_data=true;
-	msg.bridge_data=bed;
-
-	int pubResult;
-	uint8_t buf[1024];
-	memset(buf,0,sizeof(buf));
-	pb_ostream_t out=pb_ostream_from_buffer(buf,sizeof(buf));
-	if(pb_encode(&out,ign_MsgInfo_fields,&msg)){
-		size_t len=out.bytes_written;
-		if((pubResult=MQTT_sendMessage(g_sysif.mqtt_c,TOPIC_PUB,1,buf,(int)len))!=MQTTCLIENT_SUCCESS){
-			printf("SEND MQTT [GET_USER_INFO] ERROR WITH CODE[%d]\n",pubResult);
-		}else{
-			printf("SEND MQTT [GET_USER_INFO] SUCCESS\n");
-		}
-	}else{
-		printf("ENCODE GETUSERINFO ERROR\n");
-	}
-
+	msg.bridge_data.has_profile=true;
+	msg.bridge_data.profile=Create_IgnBridgeProfile(&g_sysif);
+    SendMQTTMsg(&msg, TOPIC_PUB);
 	return 0;
-}
-
-
-int DealUserInfo(void* si) {
-	//Recv UserInfo from server 
-	printf("recv userinfo from server!\n");
-	return 0;
-}
-
-// 首先实现这个扫描的 
-int ScanLock(void* tn) {
-	//Scan and connect with locks
-	printf("scan & connect with locks!\n");
-	return 0;
-}
-
-int UpdateLockState(void* tn) {
-	//update lock status to server
-	printf("update lock status to server!\n");
-    return 0;
-}
-
-int UnLock(void* tn) {
-	//unlock
-	printf("unlock!\n");
-    return 0;
-}
-
-int BLEParing(void* tn){
-	printf("BLEParing!\n");
-    return 0;
 }
 
 int Init_MQTT(MQTTClient* p_mqtt){
@@ -584,6 +464,7 @@ int DoWebMsg(char *topic,void *payload){
     cJSON *value=cJSON_GetObjectItem(root,"value");
     printf("recv CMD=%s,BRIDGEID=%s Value=%s\n",cmd->valuestring,bridgeId->valuestring,value->valuestring);
 	//handle request CMD
+    /*
     if(0 == strcmp("getUserInfo",cmd->valuestring)){
 		printf("will do getUserInfo.\n");
         GetUserInfo(bridgeId->valuestring);
@@ -591,7 +472,7 @@ int DoWebMsg(char *topic,void *payload){
 		printf("will do UnLock.\n");
         char* lockID=value->valuestring;
         UnLock(lockID);
-    }
+    }*/
     printf("=============================================================\n");
     cJSON_Delete(root);
 
@@ -686,20 +567,20 @@ int testDeletePin(igm_lock_t *lock, IgDeletePinRequest *request) {
 
     for (int j = 0; j < fsm_max_n; j++)
     {
-      if (current_state == tn->task_sm_table[j].cur_state) {
-          // 增加一个判断当前函数, 是否当前函数出错. 0 表示没问题
-        int event_result = tn->task_sm_table[j].eventActFun(tn);
-        if (event_result)
-        {
-            printf("[%d] step error.\n", j);
-            error = 1;
-            break;
+        if (current_state == tn->task_sm_table[j].cur_state) {
+            // 增加一个判断当前函数, 是否当前函数出错. 0 表示没问题
+            int event_result = tn->task_sm_table[j].eventActFun(tn);
+            if (event_result)
+            {
+                printf("[%d] step error.\n", j);
+                error = 1;
+                break;
+            }
+            else
+            {
+                current_state = tn->task_sm_table[j].next_state;
+            }
         }
-        else
-        {
-            current_state = tn->task_sm_table[j].next_state;
-        }
-		}
     }
     if (error)
     {
@@ -902,7 +783,7 @@ void WaitMQTT(sysinfo_t *si) {
 		}
 		if(msg){
 			printf("MQTTClient_receive msg from server, topic[%s].\n", topic);
-			if(strcmp(topic,PUB_WEBDEMO)==0){
+			if(0 == strcmp(topic, PUB_WEBDEMO)){
 				//web simulator request
 				DoWebMsg(topic,msg->payload);
 			}else{
@@ -940,20 +821,20 @@ void WaitMQTT(sysinfo_t *si) {
 							ign_MsgInfo tmsg={};
 							tmsg.event_type=ign_EventType_UPDATE_USER_INFO;
 							tmsg.has_bridge_data=true;
-							ign_BridgeEventData tbed={};
-							tbed.has_profile=true;
-							tbed.profile=Create_IgnBridgeProfile(&g_sysif);
-							tmsg.bridge_data=tbed;
-							ign_ServerEventData tsd={};
-							tsd.lock_entries_count = 5;
+							ign_BridgeEventData *pbed = &tmsg.bridge_data;
+							pbed->has_profile = true;
+							pbed->profile = Create_IgnBridgeProfile(&g_sysif);
+							tmsg.has_server_data = true;
+							ign_ServerEventData *psd = &tmsg.server_data;
+							psd->lock_entries_count = 5;
 							int tl=0;
 							for(int i=0;i<5;i++){
 								if(strlen(imsg.server_data.lock_entries[i].bt_id)>0){
 									tl++;
-									strcpy(tsd.lock_entries[i].bt_id,imsg.server_data.lock_entries[i].bt_id);
-									strcpy(tsd.lock_entries[i].ekey.bytes,imsg.server_data.lock_entries[i].ekey.bytes);
-									if(0 == tsd.lock_entries[i].ekey.size) {
-										serverLog(LL_ERROR, "get lock[%s] ekey is empty err!", tsd.lock_entries[i].bt_id);
+									strcpy(psd->lock_entries[i].bt_id,imsg.server_data.lock_entries[i].bt_id);
+									strcpy(psd->lock_entries[i].ekey.bytes,imsg.server_data.lock_entries[i].ekey.bytes);
+									if(0 == psd->lock_entries[i].ekey.size) {
+										serverLog(LL_ERROR, "get lock[%s] ekey is empty err!", psd->lock_entries[i].bt_id);
 									}
 									printf("[%d], bt_id[%s], ekey[", i, imsg.server_data.lock_entries[i].bt_id);
 									for(int k=0;k<imsg.server_data.lock_entries[i].ekey.size; k++) {
@@ -962,26 +843,9 @@ void WaitMQTT(sysinfo_t *si) {
 									printf("]");
 								}
 							}
-							tsd.lock_entries_count=tl;
-							tmsg.has_server_data=true;
-							tmsg.server_data=tsd;
+							psd->lock_entries_count=tl;
 
-							int pubResult;
-							uint8_t buf[1024];
-							memset(buf,0,sizeof(buf));
-							pb_ostream_t out=pb_ostream_from_buffer(buf,sizeof(buf));
-							if(pb_encode(&out,ign_MsgInfo_fields,&tmsg)){
-								size_t len=out.bytes_written;
-								if((pubResult=MQTT_sendMessage(g_sysif.mqtt_c,SUB_WEBDEMO,1,buf,(int)len))!=MQTTCLIENT_SUCCESS){
-									printf("TRANS TO WEB [UPDATE_USER_INFO] ERROR WITH CODE[%d]\n",pubResult);
-								}else{
-									printf("TRANS TO WEB [UPDATE_USER_INFO] SUCCESS\n");
-								}
-							}else{
-								printf("ENCODE UPDATEUSERINFO ERROR\n");
-							}
-
-							//MQTT_sendMessage(g_sysif.mqtt_c, SUB_WEBDEMO, 1, msg->payload, msg->payloadlen);
+                            SendMQTTMsg(&tmsg, SUB_WEBDEMO);
 							goto gomqttfree;
 							break;
 						case ign_EventType_NEW_JOB_NOTIFY:
@@ -1009,7 +873,6 @@ void WaitMQTT(sysinfo_t *si) {
 							}
 							printf("]\n");
 							//handle lock_cmd
-							//MQTT_sendMessage(g_sysif.mqtt_c,SUB_WEBDEMO,1,msg->payload,msg->payloadlen);
 
 							igm_lock_t* lock = NULL;
 							getLock(&lock);
@@ -1268,7 +1131,7 @@ void saveTaskData(task_node_t* ptn) {
 						printf("get status error[%d].\n", admin_result->getlockstatus_result);
 					} else {
 						printf("@@@get status success. lock_status[%d]\n", ble_data->lock_status);
-						Sync_Status(ble_data->lock_status);
+						Sync_Status(ptn->lock_id, ble_data->lock_status);
 					}
 					break;
 				}
@@ -1281,7 +1144,7 @@ void saveTaskData(task_node_t* ptn) {
 						printf("get battery error[%d].\n", ret);
 					} else {
 						printf("get battery success, battery_level[%d]\n", ble_data->battery_level);
-						Sync_Battery( ble_data->battery_level);
+						Sync_Battery(ptn->lock_id, ble_data->battery_level);
 					}
 
 					break;
@@ -1353,7 +1216,7 @@ void saveTaskData(task_node_t* ptn) {
 	}
 }
 
-
+/*
 fsm_table_t g_fsm_table[] = {
     // {  CMD_INIT,                Init,               GET_WIFI_USER},
     // {  GET_WIFI_USER,           BLEParing,          CMD_REQ_USERINFO},
@@ -1374,6 +1237,7 @@ fsm_table_t g_sm_table[] = {
     {  CMD_UPDATE_LOCKSTATUS,   UpdateLockState,    DONE},
     {  CMD_UNLOCK,              UnLock,             CMD_UPDATE_LOCKSTATUS},
 };
+*/
 
 int main() {
     int rc = Init(NULL);
@@ -1381,16 +1245,16 @@ int main() {
     serverLog(LL_NOTICE,"Ready to start.");
 
     //daemon(1, 0);
-    // 有g_sysinfo,还需要这个吗?
-    // sysinfo_t *si = (sysinfo_t *)malloc(sizeof(sysinfo_t));
-    // sysinfoInit(si);
+
+    //sysinfo_t *si = (sysinfo_t *)malloc(sizeof(sysinfo_t));
+    //sysinfoInit(si);
     //Init for paring
     /*int rc = Init(si);
-    if (0 != rc) {
-        GoExit(si);
-        return -1;
-    }*/
- 
+      if (0 != rc) {
+      GoExit(si);
+      return -1;
+      } */
+
     //g_sysif.mutex = Thread_create_mutex();
 
     //INIT_LIST_HEAD(&waiting_task_head);
@@ -1403,11 +1267,8 @@ int main() {
     pthread_t bt_thread = Thread_start(WaitBtn, &g_sysif);
     serverLog(LL_NOTICE,"new thread to WaitMQTT[%u].", bt_thread);
 
-
-
     //check req list, start a new thread to work, bred
     //after work delete node
-
 
     // addDiscoverTask();
     while(1) {
@@ -1415,16 +1276,14 @@ int main() {
         //do it , after set into waiting_list
         if (IsDEmpty()) {
             //serverLog(LL_NOTICE,"doing_task_head is empty, check Lock list.");
-            // 应该去检查waiting list
-            printLockList();
+            //printLockList();
             sleep(1);
         } else {
             serverLog(LL_NOTICE,"doing_task_head not empty, do it.-----------");
         // if doing list has task
             // 获取当前doing list 的头部
-            task_node_t *ptn=GetDHeadNode();
-            while (ptn)
-            {
+            task_node_t *ptn = GetDHeadNode();
+            while (ptn) {
                 // TODO, 当任务完成,需要怎么处理?
                 int ret = FSMHandle(ptn);
                 if(ret) {

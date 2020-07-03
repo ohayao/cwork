@@ -44,19 +44,22 @@ int GetMacAddr(char * mac, int len_limit) {
     if (ret) {
         printf("get eth0 err[%d]\n", ret);
     } else {
-        printf("get eth0 succ\n", ret);
-    }
-
-    strcpy (ifreq.ifr_name, "wlp3s0");    //Currently, only get eth0
-    ret = ioctl (sock, SIOCGIFHWADDR, &ifreq);
-    if (ret) {
-        printf("get wlp3s0 err[%d]\n", ret);
-    } else {
-        printf("get wlp3s0 succ\n", ret);
+        printf("get eth0 succ\n");
     }
 
     if (NULL == ifreq.ifr_hwaddr.sa_data) {
-        return -3;
+        strcpy (ifreq.ifr_name, "wlp3s0");    //Currently, only get eth0
+        ret = ioctl (sock, SIOCGIFHWADDR, &ifreq);
+        if (ret) {
+            printf("get wlp3s0 err[%d]\n", ret);
+        } else {
+            printf("get wlp3s0 succ\n");
+        }
+
+        if (NULL == ifreq.ifr_hwaddr.sa_data) {
+            printf("get mac falied.\n");
+            return -3;
+        }
     }
 
     return snprintf (mac, len_limit, "%X%X%X%X%X%X", 
@@ -123,6 +126,27 @@ int create_gatt_connection(const char* addr, gatt_connection_t** gatt_connection
 	serverLog(LL_NOTICE, "Succeeded to connect to the bluetooth device." );
 	return 0;
 }
+
+char* get_file_content(char *path){
+    char* buf;
+    FILE *csr=fopen(path,"r");
+    fseek(csr,0,SEEK_END);
+    int len=ftell(csr);
+    buf=(char*)malloc(len+1);
+    rewind(csr);
+    fread(buf,1,len,csr);
+    buf[len]=0;
+    fclose(csr);
+    return buf;
+}
+void write_file_content(char *path,char *content){
+    FILE *csr=fopen(path,"w");
+    fwrite(content,sizeof(char),strlen(content),csr);
+    fclose(csr);
+}
+
+
+
 // thread_type Thread_start(void* fn, void* parameter) {
 //     thread_type thread = 0;
 //     pthread_attr_t attr;
