@@ -11,7 +11,7 @@ set(TEST_DEPENDENCIES
   ign_proto
   ign_lib
   ign_wifi_service
-  ign_wifi_fsm1
+#  ign_wifi_fsm1
 )
 
 
@@ -99,19 +99,19 @@ include_directories(${CMAKE_SOURCE_DIR}/bridge/wifi_service/igloo)
 find_library(igloo_LIB
 		    libigloo.a 
 		    ${CMAKE_SOURCE_DIR}/bridge/wifi_service/igloo)
-add_executable(pairing_fsm ./pairing_fsm.c)
-target_link_libraries(pairing_fsm
-  ${TEST_DEPENDENCIES} ${igloo_LIB}
-)
+#add_executable(pairing_fsm ./pairing_fsm.c)
+#target_link_libraries(pairing_fsm
+#  ${TEST_DEPENDENCIES} ${igloo_LIB}
+#)
 
 # 测试长连接
-add_executable(long_connection ./long_connection.c)
-target_link_libraries(long_connection
-  ${TEST_DEPENDENCIES}
-)
+#add_executable(long_connection ./long_connection.c)
+#target_link_libraries(long_connection
+#  ${TEST_DEPENDENCIES}
+#)
 
 # 测试红黑树
-add_executable(red_black_tree ./red_black_tree.c)
-target_link_libraries(red_black_tree
-  ${TEST_DEPENDENCIES}
-)
+#add_executable(red_black_tree ./red_black_tree.c)
+#target_link_libraries(red_black_tree
+#  ${TEST_DEPENDENCIES}
+#)

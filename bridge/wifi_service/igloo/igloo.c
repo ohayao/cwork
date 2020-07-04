@@ -6,10 +6,10 @@
 //#include "components/libraries/timer/app_timer.h"
 //#include "components/boards/boards.h"
 //#include "components/drivers_nrf/delay/nrf_delay.h"
-#include "bridge/lock/cifra/aes.h"
-// #include "external/cifra/modes.h"
-// #include "external/cifra/hmac.h"
-// #include "external/cifra/sha2.h"
+#include "cifra/aes.h"
+#include "cifra/modes.h"
+#include "cifra/hmac.h"
+#include "cifra/sha2.h"
 
 //#define NRF_LOG_ENABLED
 // #define NRF_LOG_MODULE_NAME "APP"
@@ -34,19 +34,19 @@
 #include "bridge/lock/messages/GuestToken.h"
 */
 
-#include "bridge/lock/messages/PairingStep1.h"
-#include "bridge/lock/messages/PairingStep2.h"
-#include "bridge/lock/messages/PairingStep3.h"
-#include "bridge/lock/messages/PairingStep4.h"
-#include "bridge/lock/messages/PairingCommit.h"
-#include "bridge/lock/messages/AdminConnectionStep1.h"
-#include "bridge/lock/messages/AdminConnectionStep2.h"
-#include "bridge/lock/messages/AdminConnectionStep3.h"
-#include "bridge/lock/messages/GuestConnectionStep1.h"
-#include "bridge/lock/messages/GuestConnectionStep2.h"
-#include "bridge/lock/messages/GuestConnectionStep3.h"
-#include "bridge/lock/messages/GuestConnectionStep4.h"
-#include "bridge/lock/messages/GuestToken.h"
+#include "messages/PairingStep1.h"
+#include "messages/PairingStep2.h"
+#include "messages/PairingStep3.h"
+#include "messages/PairingStep4.h"
+#include "messages/PairingCommit.h"
+#include "messages/AdminConnectionStep1.h"
+#include "messages/AdminConnectionStep2.h"
+#include "messages/AdminConnectionStep3.h"
+#include "messages/GuestConnectionStep1.h"
+#include "messages/GuestConnectionStep2.h"
+#include "messages/GuestConnectionStep3.h"
+#include "messages/GuestConnectionStep4.h"
+#include "messages/GuestToken.h"
 #define DEAD_BEEF                       0xDEADBEEF                              /**< Value used as error code on stack dump, can be used to identify stack location on stack unwind. */
 
 #define kMaxConnections 64

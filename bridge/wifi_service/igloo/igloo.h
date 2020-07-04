@@ -3,8 +3,8 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-#include "nrf_crypto_keys.h"
-#include "nrf_crypto_ecdh.h"
+#include "nrf_crypto/nrf_crypto_keys.h"
+#include "nrf_crypto/nrf_crypto_ecdh.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
