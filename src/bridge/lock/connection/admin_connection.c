@@ -121,8 +121,7 @@ int AdminConnection_encryptNative(
 
 int AdminConnection_decryptNative(
 		int connectionId, uint8_t *jMessage, int messageLen, uint8_t **retBytes) {
-	return decryptNative(
-			connectionId, jMessage, messageLen, retBytes);
+	return decryptNative(connectionId, jMessage, messageLen, retBytes);
 }
 
 void AdminConnection_endConnection(int connectionId) {

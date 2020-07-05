@@ -462,68 +462,52 @@ int handle_step1_message(const uint8_t* data, int data_length,void* user_data) {
 	}
 }
 
-int save_message_data(const uint8_t* data, int data_length, void* user_data)
-{
-  task_node_t *task_node = (task_node_t *)user_data;
-  ble_data_t *ble_data = task_node->ble_data;
-  admin_connection_t *admin_connection = 
-                              (admin_connection_t *)ble_data->ble_connection;
+int save_message_data(const uint8_t* data, int data_length, void* user_data) {
+	task_node_t *task_node = (task_node_t *)user_data;
+	ble_data_t *ble_data = task_node->ble_data;
+	admin_connection_t *admin_connection = 
+		(admin_connection_t *)ble_data->ble_connection;
 
-  // 如果没有分配内存                            
-  if (admin_connection->step_max_size == 0)
-  {
-    if (data_length<3)
-    {
-      serverLog(LL_ERROR, "data_length < 3, can't get len");
-      return 1;
-    }
-    else
-    {
-      if (data[2] == 0xff)
-      {
-        admin_connection->n_size_byte = 3;
-        admin_connection->step_max_size = 
-                    data[0] * (0xfe) + data[1] + admin_connection->n_size_byte;
-        serverLog(LL_NOTICE, 
-                        "2 bytes lenth %d", admin_connection->step_max_size);
-      }
-      else
-      {
-        serverLog(LL_NOTICE, 
-                      "data[0] %d %02x", data[0], data[0]);
-        admin_connection->n_size_byte = 1;
-        admin_connection->step_max_size = data[0] + admin_connection->n_size_byte;
-      }
-      admin_connection->step_cur_size = 0;
-      admin_connection->step_data = (uint8_t *)malloc(
-                                            admin_connection->step_max_size);
-      if (!(admin_connection->step_data))
-      {
-        serverLog(LL_ERROR, "save_message_data malloc err");
-        return 1;
-      }
-    }
-  }
+	// 如果没有分配内存                            
+	if (admin_connection->step_max_size == 0) {
+		if (data_length<3) {
+			serverLog(LL_ERROR, "data_length < 3, can't get len");
+			return 1;
+		} else {
+			if (data[2] == 0xff) {
+				admin_connection->n_size_byte = 3;
+				admin_connection->step_max_size = data[0] * (0xfe) + data[1] + admin_connection->n_size_byte;
+				serverLog(LL_NOTICE, "2 bytes lenth %d", admin_connection->step_max_size);
+			} else {
+				serverLog(LL_NOTICE, "data[0] %d %02x", data[0], data[0]);
+				admin_connection->n_size_byte = 1;
+				admin_connection->step_max_size = data[0] + admin_connection->n_size_byte;
+			}
+			admin_connection->step_cur_size = 0;
+			admin_connection->step_data = (uint8_t *)malloc(
+					admin_connection->step_max_size);
+			if (!(admin_connection->step_data)) {
+				serverLog(LL_ERROR, "save_message_data malloc err");
+				return 1;
+			}
+		}
+	}
 
-  int size_left = 
-        admin_connection->step_max_size - admin_connection->step_cur_size;
-  // 帕不够
-  if (size_left < data_length)
-	{
-    serverLog(LL_NOTICE, "size_left < data_length");
-    admin_connection->step_max_size += 85;
+	int size_left = admin_connection->step_max_size - admin_connection->step_cur_size;
+	// 帕不够
+	if (size_left < data_length) {
+		serverLog(LL_NOTICE, "size_left < data_length");
+		admin_connection->step_max_size += 85;
 		uint8_t *old_data = admin_connection->step_data;
 		admin_connection->step_data = (uint8_t *)malloc(
-                                              admin_connection->step_max_size);
-		if (!admin_connection->step_data)
-		{
+				admin_connection->step_max_size);
+		if (!admin_connection->step_data) {
 			serverLog(LL_ERROR, "save_message_data malloc err");
 			return 4;
 		}
-		memcpy(
-      admin_connection->step_data, old_data, admin_connection->step_cur_size);
+		memcpy(admin_connection->step_data, old_data, admin_connection->step_cur_size);
 		free(old_data);
-    old_data = NULL;
+		old_data = NULL;
 	}
 
   // 空间肯定足够, 直接放下空间里面
@@ -3032,12 +3016,11 @@ int bleSetAdminParam(ble_admin_param_t *admin_param, igm_lock_t *lock)
   return 0;
 }
 
-int bleSetAdminRequest(
-		ble_admin_param_t *admin_param, void *cmd_request, size_t cmd_request_size)
+int bleSetAdminRequest(ble_admin_param_t *admin_param, void *cmd_request, size_t cmd_request_size)
 {
-	if (!cmd_request) return 1;
-	if (admin_param->cmd_request)
-	{
+	if (!cmd_request)
+		return 1;
+	if (admin_param->cmd_request) {
 		free(admin_param->cmd_request);
 		admin_param->cmd_request_size = 0;
 	} 

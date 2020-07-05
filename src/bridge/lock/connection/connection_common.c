@@ -16,8 +16,7 @@ static Connection connections_[kMaxConnections];    // auto initialized to 0
 void generateRandomNonce(int nonceLength, uint8_t resultNonceArrar[]) {
     time_t t;
     srand((unsigned) time(&t));
-    for (int i = 0; i < nonceLength; i++)
-    {
+    for (int i = 0; i < nonceLength; i++) {
         resultNonceArrar[i] = rand() % 256; // [0 - 255]
     }
     return;
