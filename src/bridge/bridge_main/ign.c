@@ -49,7 +49,7 @@ int SendMQTTMsg(ign_MsgInfo* msg, char* topic) {
                 ret = Init_MQTT(&g_sysif.mqtt_c);
             } while (0 != ret);
         } else {
-            printf("send MQTT to[%s] len[%d]", topic, len);
+            printf("send MQTT to[%s] len[%d]\n", topic, len);
         }
 
     }else{
@@ -467,10 +467,11 @@ int DoWebMsg(char *topic,void *payload){
     cJSON *value=cJSON_GetObjectItem(root,"value");
     printf("recv CMD=%s,BRIDGEID=%s Value=%s\n",cmd->valuestring,bridgeId->valuestring,value->valuestring);
 	//handle request CMD
-    /*
     if(0 == strcmp("getUserInfo",cmd->valuestring)){
 		printf("will do getUserInfo.\n");
         GetUserInfo(bridgeId->valuestring);
+	}
+    /*
     }else if(0 == strcmp("unlock",cmd->valuestring)){
 		printf("will do UnLock.\n");
         char* lockID=value->valuestring;
@@ -838,7 +839,7 @@ void WaitMQTT(sysinfo_t *si) {
 									for(int k=0;k<imsg.server_data.lock_entries[i].ekey.size; k++) {
 										printf("%x", imsg.server_data.lock_entries[i].ekey.bytes[k]);
 									}
-									printf("]");
+									printf("]\n");
 								}
 							}
 							psd->lock_entries_count=tl;
