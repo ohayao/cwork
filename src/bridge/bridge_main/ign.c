@@ -21,6 +21,7 @@
 #include <bridge/proto/pb_decode.h>
 #include "bridge/lock/messages/CreatePinRequest.h"
 #include "bridge/lock/messages/DeletePinRequest.h"
+#include "bridge/lock/messages/GetLogsResponse.h"
 //#include "bridge/https_client/https.h"
 
 static sysinfo_t g_sysif;
@@ -173,6 +174,21 @@ void saveTaskData(task_node_t* ptn) {
 
 					break;
 				}
+			case TASK_BLE_ADMIN_GETLOGS:
+				{
+					printf( "get ble response data of TASK_BLE_ADMIN_GETLOGS\n");
+					ble_admin_result_t *admin_get_logs_result = (ble_admin_result_t *)ble_data->ble_result;
+					int ret = admin_get_logs_result->getlogs_result;
+					if (ret) {
+						printf( "get lock logs error\n");
+					} else {
+						printf( "get lock logs success\n");
+						IgGetLogsResponse *get_logs_response = admin_get_logs_result->cmd_response;
+						printf( "get lock logs success data size [%lu]\n", get_logs_response->data_size);
+						// send get_logs_response.data;
+					}   
+					break;
+				}
 
 			case TASK_BLE_DISCOVER:
 				{
@@ -275,6 +291,10 @@ int HandleLockCMD (igm_lock_t *lock, int cmd, void* request) {
 		tn->sm_table_len = getAdminGetBatteryLevelFsmTableLen();
 		tn->task_sm_table = getAdminGetBatteryLevelFsmTable();
 		tn->task_type = TASK_BLE_ADMIN_GET_BATTERY_LEVEL;
+	} else if (ign_DemoLockCommand_GET_LOGS == cmd) {
+		tn->sm_table_len = getAdminGetLogsFsmTableLen();
+		tn->task_sm_table = getAdminGetLogsFsmTable();
+	    tn->task_type = TASK_BLE_ADMIN_GETLOGS;
 	} else if (ign_DemoLockCommand_CREATE_PIN == cmd) {
 		tn->sm_table_len = getAdminCreatePinRequestFsmTableLen();
 		tn->task_sm_table = getAdminCreatePinRequestFsmTable();

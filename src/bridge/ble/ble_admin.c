@@ -1366,8 +1366,7 @@ static int handleGetLogsResponce(const uint8_t* data, int data_length,void* user
 	serverLog(LL_NOTICE, "handleGetLogsResponce--------------------------------");
 	task_node_t *task_node = (task_node_t *)user_data;
 	ble_data_t *ble_data = task_node->ble_data;
-	admin_connection_t *admin_connection = 
-		(admin_connection_t *)ble_data->ble_connection;
+	admin_connection_t *admin_connection = (admin_connection_t *)ble_data->ble_connection;
 	int responceLen;
 	uint8_t *responceBytes = NULL;
 
@@ -1403,11 +1402,11 @@ static int handleGetLogsResponce(const uint8_t* data, int data_length,void* user
 
 		if (admin_connection->has_ble_result && admin_getlogs_responce.has_result) {
 			serverLog(LL_NOTICE, "set admin result to success");
-			admin_connection->ble_result->getlogs_result= admin_getlogs_responce.result;
+			admin_connection->ble_result->getlogs_result = admin_getlogs_responce.result;
 		}
 		// 返回参数给调用进程
 		serverLog(LL_NOTICE, "handle_step3_message bleSetBleResult to ble data");
-		setAdminResultCMDResponse( admin_connection->ble_result, &admin_getlogs_responce, sizeof(IgGetLogsResponse));
+		setAdminResultCMDResponse(admin_connection->ble_result, &admin_getlogs_responce, sizeof(IgGetLogsResponse));
 
 		bleSetBleResult( ble_data, admin_connection->ble_result);
 		// ig_GetLogsResponse_deinit(&admin_getlogs_responce);
