@@ -45,6 +45,7 @@
 
 uint32_t nrf_crypto_mem_init(void)
 {
+    printf("nrf_crypto_mem_init\n");
     uint32_t ret_val;
 
     // ret_val = nrf_mem_init();

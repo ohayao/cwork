@@ -43,6 +43,7 @@
 
 __WEAK void assert_nrf_callback(uint16_t line_num, const uint8_t * file_name)
 {
+    printf("assert_nrf_callback \n");
     assert_info_t assert_info =
     {
         .line_num    = line_num,

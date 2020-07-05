@@ -625,6 +625,7 @@ static void block_allocate(uint32_t block_index)
 
 uint32_t nrf_mem_init(void)
 {
+    printf("nrf_mem_init\n");
     NRF_LOG_DEBUG("[MM]: >> nrf_mem_init.\r\n");
 
     SDK_MUTEX_INIT(m_mm_mutex);
