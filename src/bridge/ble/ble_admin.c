@@ -164,8 +164,7 @@ void releaseAdminConnectionData(admin_connection_t *admin_connection) {
 	}
 }
 
-int releaseAdminConnection(admin_connection_t **pp_admin_connection)
-{
+int releaseAdminConnection(admin_connection_t **pp_admin_connection) {
 	admin_connection_t *admin_connection = *pp_admin_connection;
 	if (NULL == admin_connection) {
 		return 0;
@@ -178,29 +177,28 @@ int releaseAdminConnection(admin_connection_t **pp_admin_connection)
 	}
 	releaseLock(&admin_connection->lock);
 	bleReleaseAdminResult(&admin_connection->ble_result);
-	ret = gattlib_notification_stop(
-			admin_connection->gatt_connection, &admin_connection->admin_uuid);
-	if (ret != GATTLIB_SUCCESS)
-	{
+
+    if(NULL == admin_connection->gatt_connection) {
+    	free(*pp_admin_connection);
+	    *pp_admin_connection = NULL;
+        return 0;
+    }
+	ret = gattlib_notification_stop(admin_connection->gatt_connection, &admin_connection->admin_uuid);
+	if (GATTLIB_SUCCESS != ret) {
 		serverLog(LL_ERROR, "clearAdminConnectionGattConenction gattlib_notification_stop error");
 		return ret;
 	}
 	ret = gattlib_disconnect(admin_connection->gatt_connection);
-	if (ret != GATTLIB_SUCCESS)
-	{
+	if (GATTLIB_SUCCESS != ret) {
 		serverLog(LL_ERROR, " gattlib_disconnect error");
 		return ret;
 	}
 	admin_connection->gatt_connection = NULL;
-	free(*pp_admin_connection);
-	*pp_admin_connection = NULL;
 	return 0;
 }
 
-static int clearAdminConnectionStepData(admin_connection_t *admin_connection)
-{
-	if (admin_connection->step_data && admin_connection->step_max_size)
-	{
+static int clearAdminConnectionStepData(admin_connection_t *admin_connection) {
+	if (admin_connection->step_data && admin_connection->step_max_size) {
 		admin_connection->step_max_size = 0;
 		admin_connection->step_cur_size = 0;
 		free(admin_connection->step_data);
@@ -348,8 +346,7 @@ int register_admin_notfication(void *arg) {
 	admin_connection->has_ble_result = 1;
 	admin_connection->ble_result = malloc(sizeof(ble_admin_result_t));
 	initAdminResult(admin_connection->ble_result);
-	setAdminResultAddr(admin_connection->ble_result, 
-			admin_connection->lock->addr, admin_connection->lock->addr_len);
+	setAdminResultAddr(admin_connection->ble_result, admin_connection->lock->addr, admin_connection->lock->addr_len);
 
 	ble_data->adapter_name = NULL;
 	ble_data->adapter = NULL;
@@ -357,16 +354,13 @@ int register_admin_notfication(void *arg) {
 	//*
 	ret = gattlib_adapter_open(ble_data->adapter_name, &(ble_data->adapter));
 	if (ret) {
-		serverLog(LL_ERROR, 
-				"ERROR: register_admin_notfication Failed to open adapter.");
+		serverLog(LL_ERROR, "ERROR: register_admin_notfication Failed to open adapter.");
 		goto ADMIN_ERROR_EXIT;
 	}
 
-	serverLog(LL_NOTICE, "register_admin_notfication ready to connection %s",
-			admin_connection->lock->addr);
+	serverLog(LL_NOTICE, "register_admin_notfication ready to connection[%s]", admin_connection->lock->addr);
 	//optimise this short connection to long!
-	admin_connection->gatt_connection = gattlib_connect(
-			ble_data->adapter, admin_connection->lock->addr, GATTLIB_CONNECTION_OPTIONS_LEGACY_DEFAULT);
+	admin_connection->gatt_connection = gattlib_connect(ble_data->adapter, admin_connection->lock->addr, GATTLIB_CONNECTION_OPTIONS_LEGACY_DEFAULT);
 	if (NULL == admin_connection->gatt_connection) {
 		serverLog(LL_ERROR, "Fail to connect to the bluetooth device." );
 		goto ADMIN_ERROR_EXIT;
