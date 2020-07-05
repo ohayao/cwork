@@ -44,11 +44,14 @@ int SendMQTTMsg(ign_MsgInfo* msg, char* topic) {
     if(pb_encode(&out, ign_MsgInfo_fields, msg)){
         size_t len=out.bytes_written;
         if(MQTTCLIENT_SUCCESS != (ret = MQTT_sendMessage(g_sysif.mqtt_c, topic, 1, buf, (int)len))){
-			serverLog(LL_ERROR, "MQTT_sendMessage err[%d], do reconnection.", ret);
-			do {
-				ret = Init_MQTT(&g_sysif.mqtt_c);
-			} while (0 != ret);
+            serverLog(LL_ERROR, "MQTT_sendMessage err[%d], do reconnection.", ret);
+            do {
+                ret = Init_MQTT(&g_sysif.mqtt_c);
+            } while (0 != ret);
+        } else {
+            printf("send MQTT to[%s] len[%d]", topic, len);
         }
+
     }else{
         serverLog(LL_ERROR, "pb_encode failed.");
         printf("ENCODE UPDATEUSERINFO ERROR\n");
