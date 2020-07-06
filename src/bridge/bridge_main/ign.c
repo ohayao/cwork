@@ -38,6 +38,11 @@ void addAdminDoLockTask(igm_lock_t *lock);
 int Init_MQTT(MQTTClient* p_mqtt);
 
 int SendMQTTMsg(ign_MsgInfo* msg, char* topic) {
+	if (NULL == g_sysif.mqtt_c) {
+		serverLog(LL_ERROR, "mqtt is NULL, no available connection.");
+		printf("mqtt is NULL, no available connection.\n");
+		return -1;
+	}
     int ret = 0;
     uint8_t buf[1024];
     memset(buf, 0, sizeof(buf));
@@ -49,9 +54,20 @@ int SendMQTTMsg(ign_MsgInfo* msg, char* topic) {
             do {
                 ret = Init_MQTT(&g_sysif.mqtt_c);
             } while (0 != ret);
-        } else {
-            printf("send MQTT to[%s] len[%d]\n", topic, len);
-        }
+
+			ret = MQTTClient_subscribe(g_sysif.mqtt_c, TOPIC_SUB, 1);
+			if(MQTTCLIENT_SUCCESS != ret){
+				serverLog(LL_ERROR, "re-Subscribe [%s] error with code [%d].", TOPIC_SUB, ret);
+			}
+			serverLog(LL_NOTICE, "Re-Subscribe [%s] success!!!", TOPIC_SUB);
+			//demo use
+			ret = MQTTClient_subscribe(g_sysif.mqtt_c, PUB_WEBDEMO, 1);
+			if(MQTTCLIENT_SUCCESS != ret){
+				serverLog(LL_ERROR, "Re-Subscribe [%s] error with code [%d].", PUB_WEBDEMO, ret);
+			}
+		} else {
+			printf("<<<< Send MQTT to[%s] len[%d]\n", topic, len);
+		}
 
     }else{
         serverLog(LL_ERROR, "pb_encode failed.");
@@ -115,7 +131,7 @@ int Sync_Status(char* lock_id, int lock_status){
     return 0;
 }
 
-int Sync_Activities(char* lock_id, char* logs){
+int Sync_Activities(char* lock_id, char* logs, unsigned int logs_size){
     ign_MsgInfo log_msg = {};
     log_msg.event_type=ign_EventType_DEMO_UPDATE_LOCK_ACTIVITIES;
     log_msg.time=get_ustime();
@@ -129,12 +145,9 @@ int Sync_Activities(char* lock_id, char* logs){
 
     pbed->has_demo_update_lock_activities=true;
     ign_DemoUpdateLockActivities dula={};
-    //char logs[500];
-    //memset(logs,0,sizeof(logs));
-    //strcpy(logs,"log log log log");
-    dula.log.size=strlen(logs);
-    memcpy(dula.log.bytes,logs,strlen(logs));
-    pbed->demo_update_lock_activities=dula;
+    dula.log.size = logs_size;//strlen(logs);
+    memcpy(dula.log.bytes, logs, logs_size);
+    pbed->demo_update_lock_activities = dula;
 
     SendMQTTMsg(&log_msg, TOPIC_PUB);
     return 0;
@@ -168,7 +181,7 @@ void saveTaskData(task_node_t* ptn) {
 					if (ret) {
 						printf("get battery error[%d].\n", ret);
 					} else {
-						printf("get battery success, battery_level[%d]\n", ble_data->battery_level);
+						printf("get battery success, battery_level[%d], lock_id[%s]\n", ble_data->battery_level, ptn->lock_id);
 						Sync_Battery(ptn->lock_id, ble_data->battery_level);
 					}
 
@@ -182,10 +195,10 @@ void saveTaskData(task_node_t* ptn) {
 					if (ret) {
 						printf( "get lock logs error\n");
 					} else {
-						printf( "get lock logs success\n");
 						IgGetLogsResponse *get_logs_response = admin_get_logs_result->cmd_response;
 						printf( "get lock logs success data size [%lu]\n", get_logs_response->data_size);
 						// send get_logs_response.data;
+						Sync_Activities(ptn->lock_id, get_logs_response->data, get_logs_response->data_size);
 					}   
 					break;
 				}
@@ -274,6 +287,7 @@ int HandleLockCMD (igm_lock_t *lock, int cmd, void* request) {
 
 	task_node_t *tn = (task_node_t *)malloc(sizeof(task_node_t));
 	tn->ble_data = ble_data;
+	memcpy(tn->lock_id, lock->name, lock->name_len);
 
 	if (ign_DemoLockCommand_LOCK == cmd) {
 		tn->sm_table_len = getAdminLockFsmTableLen();
@@ -422,14 +436,6 @@ int FSMHandle(task_node_t* tn) {
 		}
 	}
 	serverLog(LL_NOTICE, "FSMHandle out for end-----------------");
-	/*
-	   if (0 == flag) {
-	// do nothing
-	// sm or cur_state err
-	serverLog(LL_ERROR, "state(%d) error.", tn->cur_state);
-	return -1;
-	}*/
-	serverLog(LL_NOTICE, "FSMHandle end");
 	return 0;
 }
 
@@ -507,6 +513,7 @@ int Init_MQTT(MQTTClient* p_mqtt){
         serverLog(LL_ERROR, "MQTT_initClients err, mqtt_c is NULL.");
         return -1;
     }
+	printf("MQTT_initClients, mqtt_c[%x], addr[%x]\n", p_mqtt, &p_mqtt);
 	return 0;
 }
 
@@ -646,7 +653,7 @@ int Init(void* tn) {
 
 //处理web端消息
 int DoWebMsg(char *topic,void *payload){
-    printf("=============================================================\n");
+    printf("^^^^^^^^^^^^^^^^web msg^^^^^^^^^^^^^^^\n");
     cJSON *root=NULL;
     root=cJSON_Parse((char *)payload);
     if(NULL == root){
@@ -668,7 +675,7 @@ int DoWebMsg(char *topic,void *payload){
         char* lockID=value->valuestring;
         UnLock(lockID);
     }*/
-    printf("=============================================================\n");
+    printf("vvvvvvvvvvvvvvv web msgvvvvvvvvvvvvvvv\n");
     cJSON_Delete(root);
 
     return 0;
@@ -682,12 +689,13 @@ void WaitMQTT(sysinfo_t *si) {
 		char *topic = NULL;
 		int topicLen;
 		MQTTClient_message *msg = NULL;
+		printf("will do MQTTClient_receive, mqtt_c[%x], addr[%s]\n", si->mqtt_c, &si->mqtt_c);
 		int rc = MQTTClient_receive(si->mqtt_c, &topic, &topicLen, &msg, 1e3);
 		if (0 != rc) {
 			serverLog(LL_ERROR, "MQTTClient_receive err[%d], topic[%s].", rc, topic);
 		}
 		if(msg){
-			printf("MQTTClient_receive msg from server, topic[%s].\n", topic);
+			printf(">>>> MQTTClient_receive msg from server, topic[%s].\n", topic);
 			if(0 == strcmp(topic, PUB_WEBDEMO)){
 				//web simulator request
 				DoWebMsg(topic,msg->payload);
@@ -771,6 +779,7 @@ void WaitMQTT(sysinfo_t *si) {
 							}
 							printf("\n");
 
+
 							printf("@@@demo_job.bt_id[%s], op_cmd[%d], pin[", 
 								imsg.server_data.demo_job.bt_id, imsg.server_data.demo_job.op_cmd);
 							for(int n=0;n<imsg.server_data.demo_job.pin.size; n++) {
@@ -790,6 +799,7 @@ void WaitMQTT(sysinfo_t *si) {
 							char admin_key[] = "BD3967AE24FD72B750C4E48B89294592";
 							char passwd[] = "7E2113D9235EA288";
 
+							setLockName(lock, imsg.server_data.demo_job.bt_id, strlen(imsg.server_data.demo_job.bt_id));
 							setLockAddr(lock, device_address, strlen(device_address));
 							uint8_t tmp_buff[100];
 							memset(tmp_buff, 0, sizeof(tmp_buff));
