@@ -111,7 +111,19 @@ find_library(igloo_LIB
 #)
 
 # 测试红黑树
-#add_executable(red_black_tree ./red_black_tree.c)
-#target_link_libraries(red_black_tree
-#  ${TEST_DEPENDENCIES}
-#)
+add_executable(red_black_tree ./red_black_tree.c)
+target_link_libraries(red_black_tree
+  ${TEST_DEPENDENCIES}
+)
+
+# 测试ecdh
+add_executable(ecdh ./ecdh.c)
+target_link_libraries(ecdh
+  ${TEST_DEPENDENCIES} mbedtls mbedcrypto
+)
+
+# 测试 AES_CCM.c
+add_executable(AES_CCM ./AES_CCM.c)
+target_link_libraries(AES_CCM
+  ${TEST_DEPENDENCIES}
+)

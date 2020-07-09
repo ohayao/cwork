@@ -16,7 +16,7 @@
 #include "salsa20.h"
 #include "poly1305.h"
 #include "bitops.h"
-#include "handy.h"
+#include "ext/handy.h"
 
 #define ENCRYPT 1
 #define DECRYPT 0

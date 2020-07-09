@@ -1,10 +1,11 @@
 #include <string.h>
 #include <stdlib.h>
-#include <bridge/lock/cifra/modes.h>
-#include <bridge/lock/cifra/aes.h>
-#include <bridge/lock/micro-ecc/uECC.h>
+#include "bridge/lock/cifra/modes.h"
+#include "bridge/lock/cifra/aes.h"
+#include "bridge/lock/micro-ecc/uECC.h"
 
-#include <bridge/lock/connection/encryption.h>
+#include "bridge/lock/connection/encryption.h"
+
 #include <bridge/lock/connection/connection_common.h>
 #include <bridge/lock/messages/PairingStep1.h>
 #include <bridge/lock/messages/PairingStep2.h>
@@ -27,8 +28,6 @@ static uint8_t otherPublicKey_[kPublicKeyLength] = {0x00};
 static uint8_t txNonce_[kNonceLength] = {0x00};
 static uint8_t rxNonce_[kNonceLength] = {0x00};
 static uint8_t sharedKey_[kConnectionKeyLength] = {0x00};
-
-
 
 bool igloohome_ble_lock_crypto_PairingConnection_beginConnection() {
     const struct uECC_Curve_t * p_curve = uECC_secp256r1();

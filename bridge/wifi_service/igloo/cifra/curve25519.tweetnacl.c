@@ -6,7 +6,7 @@
 #include <stdint.h>
 #include <stddef.h>
 
-#include "handy.h"
+#include "ext/handy.h"
 
 typedef int64_t gf[16];
 

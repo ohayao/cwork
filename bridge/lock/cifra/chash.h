@@ -18,10 +18,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 /**
  * General hash function description
  * =================================
@@ -105,7 +101,7 @@ typedef struct
  * The maximum size of a :c:type:`cf_chash_ctx`.  This allows
  * use to put a structure in automatic storage that can
  * store working data for any supported hash function. */
-#define CF_CHASH_MAXCTX 360
+#define CF_CHASH_MAXCTX 390
 
 /* .. c:macro:: CF_CHASH_MAXBLK
  * Maximum hash function block size (in bytes). */
@@ -137,9 +133,5 @@ typedef union
  * :param out: hash result buffer (written).
  */
 void cf_hash(const cf_chash *h, const void *m, size_t nm, uint8_t *out);
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif

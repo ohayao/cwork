@@ -15,7 +15,7 @@
 #include "pbkdf2.h"
 #include "hmac.h"
 #include "bitops.h"
-#include "handy.h"
+#include "ext/handy.h"
 #include "tassert.h"
 
 #include <string.h>

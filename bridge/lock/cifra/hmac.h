@@ -20,10 +20,6 @@
 
 #include "chash.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 /**
  * HMAC
  * ====
@@ -78,9 +74,5 @@ void cf_hmac(const uint8_t *key, size_t nkey,
              const uint8_t *msg, size_t nmsg,
              uint8_t *out,
              const cf_chash *hash);
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif

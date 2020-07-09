@@ -44,7 +44,7 @@ typedef void (*cf_prp_block)(void *ctx, const uint8_t *in, uint8_t *out);
  * Block size in bytes. Must be no more than :c:macro:`CF_MAXBLOCK`.
  *
  * .. c:member:: cf_prp.encrypt
- * Block Encryption function.
+ * Block encryption function.
  *
  * .. c:member:: cf_prp.decrypt
  * Block decryption function.

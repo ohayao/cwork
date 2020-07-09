@@ -12,7 +12,7 @@
  * <http://creativecommons.org/publicdomain/zero/1.0/>.
  */
 
-#include "handy.h"
+#include "ext/handy.h"
 #include "prp.h"
 #include "modes.h"
 #include "blockwise.h"

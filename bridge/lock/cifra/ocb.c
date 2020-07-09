@@ -72,7 +72,7 @@ static void ocb_init(ocb *o, const cf_prp *prp, void *prpctx,
   for (int i = 1; i < MAX_L; i++)
     cf_gf128_double(o->L[i - 1], o->L[i]);
 
-  /* Compute nonce-dependent and per-Encryption vars */
+  /* Compute nonce-dependent and per-encryption vars */
   assert(nnonce > 0 && nnonce < BLOCK);
   uint8_t full_nonce[BLOCK] = { 0 };
   full_nonce[0] = ((ntag * 8) & 0x7f) << 1;
@@ -275,7 +275,7 @@ void cf_ocb_encrypt(const cf_prp *prp, void *prpctx,
   for (size_t i = 0; i < 4; i++)
     full_tag[i] = o.checksum[i] ^ o.offset[i] ^ o.L_dollar[i];
 
-  /* Convert tag to bytes for Encryption */
+  /* Convert tag to bytes for encryption */
   uint8_t tag_bytes[BLOCK];
   cf_gf128_tobytes_be(full_tag, tag_bytes);
 
@@ -372,7 +372,7 @@ int cf_ocb_decrypt(const cf_prp *prp, void *prpctx,
   for (size_t i = 0; i < 4; i++)
     full_tag[i] = o.checksum[i] ^ o.offset[i] ^ o.L_dollar[i];
 
-  /* Convert tag to bytes for Encryption */
+  /* Convert tag to bytes for encryption */
   uint8_t tag_bytes[BLOCK];
   cf_gf128_tobytes_be(full_tag, tag_bytes);
 

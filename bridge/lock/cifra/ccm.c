@@ -116,7 +116,7 @@ void cf_ccm_encrypt(const cf_prp *prp, void *prpctx,
   /* Finish tag. */
   cf_cbcmac_stream_nopad_final(&cm, block);
 
-  /* Start Encryption. */
+  /* Start encryption. */
   /* Construct A_0 */
   uint8_t ctr_nonce[CF_MAXBLOCK];
   build_ctr_nonce(ctr_nonce, L, nonce, nnonce);

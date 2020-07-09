@@ -15,7 +15,7 @@
 
 #include "norx.h"
 #include "bitops.h"
-#include "handy.h"
+#include "ext/handy.h"
 #include "blockwise.h"
 #include "tassert.h"
 

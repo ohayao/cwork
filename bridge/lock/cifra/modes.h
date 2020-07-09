@@ -28,7 +28,7 @@
 /**
  * CBC mode
  * --------
- * This implementation allows Encryption or decryption of whole
+ * This implementation allows encryption or decryption of whole
  * blocks in CBC mode.  It does not offer a byte-wise incremental
  * interface, or do any padding.
  *
@@ -58,7 +58,7 @@ typedef struct
 } cf_cbc;
 
 /* .. c:function:: $DECL
- * Initialise CBC Encryption/decryption context using selected prp, prp context and IV. */
+ * Initialise CBC encryption/decryption context using selected prp, prp context and IV. */
 void cf_cbc_init(cf_cbc *ctx, const cf_prp *prp, void *prpctx, const uint8_t iv[CF_MAXBLOCK]);
 
 /* .. c:function:: $DECL
@@ -74,7 +74,7 @@ void cf_cbc_decrypt(cf_cbc *ctx, const uint8_t *input, uint8_t *output, size_t b
 /**
  * Counter mode
  * ------------
- * This implementation allows incremental Encryption/decryption of
+ * This implementation allows incremental encryption/decryption of
  * messages.  Encryption and decryption are the same operation.
  *
  * The counter is always big-endian, but has configurable location
@@ -122,7 +122,7 @@ typedef struct
 } cf_ctr;
 
 /* .. c:function:: $DECL
- * Initialise CTR Encryption/decryption context using selected prp and nonce.
+ * Initialise CTR encryption/decryption context using selected prp and nonce.
  * (nb, this only increments the whole nonce as a big endian block) */
 void cf_ctr_init(cf_ctr *ctx, const cf_prp *prp, void *prpctx, const uint8_t nonce[CF_MAXBLOCK]);
 
@@ -272,7 +272,7 @@ void cf_cmac_sign(cf_cmac *ctx, const uint8_t *data, size_t bytes,
  * CMAC one-shot data.
  *
  * .. c:member:: cf_cmac_stream.cbc
- * CBC block Encryption data.
+ * CBC block encryption data.
  *
  * .. c:member:: cf_cmac_stream.buffer
  * Buffer for data which can't be processed until we have a full block.
@@ -322,14 +322,14 @@ void cf_cmac_stream_final(cf_cmac_stream *ctx, uint8_t out[CF_MAXBLOCK]);
  * EAX
  * ---
  *
- * The EAX authenticated Encryption mode.  This is a one-shot
+ * The EAX authenticated encryption mode.  This is a one-shot
  * interface.
  *
  * EAX is a pretty respectable and fast AEAD mode.
  */
 
 /* .. c:function:: $DECL
- * EAX authenticated Encryption.
+ * EAX authenticated encryption.
  *
  * This function does not fail.
  *
@@ -377,7 +377,7 @@ int cf_eax_decrypt(const cf_prp *prp, void *prpctx,
 /**
  * GCM
  * ---
- * The GCM ('Galois counter mode') authenticated Encryption mode.
+ * The GCM ('Galois counter mode') authenticated encryption mode.
  * This is a one-shot interface.
  *
  * GCM is a reasonably respectable AEAD mode.  It's somewhat more
@@ -386,7 +386,7 @@ int cf_eax_decrypt(const cf_prp *prp, void *prpctx,
  */
 
 /* .. c:function:: $DECL
- * GCM authenticated Encryption.
+ * GCM authenticated encryption.
  *
  * This function does not fail.
  *
@@ -438,7 +438,7 @@ int cf_gcm_decrypt(const cf_prp *prp, void *prpctx,
  * CCM
  * ---
  *
- * The CCM ('Counter with CBC-MAC') authenticated Encryption mode.
+ * The CCM ('Counter with CBC-MAC') authenticated encryption mode.
  * CCM is a widely used AEAD mode (in IPSec, WPA2, Bluetooth, etc.)
  *
  * It works (at a high level) by just gluing together CTR and CBC-MAC
@@ -451,7 +451,7 @@ int cf_gcm_decrypt(const cf_prp *prp, void *prpctx,
  */
 
 /* .. c:function:: $DECL
- * CCM authenticated Encryption.
+ * CCM authenticated encryption.
  *
  * This function does not fail.
  *
@@ -503,7 +503,7 @@ int cf_ccm_decrypt(const cf_prp *prp, void *prpctx,
  * OCB
  * ---
  *
- * OCB is an authenticated Encryption mode by Phil Rogaway.
+ * OCB is an authenticated encryption mode by Phil Rogaway.
  *
  * This is version 3, as standardised in RFC7253.  It's defined
  * only for block ciphers with a 128-bit block size.
@@ -512,7 +512,7 @@ int cf_ccm_decrypt(const cf_prp *prp, void *prpctx,
  */
 
 /* .. c:function:: $DECL
- * OCB authenticated Encryption.
+ * OCB authenticated encryption.
  *
  * This function does not fail.
  *

@@ -28,16 +28,16 @@
  * This is NORX v2.0.  It is not compatible with earlier
  * versions.
  *
- * NORX32 uses a 128-bit key.  Each Encryption requires a
- * 64-bit nonce.  An Encryption processes one sequence of
- * additional data ('header'), followed by Encryption of
+ * NORX32 uses a 128-bit key.  Each encryption requires a
+ * 64-bit nonce.  An encryption processes one sequence of
+ * additional data ('header'), followed by encryption of
  * the plaintext, followed by processing a second sequence
  * of additional data ('trailer').  It outputs a 128-bit
  * tag.
  */
 
 /* .. c:function:: $DECL
- * NORX32-4-1 one-shot Encryption interface.
+ * NORX32-4-1 one-shot encryption interface.
  *
  * :param key: key material.
  * :param nonce: per-message nonce.

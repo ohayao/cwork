@@ -13,7 +13,7 @@
  */
 
 #include "drbg.h"
-#include "handy.h"
+#include "ext/handy.h"
 #include "bitops.h"
 #include "sha2.h"
 #include "tassert.h"

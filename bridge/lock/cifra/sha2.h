@@ -20,10 +20,6 @@
 
 #include "chash.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 /**
  * SHA224/SHA256
  * =============
@@ -235,9 +231,5 @@ extern const cf_chash cf_sha384;
  * Abstract interface to SHA512.  See :c:type:`cf_chash` for more information.
  */
 extern const cf_chash cf_sha512;
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif

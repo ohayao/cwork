@@ -72,32 +72,32 @@ static void increment_nonce(uint8_t *nonce);
 static int decrypt_data(uint8_t *aes_key, uint8_t *data_in, uint32_t data_in_len, uint8_t *data_out, uint32_t data_out_len, uint8_t *nonce, uint32_t *bytes_written); 
 static void encrypt_data(uint8_t *aes_key, uint8_t *data_in, uint32_t data_in_len, uint8_t *data_out, uint32_t data_out_len, uint8_t *nonce, uint32_t *bytes_written);
 
-void ig_init() {
-	nrf_crypto_init();
-	nrf_crypto_rng_init();
-	init_connections();
-}
+// void ig_init() {
+// 	nrf_crypto_init();
+// 	nrf_crypto_rng_init();
+// 	init_connections();
+// }
 
-void ig_begin_pairing() {
-	memset(pairing_admin_key, 0x00, IG_KEY_LENGTH);
-	memset(pairing_pin_key, 0x00, IG_PIN_KEY_LENGTH);
-	memset(pairing_password, 0x00, IG_PASSWORD_LENGTH);
-	pairing_master_pin_length = 0;
-	memset(pairing_master_pin, 0x00, IG_MASTER_PIN_MAX_LENGTH);
-}
+// void ig_begin_pairing() {
+// 	memset(pairing_admin_key, 0x00, IG_KEY_LENGTH);
+// 	memset(pairing_pin_key, 0x00, IG_PIN_KEY_LENGTH);
+// 	memset(pairing_password, 0x00, IG_PASSWORD_LENGTH);
+// 	pairing_master_pin_length = 0;
+// 	memset(pairing_master_pin, 0x00, IG_MASTER_PIN_MAX_LENGTH);
+// }
 
-uint32_t ig_pairing_step2_size() {
-	IgPairingStep2 step2;
-	ig_PairingStep2_init(&step2);
-	uint8_t nonce[kNonceLength] = {0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1};
-	ig_PairingStep2_set_nonce(&step2, nonce, kNonceLength);
-	uint8_t public_key[IG_KEY_EXCHANGE_PUBLIC_LENGTH] = {0x0};
-	ig_PairingStep2_set_public_key(&step2, public_key, IG_KEY_EXCHANGE_PUBLIC_LENGTH);
-	size_t step2_size = ig_PairingStep2_get_max_payload_in_bytes(&step2);
+// uint32_t ig_pairing_step2_size() {
+// 	IgPairingStep2 step2;
+// 	ig_PairingStep2_init(&step2);
+// 	uint8_t nonce[kNonceLength] = {0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1};
+// 	ig_PairingStep2_set_nonce(&step2, nonce, kNonceLength);
+// 	uint8_t public_key[IG_KEY_EXCHANGE_PUBLIC_LENGTH] = {0x0};
+// 	ig_PairingStep2_set_public_key(&step2, public_key, IG_KEY_EXCHANGE_PUBLIC_LENGTH);
+// 	size_t step2_size = ig_PairingStep2_get_max_payload_in_bytes(&step2);
 
-	ig_PairingStep2_deinit(&step2);
-	return step2_size;
-}
+// 	ig_PairingStep2_deinit(&step2);
+// 	return step2_size;
+// }
 
 IgErrorCode ig_pairing_step2(uint8_t *data_in, uint32_t data_in_len, uint8_t *data_out, uint32_t data_out_len, uint32_t *bytes_written) {
 	IgPairingStep1 step1;
@@ -231,599 +231,599 @@ IgErrorCode ig_pairing_step2(uint8_t *data_in, uint32_t data_in_len, uint8_t *da
 	return IG_ERROR_NONE;
 }
 
-uint32_t ig_pairing_step4_size() {
-	IgPairingStep4 step4;
-	ig_PairingStep4_init(&step4);
-	ig_PairingStep4_set_success(&step4, true);
-	ig_PairingStep4_set_pin_key(&step4, pairing_pin_key, sizeof(pairing_pin_key));
-	ig_PairingStep4_set_password(&step4, pairing_password, sizeof(pairing_password));
-	ig_PairingStep4_set_master_pin(&step4, pairing_master_pin, sizeof(pairing_master_pin));
-	size_t step4_size = ig_PairingStep4_get_max_payload_in_bytes(&step4);
+// uint32_t ig_pairing_step4_size() {
+// 	IgPairingStep4 step4;
+// 	ig_PairingStep4_init(&step4);
+// 	ig_PairingStep4_set_success(&step4, true);
+// 	ig_PairingStep4_set_pin_key(&step4, pairing_pin_key, sizeof(pairing_pin_key));
+// 	ig_PairingStep4_set_password(&step4, pairing_password, sizeof(pairing_password));
+// 	ig_PairingStep4_set_master_pin(&step4, pairing_master_pin, sizeof(pairing_master_pin));
+// 	size_t step4_size = ig_PairingStep4_get_max_payload_in_bytes(&step4);
 
-	ig_PairingStep4_deinit(&step4);
-	return step4_size;
-}
+// 	ig_PairingStep4_deinit(&step4);
+// 	return step4_size;
+// }
 
-IgErrorCode ig_pairing_step4(uint8_t *data_in, uint32_t data_in_len, uint8_t *data_out, uint32_t data_out_len, uint32_t *bytes_written) {
-	// decrypt key with calculated admin key
-	uint32_t decrypted_data_in_len = ig_decrypt_data_size(data_in_len);
-	uint8_t decrypted_data_in[decrypted_data_in_len];
-	uint32_t decrypted_bytes_written = 0;
-	int decrypt_result = decrypt_data(pairing_admin_key, data_in, data_in_len, decrypted_data_in, decrypted_data_in_len, pairing_rx_nonce, &decrypted_bytes_written);
-	if (decrypt_result) {
-		return IG_ERROR_INVALID_MESSAGE;
-	}
-	increment_nonce(pairing_rx_nonce);
-	// TEST: unencrypted
-//	uint8_t *decrypted_data_in = data_in;
-//	uint32_t decrypted_data_len = data_in_len;
+// IgErrorCode ig_pairing_step4(uint8_t *data_in, uint32_t data_in_len, uint8_t *data_out, uint32_t data_out_len, uint32_t *bytes_written) {
+// 	// decrypt key with calculated admin key
+// 	uint32_t decrypted_data_in_len = ig_decrypt_data_size(data_in_len);
+// 	uint8_t decrypted_data_in[decrypted_data_in_len];
+// 	uint32_t decrypted_bytes_written = 0;
+// 	int decrypt_result = decrypt_data(pairing_admin_key, data_in, data_in_len, decrypted_data_in, decrypted_data_in_len, pairing_rx_nonce, &decrypted_bytes_written);
+// 	if (decrypt_result) {
+// 		return IG_ERROR_INVALID_MESSAGE;
+// 	}
+// 	increment_nonce(pairing_rx_nonce);
+// 	// TEST: unencrypted
+// //	uint8_t *decrypted_data_in = data_in;
+// //	uint32_t decrypted_data_len = data_in_len;
 
-	// decode step 3
-	IgPairingStep3 step3;
-	ig_PairingStep3_init(&step3);
-	ig_PairingStep3_decode(decrypted_data_in, decrypted_bytes_written, &step3, 0);
+// 	// decode step 3
+// 	IgPairingStep3 step3;
+// 	ig_PairingStep3_init(&step3);
+// 	ig_PairingStep3_decode(decrypted_data_in, decrypted_bytes_written, &step3, 0);
 
-	// validate data
-	if (!ig_PairingStep3_is_valid(&step3) ||
-		(step3.has_nonce && ig_PairingStep3_get_nonce_size(&step3) != kNonceLength) ||
-		(step3.has_pin_key && ig_PairingStep3_get_pin_key_size(&step3) != IG_PIN_KEY_LENGTH) ||
-		(step3.has_password && ig_PairingStep3_get_password_size(&step3) != IG_PASSWORD_LENGTH) ||
-		(step3.has_master_pin && ig_PairingStep3_get_master_pin_size(&step3) > IG_MASTER_PIN_MAX_LENGTH) ||
-		(step3.has_master_pin && ig_PairingStep3_get_master_pin_size(&step3) < IG_MASTER_PIN_MIN_LENGTH)) 
-	{
-		ig_PairingStep3_deinit(&step3);
-		return IG_ERROR_INVALID_MESSAGE;
-	}
+// 	// validate data
+// 	if (!ig_PairingStep3_is_valid(&step3) ||
+// 		(step3.has_nonce && ig_PairingStep3_get_nonce_size(&step3) != kNonceLength) ||
+// 		(step3.has_pin_key && ig_PairingStep3_get_pin_key_size(&step3) != IG_PIN_KEY_LENGTH) ||
+// 		(step3.has_password && ig_PairingStep3_get_password_size(&step3) != IG_PASSWORD_LENGTH) ||
+// 		(step3.has_master_pin && ig_PairingStep3_get_master_pin_size(&step3) > IG_MASTER_PIN_MAX_LENGTH) ||
+// 		(step3.has_master_pin && ig_PairingStep3_get_master_pin_size(&step3) < IG_MASTER_PIN_MIN_LENGTH)) 
+// 	{
+// 		ig_PairingStep3_deinit(&step3);
+// 		return IG_ERROR_INVALID_MESSAGE;
+// 	}
 
 
-	// copy key or generate random
-	if (step3.has_pin_key) {
-		memcpy(pairing_pin_key, step3.pin_key, ig_PairingStep3_get_pin_key_size(&step3));
-	}
-	else {
-		nrf_crypto_rng_vector_generate(pairing_pin_key, sizeof(pairing_pin_key));
-		// TEST: hardcoded value
-//		memset(pairing_pin_key, 0x2, sizeof(pairing_pin_key));
-	}
-	if (step3.has_password) {
-		memcpy(pairing_password, step3.password, ig_PairingStep3_get_password_size(&step3));
-	}
-	else {
-		nrf_crypto_rng_vector_generate(pairing_password, sizeof(pairing_password));
-		// TEST: hardcoded value
-//		memset(pairing_password, 0x3, sizeof(pairing_password));
-	}
-	if (step3.has_master_pin && 
-			ig_PairingStep3_get_master_pin_size(&step3) >= IG_MASTER_PIN_MIN_LENGTH && 
-			ig_PairingStep3_get_master_pin_size(&step3) <= IG_MASTER_PIN_MAX_LENGTH) {
-		pairing_master_pin_length = ig_PairingStep3_get_master_pin_size(&step3);
-		memcpy(pairing_master_pin, step3.master_pin, pairing_master_pin_length);
-	}
-	else {
-		pairing_master_pin_length = IG_MASTER_PIN_DEFAULT_LENGTH;
-		nrf_crypto_rng_vector_generate(pairing_master_pin, IG_MASTER_PIN_DEFAULT_LENGTH);
-		for (int i = 0; i < IG_MASTER_PIN_DEFAULT_LENGTH; ++i) {
-			pairing_master_pin[i] = pairing_master_pin[i] % 10;
-			pairing_master_pin[i] = pairing_master_pin[i] + 0x30;
-		}
-	}
-	memcpy(pairing_tx_nonce, step3.nonce, step3.nonce_size);
-	pairing_gmt_offset = step3.has_gmt_offset ? step3.gmt_offset : 0;
-	if (step3.has_dst_times) {
-	   	if (ig_PairingStep3_get_dst_times_size(&step3) <= kDstArrayLen) {
-			pairing_dst_len = ig_PairingStep3_get_dst_times_size(&step3);
-			memcpy(pairing_dst, step3.dst_times, pairing_dst_len);
-		}
-		else {
-			return IG_ERROR_INTERNAL_ERROR;
-		}
-	}
-	else {
-		pairing_dst_len = 0;
-	}
+// 	// copy key or generate random
+// 	if (step3.has_pin_key) {
+// 		memcpy(pairing_pin_key, step3.pin_key, ig_PairingStep3_get_pin_key_size(&step3));
+// 	}
+// 	else {
+// 		nrf_crypto_rng_vector_generate(pairing_pin_key, sizeof(pairing_pin_key));
+// 		// TEST: hardcoded value
+// //		memset(pairing_pin_key, 0x2, sizeof(pairing_pin_key));
+// 	}
+// 	if (step3.has_password) {
+// 		memcpy(pairing_password, step3.password, ig_PairingStep3_get_password_size(&step3));
+// 	}
+// 	else {
+// 		nrf_crypto_rng_vector_generate(pairing_password, sizeof(pairing_password));
+// 		// TEST: hardcoded value
+// //		memset(pairing_password, 0x3, sizeof(pairing_password));
+// 	}
+// 	if (step3.has_master_pin && 
+// 			ig_PairingStep3_get_master_pin_size(&step3) >= IG_MASTER_PIN_MIN_LENGTH && 
+// 			ig_PairingStep3_get_master_pin_size(&step3) <= IG_MASTER_PIN_MAX_LENGTH) {
+// 		pairing_master_pin_length = ig_PairingStep3_get_master_pin_size(&step3);
+// 		memcpy(pairing_master_pin, step3.master_pin, pairing_master_pin_length);
+// 	}
+// 	else {
+// 		pairing_master_pin_length = IG_MASTER_PIN_DEFAULT_LENGTH;
+// 		nrf_crypto_rng_vector_generate(pairing_master_pin, IG_MASTER_PIN_DEFAULT_LENGTH);
+// 		for (int i = 0; i < IG_MASTER_PIN_DEFAULT_LENGTH; ++i) {
+// 			pairing_master_pin[i] = pairing_master_pin[i] % 10;
+// 			pairing_master_pin[i] = pairing_master_pin[i] + 0x30;
+// 		}
+// 	}
+// 	memcpy(pairing_tx_nonce, step3.nonce, step3.nonce_size);
+// 	pairing_gmt_offset = step3.has_gmt_offset ? step3.gmt_offset : 0;
+// 	if (step3.has_dst_times) {
+// 	   	if (ig_PairingStep3_get_dst_times_size(&step3) <= kDstArrayLen) {
+// 			pairing_dst_len = ig_PairingStep3_get_dst_times_size(&step3);
+// 			memcpy(pairing_dst, step3.dst_times, pairing_dst_len);
+// 		}
+// 		else {
+// 			return IG_ERROR_INTERNAL_ERROR;
+// 		}
+// 	}
+// 	else {
+// 		pairing_dst_len = 0;
+// 	}
 
-	IgPairingStep4 step4;
-	ig_PairingStep4_init(&step4);
-	ig_PairingStep4_set_success(&step4, true);
-	ig_PairingStep4_set_pin_key(&step4, pairing_pin_key, sizeof(pairing_pin_key));
-	ig_PairingStep4_set_password(&step4, pairing_password, sizeof(pairing_password));
-	ig_PairingStep4_set_master_pin(&step4, pairing_master_pin, pairing_master_pin_length);
-	ig_PairingStep4_set_gmt_offset(&step4, pairing_gmt_offset);
+// 	IgPairingStep4 step4;
+// 	ig_PairingStep4_init(&step4);
+// 	ig_PairingStep4_set_success(&step4, true);
+// 	ig_PairingStep4_set_pin_key(&step4, pairing_pin_key, sizeof(pairing_pin_key));
+// 	ig_PairingStep4_set_password(&step4, pairing_password, sizeof(pairing_password));
+// 	ig_PairingStep4_set_master_pin(&step4, pairing_master_pin, pairing_master_pin_length);
+// 	ig_PairingStep4_set_gmt_offset(&step4, pairing_gmt_offset);
 
-	size_t step4_size = ig_PairingStep4_get_max_payload_in_bytes(&step4);
-	if (data_out_len < step4_size) {
-		ig_PairingStep3_deinit(&step3);
-		ig_PairingStep4_deinit(&step4);
-		return IG_ERROR_DATA_TOO_SHORT;
-	}
+// 	size_t step4_size = ig_PairingStep4_get_max_payload_in_bytes(&step4);
+// 	if (data_out_len < step4_size) {
+// 		ig_PairingStep3_deinit(&step3);
+// 		ig_PairingStep4_deinit(&step4);
+// 		return IG_ERROR_DATA_TOO_SHORT;
+// 	}
 
-	uint8_t step4_serialized[step4_size];
-	size_t step4_written_bytes = 0;
-	IgSerializerError err = ig_PairingStep4_encode(&step4, step4_serialized, step4_size, &step4_written_bytes);
-	if (err != IgSerializerNoError) {
-		ig_PairingStep3_deinit(&step3);
-		ig_PairingStep4_deinit(&step4);
-		return IG_ERROR_GENERIC_FAIL;
-	}
+// 	uint8_t step4_serialized[step4_size];
+// 	size_t step4_written_bytes = 0;
+// 	IgSerializerError err = ig_PairingStep4_encode(&step4, step4_serialized, step4_size, &step4_written_bytes);
+// 	if (err != IgSerializerNoError) {
+// 		ig_PairingStep3_deinit(&step3);
+// 		ig_PairingStep4_deinit(&step4);
+// 		return IG_ERROR_GENERIC_FAIL;
+// 	}
 
-	// encrypt message
-	uint32_t encrypted_bytes_written = 0;
-	encrypt_data(pairing_admin_key, step4_serialized, step4_written_bytes, data_out, data_out_len, pairing_tx_nonce, &encrypted_bytes_written);
-	*bytes_written = encrypted_bytes_written;
-	// TEST: unencrypted message
-//	memcpy(data_out, step4_serialized, step4_written_bytes);
-//	*bytes_written = (uint32_t)step4_written_bytes;
+// 	// encrypt message
+// 	uint32_t encrypted_bytes_written = 0;
+// 	encrypt_data(pairing_admin_key, step4_serialized, step4_written_bytes, data_out, data_out_len, pairing_tx_nonce, &encrypted_bytes_written);
+// 	*bytes_written = encrypted_bytes_written;
+// 	// TEST: unencrypted message
+// //	memcpy(data_out, step4_serialized, step4_written_bytes);
+// //	*bytes_written = (uint32_t)step4_written_bytes;
 	
-	ig_PairingStep3_deinit(&step3);
-	ig_PairingStep4_deinit(&step4);
-	return IG_ERROR_NONE;
-}
+// 	ig_PairingStep3_deinit(&step3);
+// 	ig_PairingStep4_deinit(&step4);
+// 	return IG_ERROR_NONE;
+// }
 
-IgErrorCode ig_commit_pairing(uint8_t *data_in, uint32_t data_in_len, IgPairingResult *data_out) {
-	// decrypt key with calculated admin key
-	uint32_t decrypted_data_in_len = ig_decrypt_data_size(data_in_len);
-	uint8_t decrypted_data_in[decrypted_data_in_len];
-	uint32_t decrypted_bytes_written = 0;
-	decrypt_data(pairing_admin_key, data_in, data_in_len, decrypted_data_in, decrypted_data_in_len, pairing_rx_nonce, &decrypted_bytes_written);
-	increment_nonce(pairing_rx_nonce);
-	// TEST: unencrpyted version
-//	uint8_t *decrypted_data_in = data_in;
-//	uint32_t decrypted_data_len = data_len;
+// IgErrorCode ig_commit_pairing(uint8_t *data_in, uint32_t data_in_len, IgPairingResult *data_out) {
+// 	// decrypt key with calculated admin key
+// 	uint32_t decrypted_data_in_len = ig_decrypt_data_size(data_in_len);
+// 	uint8_t decrypted_data_in[decrypted_data_in_len];
+// 	uint32_t decrypted_bytes_written = 0;
+// 	decrypt_data(pairing_admin_key, data_in, data_in_len, decrypted_data_in, decrypted_data_in_len, pairing_rx_nonce, &decrypted_bytes_written);
+// 	increment_nonce(pairing_rx_nonce);
+// 	// TEST: unencrpyted version
+// //	uint8_t *decrypted_data_in = data_in;
+// //	uint32_t decrypted_data_len = data_len;
 
-	IgPairingCommit pairing_commit;
-	ig_PairingCommit_init(&pairing_commit);
-	ig_PairingCommit_decode(decrypted_data_in, decrypted_data_in_len, &pairing_commit, 0);
-	if (!ig_PairingCommit_is_valid(&pairing_commit)) {
-		ig_PairingCommit_deinit(&pairing_commit);
-		return IG_ERROR_INVALID_MESSAGE;
-	}
+// 	IgPairingCommit pairing_commit;
+// 	ig_PairingCommit_init(&pairing_commit);
+// 	ig_PairingCommit_decode(decrypted_data_in, decrypted_data_in_len, &pairing_commit, 0);
+// 	if (!ig_PairingCommit_is_valid(&pairing_commit)) {
+// 		ig_PairingCommit_deinit(&pairing_commit);
+// 		return IG_ERROR_INVALID_MESSAGE;
+// 	}
 	
-	data_out->current_time = pairing_commit.current_time;
-	memcpy(data_out->admin_key, pairing_admin_key, IG_KEY_LENGTH);
-	memcpy(data_out->pin_key, pairing_pin_key, IG_PIN_KEY_LENGTH);
-	memcpy(data_out->password, pairing_password, IG_PASSWORD_LENGTH);
-	data_out->master_pin_length = pairing_master_pin_length;
-	memcpy(data_out->master_pin, pairing_master_pin, pairing_master_pin_length);
-	data_out->gmt_offset = pairing_gmt_offset;
-	data_out->dst = pairing_dst;
-	data_out->dst_length = pairing_dst_len;
+// 	data_out->current_time = pairing_commit.current_time;
+// 	memcpy(data_out->admin_key, pairing_admin_key, IG_KEY_LENGTH);
+// 	memcpy(data_out->pin_key, pairing_pin_key, IG_PIN_KEY_LENGTH);
+// 	memcpy(data_out->password, pairing_password, IG_PASSWORD_LENGTH);
+// 	data_out->master_pin_length = pairing_master_pin_length;
+// 	memcpy(data_out->master_pin, pairing_master_pin, pairing_master_pin_length);
+// 	data_out->gmt_offset = pairing_gmt_offset;
+// 	data_out->dst = pairing_dst;
+// 	data_out->dst_length = pairing_dst_len;
 
-	ig_PairingCommit_deinit(&pairing_commit);
-	return IG_ERROR_NONE;
-}
+// 	ig_PairingCommit_deinit(&pairing_commit);
+// 	return IG_ERROR_NONE;
+// }
 
-void ig_end_pairing() {
-	memset(pairing_admin_key, 0x00, IG_KEY_LENGTH);
-	memset(pairing_pin_key, 0x00, IG_PIN_KEY_LENGTH);
-	memset(pairing_password, 0x00, IG_PASSWORD_LENGTH);
-	pairing_master_pin_length = 0;
-	memset(pairing_master_pin, 0x00, IG_MASTER_PIN_MAX_LENGTH);
-	pairing_dst_len = 0;
-	memset(pairing_dst, 0x00, kDstArrayLen); 
-}
+// void ig_end_pairing() {
+// 	memset(pairing_admin_key, 0x00, IG_KEY_LENGTH);
+// 	memset(pairing_pin_key, 0x00, IG_PIN_KEY_LENGTH);
+// 	memset(pairing_password, 0x00, IG_PASSWORD_LENGTH);
+// 	pairing_master_pin_length = 0;
+// 	memset(pairing_master_pin, 0x00, IG_MASTER_PIN_MAX_LENGTH);
+// 	pairing_dst_len = 0;
+// 	memset(pairing_dst, 0x00, kDstArrayLen); 
+// }
 
-int ig_debug_get_pairing_state() {
-	return 911555;
-}
+// int ig_debug_get_pairing_state() {
+// 	return 911555;
+// }
 
-// --------------------------------------------------------------
-typedef struct ConnectionEntry {
-	uint32_t conn_id;
-	bool active;
-	IgConnectionCharacteristicType type;
-	uint8_t tx_nonce[kNonceLength];
-	uint8_t rx_nonce[kNonceLength];
-	uint8_t aes_key[IG_KEY_LENGTH];
-} ConnectionEntry;
-static ConnectionEntry connections_[kMaxConnections];
-static uint8_t admin_key[IG_KEY_LENGTH];
+// // --------------------------------------------------------------
+// typedef struct ConnectionEntry {
+// 	uint32_t conn_id;
+// 	bool active;
+// 	IgConnectionCharacteristicType type;
+// 	uint8_t tx_nonce[kNonceLength];
+// 	uint8_t rx_nonce[kNonceLength];
+// 	uint8_t aes_key[IG_KEY_LENGTH];
+// } ConnectionEntry;
+// static ConnectionEntry connections_[kMaxConnections];
+// static uint8_t admin_key[IG_KEY_LENGTH];
 
-static void init_connections() {
-	memset(connections_, 0, sizeof(connections_));
-}
+// static void init_connections() {
+// 	memset(connections_, 0, sizeof(connections_));
+// }
 
-void ig_set_admin_key(uint8_t key[IG_KEY_LENGTH]) {
-	memcpy(admin_key, key, IG_KEY_LENGTH);
-}
+// void ig_set_admin_key(uint8_t key[IG_KEY_LENGTH]) {
+// 	memcpy(admin_key, key, IG_KEY_LENGTH);
+// }
 
-static uint32_t ig_begin_connection(IgConnectionCharacteristicType type, IgConnectionScratchpad *scratchpad) {
-	// find free slot for connection
-	int free_idx = -1;
-	for (int i = 0; i < kMaxConnections; ++i) {
-		if (!connections_[i].active) {
-			free_idx = i;
-			break;
-		}
-	}
+// static uint32_t ig_begin_connection(IgConnectionCharacteristicType type, IgConnectionScratchpad *scratchpad) {
+// 	// find free slot for connection
+// 	int free_idx = -1;
+// 	for (int i = 0; i < kMaxConnections; ++i) {
+// 		if (!connections_[i].active) {
+// 			free_idx = i;
+// 			break;
+// 		}
+// 	}
 	
-	if (free_idx == -1) {
-		return IG_ERROR_MAX_CONNECTIONS;
-	}
+// 	if (free_idx == -1) {
+// 		return IG_ERROR_MAX_CONNECTIONS;
+// 	}
 
-	connections_[free_idx].active = true;
-	memset(&(connections_[free_idx].tx_nonce), 0x0, sizeof(connections_[free_idx].tx_nonce));
-	memset(&(connections_[free_idx].rx_nonce), 0x0, sizeof(connections_[free_idx].rx_nonce));
-	connections_[free_idx].type = type;
-	connections_[free_idx].conn_id = free_idx;
-	if (type == IG_CONNECTION_TYPE_ADMIN)
-		memcpy(connections_[free_idx].aes_key, admin_key, sizeof(admin_key));
-	else
-		memset(connections_[free_idx].aes_key, 0x0, sizeof(connections_[free_idx].aes_key));
+// 	connections_[free_idx].active = true;
+// 	memset(&(connections_[free_idx].tx_nonce), 0x0, sizeof(connections_[free_idx].tx_nonce));
+// 	memset(&(connections_[free_idx].rx_nonce), 0x0, sizeof(connections_[free_idx].rx_nonce));
+// 	connections_[free_idx].type = type;
+// 	connections_[free_idx].conn_id = free_idx;
+// 	if (type == IG_CONNECTION_TYPE_ADMIN)
+// 		memcpy(connections_[free_idx].aes_key, admin_key, sizeof(admin_key));
+// 	else
+// 		memset(connections_[free_idx].aes_key, 0x0, sizeof(connections_[free_idx].aes_key));
 
-	return free_idx;
-}
+// 	return free_idx;
+// }
 
-static bool ig_end_connection(IgConnectionCharacteristicType type, uint32_t conn_id) {
-	if (conn_id >= kMaxConnections) 
-		return false;
-	ConnectionEntry *connection_entry = &(connections_[conn_id]);
-	if (connection_entry->active == false)
-		return false;
-	if (connection_entry->type != type) 
-		return false;
+// static bool ig_end_connection(IgConnectionCharacteristicType type, uint32_t conn_id) {
+// 	if (conn_id >= kMaxConnections) 
+// 		return false;
+// 	ConnectionEntry *connection_entry = &(connections_[conn_id]);
+// 	if (connection_entry->active == false)
+// 		return false;
+// 	if (connection_entry->type != type) 
+// 		return false;
 
-	connections_[conn_id].active = false;
-	return true;
-}
+// 	connections_[conn_id].active = false;
+// 	return true;
+// }
 
-uint32_t ig_admin_begin_connection(IgConnectionScratchpad *scratchpad) {
-	return ig_begin_connection(IG_CONNECTION_TYPE_ADMIN, scratchpad);
-}
+// uint32_t ig_admin_begin_connection(IgConnectionScratchpad *scratchpad) {
+// 	return ig_begin_connection(IG_CONNECTION_TYPE_ADMIN, scratchpad);
+// }
 
-uint32_t ig_admin_connect_step1_size() {
-	uint8_t nonce[kNonceLength] = {0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1};
-	IgAdminConnectionStep1 step1;
-	ig_AdminConnectionStep1_init(&step1);
-	ig_AdminConnectionStep1_set_nonce(&step1, nonce, kNonceLength);
-	size_t step1_size = ig_AdminConnectionStep1_get_max_payload_in_bytes(&step1);
-	ig_AdminConnectionStep1_deinit(&step1);
-	return step1_size;
-}
+// uint32_t ig_admin_connect_step1_size() {
+// 	uint8_t nonce[kNonceLength] = {0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1};
+// 	IgAdminConnectionStep1 step1;
+// 	ig_AdminConnectionStep1_init(&step1);
+// 	ig_AdminConnectionStep1_set_nonce(&step1, nonce, kNonceLength);
+// 	size_t step1_size = ig_AdminConnectionStep1_get_max_payload_in_bytes(&step1);
+// 	ig_AdminConnectionStep1_deinit(&step1);
+// 	return step1_size;
+// }
 
-IgErrorCode ig_admin_connect_step1(uint32_t conn_id, uint8_t *data_out, uint32_t data_out_len, uint32_t *bytes_written) {
-	if (conn_id >= kMaxConnections) 
-		return IG_ERROR_INVALID_CONN_ID;
+// IgErrorCode ig_admin_connect_step1(uint32_t conn_id, uint8_t *data_out, uint32_t data_out_len, uint32_t *bytes_written) {
+// 	if (conn_id >= kMaxConnections) 
+// 		return IG_ERROR_INVALID_CONN_ID;
 
-	ConnectionEntry *connection_entry = &(connections_[conn_id]);
-	if (connection_entry->active == false)
-		return IG_ERROR_INVALID_CONN_ID;
-	if (connection_entry->type != IG_CONNECTION_TYPE_ADMIN)
-		return IG_ERROR_INVALID_CONN_ID;
+// 	ConnectionEntry *connection_entry = &(connections_[conn_id]);
+// 	if (connection_entry->active == false)
+// 		return IG_ERROR_INVALID_CONN_ID;
+// 	if (connection_entry->type != IG_CONNECTION_TYPE_ADMIN)
+// 		return IG_ERROR_INVALID_CONN_ID;
 
-	// random nonce
-	nrf_crypto_rng_vector_generate(connection_entry->rx_nonce, kNonceLength);
-	// TEST: hardcoded nonce
-//	uint8_t nonce[kNonceLength] = {0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1};
-//	memcpy(connection_entry->rx_nonce, nonce, kNonceLength);
+// 	// random nonce
+// 	nrf_crypto_rng_vector_generate(connection_entry->rx_nonce, kNonceLength);
+// 	// TEST: hardcoded nonce
+// //	uint8_t nonce[kNonceLength] = {0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1};
+// //	memcpy(connection_entry->rx_nonce, nonce, kNonceLength);
 
-	IgAdminConnectionStep1 step1;
-	ig_AdminConnectionStep1_init(&step1);
-	ig_AdminConnectionStep1_set_nonce(&step1, connection_entry->rx_nonce, kNonceLength);
-	size_t step1_size = ig_AdminConnectionStep1_get_max_payload_in_bytes(&step1);
-	if (data_out_len < step1_size) {
-		ig_AdminConnectionStep1_deinit(&step1);
-		return IG_ERROR_DATA_TOO_SHORT;
-	}
-	size_t step1_bytes_written = 0;
-	IgSerializerError err = ig_AdminConnectionStep1_encode(&step1, data_out, data_out_len, &step1_bytes_written);
-	if (err != IgSerializerNoError) {
-		ig_AdminConnectionStep1_deinit(&step1);
-		return IG_ERROR_GENERIC_FAIL;
-	}
-	*bytes_written = step1_bytes_written;
+// 	IgAdminConnectionStep1 step1;
+// 	ig_AdminConnectionStep1_init(&step1);
+// 	ig_AdminConnectionStep1_set_nonce(&step1, connection_entry->rx_nonce, kNonceLength);
+// 	size_t step1_size = ig_AdminConnectionStep1_get_max_payload_in_bytes(&step1);
+// 	if (data_out_len < step1_size) {
+// 		ig_AdminConnectionStep1_deinit(&step1);
+// 		return IG_ERROR_DATA_TOO_SHORT;
+// 	}
+// 	size_t step1_bytes_written = 0;
+// 	IgSerializerError err = ig_AdminConnectionStep1_encode(&step1, data_out, data_out_len, &step1_bytes_written);
+// 	if (err != IgSerializerNoError) {
+// 		ig_AdminConnectionStep1_deinit(&step1);
+// 		return IG_ERROR_GENERIC_FAIL;
+// 	}
+// 	*bytes_written = step1_bytes_written;
 
-	ig_AdminConnectionStep1_deinit(&step1);
-	return IG_ERROR_NONE;
-}
+// 	ig_AdminConnectionStep1_deinit(&step1);
+// 	return IG_ERROR_NONE;
+// }
 
-uint32_t ig_admin_connect_step3_size() {
-	IgAdminConnectionStep3 step3;
-	ig_AdminConnectionStep3_init(&step3);
-	ig_AdminConnectionStep3_set_success(&step3, true);
-	size_t step3_size = ig_AdminConnectionStep3_get_max_payload_in_bytes(&step3);
-	ig_AdminConnectionStep3_deinit(&step3);
-	// TEST: unencrypted size
-//	return step3_size;
+// uint32_t ig_admin_connect_step3_size() {
+// 	IgAdminConnectionStep3 step3;
+// 	ig_AdminConnectionStep3_init(&step3);
+// 	ig_AdminConnectionStep3_set_success(&step3, true);
+// 	size_t step3_size = ig_AdminConnectionStep3_get_max_payload_in_bytes(&step3);
+// 	ig_AdminConnectionStep3_deinit(&step3);
+// 	// TEST: unencrypted size
+// //	return step3_size;
 
-	uint32_t encrypted_size = ig_encrypt_data_size(step3_size);
-	return encrypted_size;
-}
+// 	uint32_t encrypted_size = ig_encrypt_data_size(step3_size);
+// 	return encrypted_size;
+// }
 
-IgErrorCode ig_admin_connect_step3(uint32_t conn_id, uint8_t *data_in, uint32_t data_in_len, uint8_t *data_out, uint32_t data_out_len, uint32_t *bytes_written) {
-	if (conn_id >= kMaxConnections) 
-		return IG_ERROR_INVALID_CONN_ID;
+// IgErrorCode ig_admin_connect_step3(uint32_t conn_id, uint8_t *data_in, uint32_t data_in_len, uint8_t *data_out, uint32_t data_out_len, uint32_t *bytes_written) {
+// 	if (conn_id >= kMaxConnections) 
+// 		return IG_ERROR_INVALID_CONN_ID;
 
-	ConnectionEntry *connection_entry = &(connections_[conn_id]);
-	if (connection_entry->active == false)
-		return IG_ERROR_INVALID_CONN_ID;
-	if (connection_entry->type != IG_CONNECTION_TYPE_ADMIN)
-		return IG_ERROR_INVALID_CONN_ID;
+// 	ConnectionEntry *connection_entry = &(connections_[conn_id]);
+// 	if (connection_entry->active == false)
+// 		return IG_ERROR_INVALID_CONN_ID;
+// 	if (connection_entry->type != IG_CONNECTION_TYPE_ADMIN)
+// 		return IG_ERROR_INVALID_CONN_ID;
 
-	// decrypt
-	uint32_t decrypted_data_len = ig_decrypt_data_size(data_in_len);
-	uint8_t decrypted_data_in[decrypted_data_len];
-	uint32_t decrypted_bytes_written = 0;
-	IgErrorCode decrypt_err = ig_decrypt_data(conn_id, data_in, data_in_len, decrypted_data_in, decrypted_data_len, &decrypted_bytes_written);
-	if (decrypt_err != IG_ERROR_NONE) {
-		return IG_ERROR_INVALID_MESSAGE;
-	}
+// 	// decrypt
+// 	uint32_t decrypted_data_len = ig_decrypt_data_size(data_in_len);
+// 	uint8_t decrypted_data_in[decrypted_data_len];
+// 	uint32_t decrypted_bytes_written = 0;
+// 	IgErrorCode decrypt_err = ig_decrypt_data(conn_id, data_in, data_in_len, decrypted_data_in, decrypted_data_len, &decrypted_bytes_written);
+// 	if (decrypt_err != IG_ERROR_NONE) {
+// 		return IG_ERROR_INVALID_MESSAGE;
+// 	}
 
-	// decode step 2
-	IgAdminConnectionStep2 step2;
-	ig_AdminConnectionStep2_init(&step2);
-	ig_AdminConnectionStep2_decode(decrypted_data_in, decrypted_bytes_written, &step2, 0);
-	if (!ig_AdminConnectionStep2_is_valid(&step2) || step2.nonce_size != kNonceLength) {
-		ig_AdminConnectionStep2_deinit(&step2);
-		return IG_ERROR_INVALID_MESSAGE;
-	}
-	memcpy(connection_entry->tx_nonce, step2.nonce, step2.nonce_size);
+// 	// decode step 2
+// 	IgAdminConnectionStep2 step2;
+// 	ig_AdminConnectionStep2_init(&step2);
+// 	ig_AdminConnectionStep2_decode(decrypted_data_in, decrypted_bytes_written, &step2, 0);
+// 	if (!ig_AdminConnectionStep2_is_valid(&step2) || step2.nonce_size != kNonceLength) {
+// 		ig_AdminConnectionStep2_deinit(&step2);
+// 		return IG_ERROR_INVALID_MESSAGE;
+// 	}
+// 	memcpy(connection_entry->tx_nonce, step2.nonce, step2.nonce_size);
 
-	// create step 3
-	IgAdminConnectionStep3 step3;
-	ig_AdminConnectionStep3_init(&step3);
-	ig_AdminConnectionStep3_set_success(&step3, true);
-	size_t step3_size = ig_AdminConnectionStep3_get_max_payload_in_bytes(&step3);
-	uint8_t step3_bytes[step3_size];
-	size_t step3_bytes_written = 0;
-	if (data_out_len < step3_size) {
-		ig_AdminConnectionStep2_deinit(&step2);
-		ig_AdminConnectionStep3_deinit(&step3);
-		return IG_ERROR_DATA_TOO_SHORT;
-	}
-	IgSerializerError encode_err = ig_AdminConnectionStep3_encode(&step3, step3_bytes, step3_size, &step3_bytes_written);
-	if (encode_err != IgSerializerNoError) {
-		ig_AdminConnectionStep2_deinit(&step2);
-		ig_AdminConnectionStep3_deinit(&step3);
-		return IG_ERROR_GENERIC_FAIL;
-	}
+// 	// create step 3
+// 	IgAdminConnectionStep3 step3;
+// 	ig_AdminConnectionStep3_init(&step3);
+// 	ig_AdminConnectionStep3_set_success(&step3, true);
+// 	size_t step3_size = ig_AdminConnectionStep3_get_max_payload_in_bytes(&step3);
+// 	uint8_t step3_bytes[step3_size];
+// 	size_t step3_bytes_written = 0;
+// 	if (data_out_len < step3_size) {
+// 		ig_AdminConnectionStep2_deinit(&step2);
+// 		ig_AdminConnectionStep3_deinit(&step3);
+// 		return IG_ERROR_DATA_TOO_SHORT;
+// 	}
+// 	IgSerializerError encode_err = ig_AdminConnectionStep3_encode(&step3, step3_bytes, step3_size, &step3_bytes_written);
+// 	if (encode_err != IgSerializerNoError) {
+// 		ig_AdminConnectionStep2_deinit(&step2);
+// 		ig_AdminConnectionStep3_deinit(&step3);
+// 		return IG_ERROR_GENERIC_FAIL;
+// 	}
 
-	// encrypt
-	IgErrorCode encrypt_err = ig_encrypt_data(conn_id, step3_bytes, step3_bytes_written, data_out, data_out_len, bytes_written);
-	if (encrypt_err != IgSerializerNoError) {
-		ig_AdminConnectionStep2_deinit(&step2);
-		ig_AdminConnectionStep3_deinit(&step3);
-		return IG_ERROR_GENERIC_FAIL;
-	}
+// 	// encrypt
+// 	IgErrorCode encrypt_err = ig_encrypt_data(conn_id, step3_bytes, step3_bytes_written, data_out, data_out_len, bytes_written);
+// 	if (encrypt_err != IgSerializerNoError) {
+// 		ig_AdminConnectionStep2_deinit(&step2);
+// 		ig_AdminConnectionStep3_deinit(&step3);
+// 		return IG_ERROR_GENERIC_FAIL;
+// 	}
 
-	ig_AdminConnectionStep2_deinit(&step2);
-	ig_AdminConnectionStep3_deinit(&step3);
-	return IG_ERROR_NONE;
-}
+// 	ig_AdminConnectionStep2_deinit(&step2);
+// 	ig_AdminConnectionStep3_deinit(&step3);
+// 	return IG_ERROR_NONE;
+// }
 
-bool ig_admin_end_connection(uint32_t conn_id) {
-	return ig_end_connection(IG_CONNECTION_TYPE_ADMIN, conn_id);
-}
+// bool ig_admin_end_connection(uint32_t conn_id) {
+// 	return ig_end_connection(IG_CONNECTION_TYPE_ADMIN, conn_id);
+// }
 
-uint32_t ig_guest_begin_connection(IgConnectionScratchpad *scratchpad) {
-	return ig_begin_connection(IG_CONNECTION_TYPE_GUEST, scratchpad);
-}
+// uint32_t ig_guest_begin_connection(IgConnectionScratchpad *scratchpad) {
+// 	return ig_begin_connection(IG_CONNECTION_TYPE_GUEST, scratchpad);
+// }
 
-uint32_t ig_guest_connect_step2_size(void) {
-	uint8_t nonce[kNonceLength] = {0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1};
-	IgGuestConnectionStep2 step2;
-	ig_GuestConnectionStep2_init(&step2);
-	ig_GuestConnectionStep2_set_nonce(&step2, nonce, kNonceLength);
-	size_t step2_size = ig_GuestConnectionStep2_get_max_payload_in_bytes(&step2);
-	ig_GuestConnectionStep2_deinit(&step2);
-	return step2_size;
-}
+// uint32_t ig_guest_connect_step2_size(void) {
+// 	uint8_t nonce[kNonceLength] = {0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1};
+// 	IgGuestConnectionStep2 step2;
+// 	ig_GuestConnectionStep2_init(&step2);
+// 	ig_GuestConnectionStep2_set_nonce(&step2, nonce, kNonceLength);
+// 	size_t step2_size = ig_GuestConnectionStep2_get_max_payload_in_bytes(&step2);
+// 	ig_GuestConnectionStep2_deinit(&step2);
+// 	return step2_size;
+// }
 
-IgErrorCode ig_guest_connect_step2(uint32_t conn_id, uint8_t *data_in, uint32_t data_in_len, uint8_t *data_out, uint32_t data_out_len, uint32_t *bytes_written, IgGuestKeyParams *guest_key_params) {
-	if (conn_id >= kMaxConnections) 
-		return IG_ERROR_INVALID_CONN_ID;
-	if (!guest_key_params)
-		return IG_ERROR_INVALID_PARAMS;
+// IgErrorCode ig_guest_connect_step2(uint32_t conn_id, uint8_t *data_in, uint32_t data_in_len, uint8_t *data_out, uint32_t data_out_len, uint32_t *bytes_written, IgGuestKeyParams *guest_key_params) {
+// 	if (conn_id >= kMaxConnections) 
+// 		return IG_ERROR_INVALID_CONN_ID;
+// 	if (!guest_key_params)
+// 		return IG_ERROR_INVALID_PARAMS;
 
-	ConnectionEntry *connection_entry = &(connections_[conn_id]);
-	if (connection_entry->active == false)
-		return IG_ERROR_INVALID_CONN_ID;
-	if (connection_entry->type != IG_CONNECTION_TYPE_GUEST)
-		return IG_ERROR_INVALID_CONN_ID;
+// 	ConnectionEntry *connection_entry = &(connections_[conn_id]);
+// 	if (connection_entry->active == false)
+// 		return IG_ERROR_INVALID_CONN_ID;
+// 	if (connection_entry->type != IG_CONNECTION_TYPE_GUEST)
+// 		return IG_ERROR_INVALID_CONN_ID;
 
-	IgGuestConnectionStep1 step1;
-	ig_GuestConnectionStep1_init(&step1);
-	ig_GuestConnectionStep1_decode(data_in, data_in_len, &step1, 0);
-	if (!ig_GuestConnectionStep1_is_valid(&step1)) {
-		ig_GuestConnectionStep1_deinit(&step1);
-		return IG_ERROR_INVALID_MESSAGE;
-	}
+// 	IgGuestConnectionStep1 step1;
+// 	ig_GuestConnectionStep1_init(&step1);
+// 	ig_GuestConnectionStep1_decode(data_in, data_in_len, &step1, 0);
+// 	if (!ig_GuestConnectionStep1_is_valid(&step1)) {
+// 		ig_GuestConnectionStep1_deinit(&step1);
+// 		return IG_ERROR_INVALID_MESSAGE;
+// 	}
 
-	// decrypt token
-	uint32_t token_ciphertext_size = step1.token_size - kNonceLength;
-	uint32_t decrypted_token_size = ig_decrypt_data_size(token_ciphertext_size);
-	uint8_t decrypted_token[decrypted_token_size];
-	uint32_t decrypted_token_bytes_written = 0;
-	int token_decrypt_result = decrypt_data(admin_key, step1.token + kNonceLength, token_ciphertext_size, decrypted_token, decrypted_token_size, step1.token, &decrypted_token_bytes_written);
-	if (token_decrypt_result) {
-		ig_GuestConnectionStep1_deinit(&step1);
-		return IG_ERROR_INVALID_MESSAGE;
-	}
+// 	// decrypt token
+// 	uint32_t token_ciphertext_size = step1.token_size - kNonceLength;
+// 	uint32_t decrypted_token_size = ig_decrypt_data_size(token_ciphertext_size);
+// 	uint8_t decrypted_token[decrypted_token_size];
+// 	uint32_t decrypted_token_bytes_written = 0;
+// 	int token_decrypt_result = decrypt_data(admin_key, step1.token + kNonceLength, token_ciphertext_size, decrypted_token, decrypted_token_size, step1.token, &decrypted_token_bytes_written);
+// 	if (token_decrypt_result) {
+// 		ig_GuestConnectionStep1_deinit(&step1);
+// 		return IG_ERROR_INVALID_MESSAGE;
+// 	}
 
-	IgGuestToken guest_token;
-	ig_GuestToken_init(&guest_token);
-	ig_GuestToken_decode(decrypted_token, decrypted_token_bytes_written, &guest_token, 0);
-	if (!ig_GuestToken_is_valid(&guest_token) || 
-			!guest_token.has_aes_key ||  guest_token.aes_key_size != IG_KEY_LENGTH || 
-			!guest_token.has_access_rights || guest_token.access_rights_size != IG_ACCESS_RIGHTS_SIZE ||
-			!guest_token.has_start_date || !guest_token.has_end_date) {
-		ig_GuestConnectionStep1_deinit(&step1);
-		ig_GuestToken_deinit(&guest_token);
-		return IG_ERROR_INVALID_MESSAGE;
-	}
-	memcpy(guest_key_params->access_rights, guest_token.access_rights, sizeof(guest_key_params->access_rights));
-	guest_key_params->start_time = guest_token.start_date;
-	guest_key_params->end_time = guest_token.end_date;
-	guest_key_params->key_id = guest_token.key_id;
-	memcpy(connection_entry->aes_key, guest_token.aes_key, IG_KEY_LENGTH);
+// 	IgGuestToken guest_token;
+// 	ig_GuestToken_init(&guest_token);
+// 	ig_GuestToken_decode(decrypted_token, decrypted_token_bytes_written, &guest_token, 0);
+// 	if (!ig_GuestToken_is_valid(&guest_token) || 
+// 			!guest_token.has_aes_key ||  guest_token.aes_key_size != IG_KEY_LENGTH || 
+// 			!guest_token.has_access_rights || guest_token.access_rights_size != IG_ACCESS_RIGHTS_SIZE ||
+// 			!guest_token.has_start_date || !guest_token.has_end_date) {
+// 		ig_GuestConnectionStep1_deinit(&step1);
+// 		ig_GuestToken_deinit(&guest_token);
+// 		return IG_ERROR_INVALID_MESSAGE;
+// 	}
+// 	memcpy(guest_key_params->access_rights, guest_token.access_rights, sizeof(guest_key_params->access_rights));
+// 	guest_key_params->start_time = guest_token.start_date;
+// 	guest_key_params->end_time = guest_token.end_date;
+// 	guest_key_params->key_id = guest_token.key_id;
+// 	memcpy(connection_entry->aes_key, guest_token.aes_key, IG_KEY_LENGTH);
 
-	// random nonce
-	nrf_crypto_rng_vector_generate(connection_entry->rx_nonce, kNonceLength);
-	// TEST: hardcoded nonce
-//	uint8_t nonce[kNonceLength] = {0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1};
-//	memcpy(connection_entry->rx_nonce, nonce, kNonceLength);
+// 	// random nonce
+// 	nrf_crypto_rng_vector_generate(connection_entry->rx_nonce, kNonceLength);
+// 	// TEST: hardcoded nonce
+// //	uint8_t nonce[kNonceLength] = {0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1};
+// //	memcpy(connection_entry->rx_nonce, nonce, kNonceLength);
 
-	// create response message
-	IgGuestConnectionStep2 step2;
-	ig_GuestConnectionStep2_init(&step2);
-	ig_GuestConnectionStep2_set_nonce(&step2, connection_entry->rx_nonce, kNonceLength);
-	size_t step2_size = ig_GuestConnectionStep2_get_max_payload_in_bytes(&step2);
-	if (data_out_len < step2_size) {
-		ig_GuestConnectionStep1_deinit(&step1);
-		ig_GuestToken_deinit(&guest_token);
-		ig_GuestConnectionStep2_deinit(&step2);
-		return IG_ERROR_DATA_TOO_SHORT;
-	}
-	size_t step2_bytes_written = 0;
-	IgSerializerError err = ig_GuestConnectionStep2_encode(&step2, data_out, data_out_len, &step2_bytes_written);
-	if (err != IgSerializerNoError) {
-		ig_GuestConnectionStep1_deinit(&step1);
-		ig_GuestToken_deinit(&guest_token);
-		ig_GuestConnectionStep2_deinit(&step2);
-		return IG_ERROR_GENERIC_FAIL;
-	}
-	*bytes_written = step2_bytes_written;
+// 	// create response message
+// 	IgGuestConnectionStep2 step2;
+// 	ig_GuestConnectionStep2_init(&step2);
+// 	ig_GuestConnectionStep2_set_nonce(&step2, connection_entry->rx_nonce, kNonceLength);
+// 	size_t step2_size = ig_GuestConnectionStep2_get_max_payload_in_bytes(&step2);
+// 	if (data_out_len < step2_size) {
+// 		ig_GuestConnectionStep1_deinit(&step1);
+// 		ig_GuestToken_deinit(&guest_token);
+// 		ig_GuestConnectionStep2_deinit(&step2);
+// 		return IG_ERROR_DATA_TOO_SHORT;
+// 	}
+// 	size_t step2_bytes_written = 0;
+// 	IgSerializerError err = ig_GuestConnectionStep2_encode(&step2, data_out, data_out_len, &step2_bytes_written);
+// 	if (err != IgSerializerNoError) {
+// 		ig_GuestConnectionStep1_deinit(&step1);
+// 		ig_GuestToken_deinit(&guest_token);
+// 		ig_GuestConnectionStep2_deinit(&step2);
+// 		return IG_ERROR_GENERIC_FAIL;
+// 	}
+// 	*bytes_written = step2_bytes_written;
 
-	ig_GuestConnectionStep1_deinit(&step1);
-	ig_GuestToken_deinit(&guest_token);
-	ig_GuestConnectionStep2_deinit(&step2);
-	return IG_ERROR_NONE;
-}
+// 	ig_GuestConnectionStep1_deinit(&step1);
+// 	ig_GuestToken_deinit(&guest_token);
+// 	ig_GuestConnectionStep2_deinit(&step2);
+// 	return IG_ERROR_NONE;
+// }
 
-uint32_t ig_guest_connect_step4_size(void) {
-	IgGuestConnectionStep4 step4;
-	ig_GuestConnectionStep4_init(&step4);
-	ig_GuestConnectionStep4_set_success(&step4, true);
-	size_t step4_size = ig_GuestConnectionStep4_get_max_payload_in_bytes(&step4);
-	ig_GuestConnectionStep4_deinit(&step4);
-	return step4_size;
-}
+// uint32_t ig_guest_connect_step4_size(void) {
+// 	IgGuestConnectionStep4 step4;
+// 	ig_GuestConnectionStep4_init(&step4);
+// 	ig_GuestConnectionStep4_set_success(&step4, true);
+// 	size_t step4_size = ig_GuestConnectionStep4_get_max_payload_in_bytes(&step4);
+// 	ig_GuestConnectionStep4_deinit(&step4);
+// 	return step4_size;
+// }
 
-IgErrorCode ig_guest_connect_step4(uint32_t conn_id, uint8_t *data_in, uint32_t data_in_len, uint8_t *data_out, uint32_t data_out_len, uint32_t *bytes_written) {
-	if (conn_id >= kMaxConnections) 
-		return IG_ERROR_INVALID_CONN_ID;
+// IgErrorCode ig_guest_connect_step4(uint32_t conn_id, uint8_t *data_in, uint32_t data_in_len, uint8_t *data_out, uint32_t data_out_len, uint32_t *bytes_written) {
+// 	if (conn_id >= kMaxConnections) 
+// 		return IG_ERROR_INVALID_CONN_ID;
 
-	ConnectionEntry *connection_entry = &(connections_[conn_id]);
-	if (connection_entry->active == false)
-		return IG_ERROR_INVALID_CONN_ID;
-	if (connection_entry->type != IG_CONNECTION_TYPE_GUEST)
-		return IG_ERROR_INVALID_CONN_ID;
+// 	ConnectionEntry *connection_entry = &(connections_[conn_id]);
+// 	if (connection_entry->active == false)
+// 		return IG_ERROR_INVALID_CONN_ID;
+// 	if (connection_entry->type != IG_CONNECTION_TYPE_GUEST)
+// 		return IG_ERROR_INVALID_CONN_ID;
 
-	// decrypt
-	uint32_t decrypted_data_len = ig_decrypt_data_size(data_in_len);
-	uint8_t decrypted_data_in[decrypted_data_len];
-	uint32_t decrypted_bytes_written = 0;
-	IgErrorCode decrypt_err = ig_decrypt_data(conn_id, data_in, data_in_len, decrypted_data_in, decrypted_data_len, &decrypted_bytes_written);
-	if (decrypt_err != IG_ERROR_NONE) {
-		return IG_ERROR_INVALID_MESSAGE;
-	}
+// 	// decrypt
+// 	uint32_t decrypted_data_len = ig_decrypt_data_size(data_in_len);
+// 	uint8_t decrypted_data_in[decrypted_data_len];
+// 	uint32_t decrypted_bytes_written = 0;
+// 	IgErrorCode decrypt_err = ig_decrypt_data(conn_id, data_in, data_in_len, decrypted_data_in, decrypted_data_len, &decrypted_bytes_written);
+// 	if (decrypt_err != IG_ERROR_NONE) {
+// 		return IG_ERROR_INVALID_MESSAGE;
+// 	}
 
-	// decode step 3
-	IgGuestConnectionStep3 step3;
-	ig_GuestConnectionStep3_init(&step3);
-	ig_GuestConnectionStep3_decode(decrypted_data_in, decrypted_data_len, &step3, 0);
-	if (!ig_GuestConnectionStep3_is_valid(&step3) || step3.nonce_size != kNonceLength) {
-		ig_GuestConnectionStep3_deinit(&step3);
-		return IG_ERROR_INVALID_MESSAGE;
-	}
-	memcpy(connection_entry->tx_nonce, step3.nonce, step3.nonce_size);
+// 	// decode step 3
+// 	IgGuestConnectionStep3 step3;
+// 	ig_GuestConnectionStep3_init(&step3);
+// 	ig_GuestConnectionStep3_decode(decrypted_data_in, decrypted_data_len, &step3, 0);
+// 	if (!ig_GuestConnectionStep3_is_valid(&step3) || step3.nonce_size != kNonceLength) {
+// 		ig_GuestConnectionStep3_deinit(&step3);
+// 		return IG_ERROR_INVALID_MESSAGE;
+// 	}
+// 	memcpy(connection_entry->tx_nonce, step3.nonce, step3.nonce_size);
 
-	// create step 4
-	IgGuestConnectionStep4 step4;
-	ig_GuestConnectionStep4_init(&step4);
-	ig_GuestConnectionStep4_set_success(&step4, true);
-	size_t step4_size = ig_GuestConnectionStep4_get_max_payload_in_bytes(&step4);
-	uint8_t step4_bytes[step4_size];
-	size_t step4_bytes_written = 0;
-	if (data_out_len < step4_size) {
-		ig_GuestConnectionStep3_deinit(&step3);
-		ig_GuestConnectionStep4_deinit(&step4);
-		return IG_ERROR_DATA_TOO_SHORT;
-	}
-	IgSerializerError err = ig_GuestConnectionStep4_encode(&step4, step4_bytes, step4_size, &step4_bytes_written);
-	if (err != IgSerializerNoError) {
-		ig_GuestConnectionStep3_deinit(&step3);
-		ig_GuestConnectionStep4_deinit(&step4);
-		return IG_ERROR_GENERIC_FAIL;
-	}
+// 	// create step 4
+// 	IgGuestConnectionStep4 step4;
+// 	ig_GuestConnectionStep4_init(&step4);
+// 	ig_GuestConnectionStep4_set_success(&step4, true);
+// 	size_t step4_size = ig_GuestConnectionStep4_get_max_payload_in_bytes(&step4);
+// 	uint8_t step4_bytes[step4_size];
+// 	size_t step4_bytes_written = 0;
+// 	if (data_out_len < step4_size) {
+// 		ig_GuestConnectionStep3_deinit(&step3);
+// 		ig_GuestConnectionStep4_deinit(&step4);
+// 		return IG_ERROR_DATA_TOO_SHORT;
+// 	}
+// 	IgSerializerError err = ig_GuestConnectionStep4_encode(&step4, step4_bytes, step4_size, &step4_bytes_written);
+// 	if (err != IgSerializerNoError) {
+// 		ig_GuestConnectionStep3_deinit(&step3);
+// 		ig_GuestConnectionStep4_deinit(&step4);
+// 		return IG_ERROR_GENERIC_FAIL;
+// 	}
 
-	// encrypt
-	IgErrorCode encrypt_err = ig_encrypt_data(conn_id, step4_bytes, step4_bytes_written, data_out, data_out_len, bytes_written);
-	if (encrypt_err != IgSerializerNoError) {
-		ig_GuestConnectionStep3_deinit(&step3);
-		ig_GuestConnectionStep4_deinit(&step4);
-		return IG_ERROR_GENERIC_FAIL;
-	}
+// 	// encrypt
+// 	IgErrorCode encrypt_err = ig_encrypt_data(conn_id, step4_bytes, step4_bytes_written, data_out, data_out_len, bytes_written);
+// 	if (encrypt_err != IgSerializerNoError) {
+// 		ig_GuestConnectionStep3_deinit(&step3);
+// 		ig_GuestConnectionStep4_deinit(&step4);
+// 		return IG_ERROR_GENERIC_FAIL;
+// 	}
 
-	return IG_ERROR_NONE;
-}
+// 	return IG_ERROR_NONE;
+// }
 
-bool ig_guest_end_connection(uint32_t conn_id) {
-	return ig_end_connection(IG_CONNECTION_TYPE_GUEST, conn_id);
-}
+// bool ig_guest_end_connection(uint32_t conn_id) {
+// 	return ig_end_connection(IG_CONNECTION_TYPE_GUEST, conn_id);
+// }
 
-static void increment_nonce(uint8_t *nonce) {
-	// nonce interpreted as big endian (most significant byte has lowest address/index)
-	for (int i = kNonceLength-1; i >= 0; i--) {
-		if (nonce[i] == 255) {
-			nonce[i] = 0;
-		}
-		else {
-			nonce[i]++;
-			break;
-		}
-	}
-}
+// static void increment_nonce(uint8_t *nonce) {
+// 	// nonce interpreted as big endian (most significant byte has lowest address/index)
+// 	for (int i = kNonceLength-1; i >= 0; i--) {
+// 		if (nonce[i] == 255) {
+// 			nonce[i] = 0;
+// 		}
+// 		else {
+// 			nonce[i]++;
+// 			break;
+// 		}
+// 	}
+// }
 
-uint32_t ig_encrypt_data_size(uint32_t data_len) {
-	// TEST: non-encrypted version
-	//return data_len;
+// uint32_t ig_encrypt_data_size(uint32_t data_len) {
+// 	// TEST: non-encrypted version
+// 	//return data_len;
 
-	return data_len + kCcmTagLength;
-}
+// 	return data_len + kCcmTagLength;
+// }
 
-static void encrypt_data(uint8_t *aes_key, uint8_t *data_in, uint32_t data_in_len, uint8_t *data_out, uint32_t data_out_len, uint8_t *nonce, uint32_t *bytes_written)  {
-	uint8_t tag[kCcmTagLength];
-	uint8_t ciphertext[data_in_len];
-	cf_aes_context aes_ctx;
-	cf_aes_init(&aes_ctx, aes_key, IG_KEY_LENGTH); 
-	cf_ccm_encrypt(&cf_aes, &aes_ctx, data_in, data_in_len, kCcmInternalCounterLength, NULL, 0, nonce, kNonceLength, ciphertext, tag, kCcmTagLength); 
-	memcpy(data_out, ciphertext, data_in_len);
-	memcpy(data_out+data_in_len, tag, kCcmTagLength);
-	*bytes_written = ig_encrypt_data_size(data_in_len);
-	cf_aes_finish(&aes_ctx);
-}
+// static void encrypt_data(uint8_t *aes_key, uint8_t *data_in, uint32_t data_in_len, uint8_t *data_out, uint32_t data_out_len, uint8_t *nonce, uint32_t *bytes_written)  {
+// 	uint8_t tag[kCcmTagLength];
+// 	uint8_t ciphertext[data_in_len];
+// 	cf_aes_context aes_ctx;
+// 	cf_aes_init(&aes_ctx, aes_key, IG_KEY_LENGTH); 
+// 	cf_ccm_encrypt(&cf_aes, &aes_ctx, data_in, data_in_len, kCcmInternalCounterLength, NULL, 0, nonce, kNonceLength, ciphertext, tag, kCcmTagLength); 
+// 	memcpy(data_out, ciphertext, data_in_len);
+// 	memcpy(data_out+data_in_len, tag, kCcmTagLength);
+// 	*bytes_written = ig_encrypt_data_size(data_in_len);
+// 	cf_aes_finish(&aes_ctx);
+// }
 
-IgErrorCode ig_encrypt_data(uint32_t conn_id, uint8_t *data_in, uint32_t data_in_len, uint8_t *data_out, uint32_t data_out_len, uint32_t *bytes_written) {
-	if (conn_id >= kMaxConnections) 
-		return IG_ERROR_INVALID_CONN_ID;
-	if (data_in_len > 1024)
-		return IG_ERROR_INVALID_PARAMS;
-	if (data_out_len < ig_encrypt_data_size(data_in_len))
-		return IG_ERROR_DATA_TOO_SHORT;
-	ConnectionEntry *connection_entry = &(connections_[conn_id]);
-	if (connection_entry->active == false)
-		return IG_ERROR_INVALID_CONN_ID;
+// IgErrorCode ig_encrypt_data(uint32_t conn_id, uint8_t *data_in, uint32_t data_in_len, uint8_t *data_out, uint32_t data_out_len, uint32_t *bytes_written) {
+// 	if (conn_id >= kMaxConnections) 
+// 		return IG_ERROR_INVALID_CONN_ID;
+// 	if (data_in_len > 1024)
+// 		return IG_ERROR_INVALID_PARAMS;
+// 	if (data_out_len < ig_encrypt_data_size(data_in_len))
+// 		return IG_ERROR_DATA_TOO_SHORT;
+// 	ConnectionEntry *connection_entry = &(connections_[conn_id]);
+// 	if (connection_entry->active == false)
+// 		return IG_ERROR_INVALID_CONN_ID;
 
-	encrypt_data(connection_entry->aes_key, data_in, data_in_len, data_out, data_out_len, connections_[conn_id].tx_nonce, bytes_written);
-	increment_nonce(connections_[conn_id].tx_nonce);
+// 	encrypt_data(connection_entry->aes_key, data_in, data_in_len, data_out, data_out_len, connections_[conn_id].tx_nonce, bytes_written);
+// 	increment_nonce(connections_[conn_id].tx_nonce);
 
-	//NRF_LOG_HEXDUMP_INFO(data_out, *bytes_written);
-	//NRF_LOG_HEXDUMP_INFO(ciphertext, data_in_len);
-	//NRF_LOG_HEXDUMP_INFO(tag, kCcmTagLength);
+// 	//NRF_LOG_HEXDUMP_INFO(data_out, *bytes_written);
+// 	//NRF_LOG_HEXDUMP_INFO(ciphertext, data_in_len);
+// 	//NRF_LOG_HEXDUMP_INFO(tag, kCcmTagLength);
 
-	// TEST: non-encrypted version
-//	memcpy(data_out, data_in, data_in_len);
-//	*bytes_written = data_in_len;
+// 	// TEST: non-encrypted version
+// //	memcpy(data_out, data_in, data_in_len);
+// //	*bytes_written = data_in_len;
 
-	return IG_ERROR_NONE;
-}
+// 	return IG_ERROR_NONE;
+// }
 
-uint32_t ig_decrypt_data_size(uint32_t data_len) {
-	// TEST: non-encrypted version
-//	return data_len;
+// uint32_t ig_decrypt_data_size(uint32_t data_len) {
+// 	// TEST: non-encrypted version
+// //	return data_len;
 
-	return data_len - kCcmTagLength;
-}
+// 	return data_len - kCcmTagLength;
+// }
 
 //void decrypt_data(uint32_t conn_id, uint8_t *data_in, uint32_t data_in_len, uint8_t *data_out, uint32_t data_out_len, uint8_t *nonce, uint32_t *bytes_written)  {
 //	// TEST function
@@ -842,73 +842,73 @@ uint32_t ig_decrypt_data_size(uint32_t data_len) {
 //	cf_aes_finish(&aes_ctx);
 //}
 
-static int decrypt_data(uint8_t *aes_key, uint8_t *data_in, uint32_t data_in_len, uint8_t *data_out, uint32_t data_out_len, uint8_t *nonce, uint32_t *bytes_written)  {
-	uint8_t *ciphertext = data_in;
-	size_t ciphertext_len = data_in_len - kCcmTagLength;
-	//NRF_LOG_HEXDUMP_INFO(ciphertext, ciphertext_len);
-	uint8_t *tag = data_in + ciphertext_len;
-	size_t tag_len = kCcmTagLength;
-	//NRF_LOG_HEXDUMP_INFO(tag, tag_len);
-	cf_aes_context aes_ctx;
-	cf_aes_init(&aes_ctx, aes_key, IG_KEY_LENGTH); 
-	int result = cf_ccm_decrypt(&cf_aes, &aes_ctx, ciphertext, ciphertext_len, kCcmInternalCounterLength, NULL, 0, nonce, kNonceLength, tag, tag_len, data_out);
-	//NRF_LOG_INFO("result = %i\n", result);
-	*bytes_written = ciphertext_len;
-	cf_aes_finish(&aes_ctx);
-	return result;
-}
+// static int decrypt_data(uint8_t *aes_key, uint8_t *data_in, uint32_t data_in_len, uint8_t *data_out, uint32_t data_out_len, uint8_t *nonce, uint32_t *bytes_written)  {
+// 	uint8_t *ciphertext = data_in;
+// 	size_t ciphertext_len = data_in_len - kCcmTagLength;
+// 	//NRF_LOG_HEXDUMP_INFO(ciphertext, ciphertext_len);
+// 	uint8_t *tag = data_in + ciphertext_len;
+// 	size_t tag_len = kCcmTagLength;
+// 	//NRF_LOG_HEXDUMP_INFO(tag, tag_len);
+// 	cf_aes_context aes_ctx;
+// 	cf_aes_init(&aes_ctx, aes_key, IG_KEY_LENGTH); 
+// 	int result = cf_ccm_decrypt(&cf_aes, &aes_ctx, ciphertext, ciphertext_len, kCcmInternalCounterLength, NULL, 0, nonce, kNonceLength, tag, tag_len, data_out);
+// 	//NRF_LOG_INFO("result = %i\n", result);
+// 	*bytes_written = ciphertext_len;
+// 	cf_aes_finish(&aes_ctx);
+// 	return result;
+// }
 
-IgErrorCode ig_decrypt_data(uint32_t conn_id, uint8_t *data_in, uint32_t data_in_len, uint8_t *data_out, uint32_t data_out_len, uint32_t *bytes_written) {
-	if (conn_id >= kMaxConnections) 
-		return IG_ERROR_INVALID_CONN_ID;
-	if (data_in_len > 1024)
-		return IG_ERROR_INVALID_PARAMS;
-	if (data_out_len < ig_decrypt_data_size(data_in_len))
-		return IG_ERROR_DATA_TOO_SHORT;
-	ConnectionEntry *connection_entry = &(connections_[conn_id]);
-	if (connection_entry->active == false)
-		return IG_ERROR_INVALID_CONN_ID;
+// IgErrorCode ig_decrypt_data(uint32_t conn_id, uint8_t *data_in, uint32_t data_in_len, uint8_t *data_out, uint32_t data_out_len, uint32_t *bytes_written) {
+// 	if (conn_id >= kMaxConnections) 
+// 		return IG_ERROR_INVALID_CONN_ID;
+// 	if (data_in_len > 1024)
+// 		return IG_ERROR_INVALID_PARAMS;
+// 	if (data_out_len < ig_decrypt_data_size(data_in_len))
+// 		return IG_ERROR_DATA_TOO_SHORT;
+// 	ConnectionEntry *connection_entry = &(connections_[conn_id]);
+// 	if (connection_entry->active == false)
+// 		return IG_ERROR_INVALID_CONN_ID;
 
-	int result = decrypt_data(connection_entry->aes_key, data_in, data_in_len, data_out, data_out_len, connections_[conn_id].rx_nonce, bytes_written);
-	if (result) {
-		return IG_ERROR_GENERIC_FAIL;
-	}
-	increment_nonce(connections_[conn_id].rx_nonce);
+// 	int result = decrypt_data(connection_entry->aes_key, data_in, data_in_len, data_out, data_out_len, connections_[conn_id].rx_nonce, bytes_written);
+// 	if (result) {
+// 		return IG_ERROR_GENERIC_FAIL;
+// 	}
+// 	increment_nonce(connections_[conn_id].rx_nonce);
 
-	// TEST: non-encrypted version
-//	memcpy(data_out, data_in, data_in_len);
-//	*bytes_written = data_in_len;
+// 	// TEST: non-encrypted version
+// //	memcpy(data_out, data_in, data_in_len);
+// //	*bytes_written = data_in_len;
 
-	return IG_ERROR_NONE;
-}
+// 	return IG_ERROR_NONE;
+// }
 
-uint32_t ig_encrypt_log_data_size(uint32_t data_len) {
-	// TEST: unencrypted version
-//	return data_len;
+// uint32_t ig_encrypt_log_data_size(uint32_t data_len) {
+// 	// TEST: unencrypted version
+// //	return data_len;
 	
-	return data_len + kNonceLength + kCcmTagLength;
-}
+// 	return data_len + kNonceLength + kCcmTagLength;
+// }
 
-IgErrorCode ig_encrypt_log_data(uint8_t *data_in, uint32_t data_in_len, uint8_t *data_out, uint32_t data_out_len, uint32_t *bytes_written) {
-	// validate inputs
-	if (data_in_len == 0)
-		return IG_ERROR_INVALID_PARAMS;
-	if (data_out_len < ig_encrypt_log_data_size(data_in_len))
-		return IG_ERROR_INVALID_PARAMS;
+// IgErrorCode ig_encrypt_log_data(uint8_t *data_in, uint32_t data_in_len, uint8_t *data_out, uint32_t data_out_len, uint32_t *bytes_written) {
+// 	// validate inputs
+// 	if (data_in_len == 0)
+// 		return IG_ERROR_INVALID_PARAMS;
+// 	if (data_out_len < ig_encrypt_log_data_size(data_in_len))
+// 		return IG_ERROR_INVALID_PARAMS;
 
-	// TEST: unencrypted version
-//	memcpy(data_out, data_in, data_in_len);
-//	*bytes_written = data_in_len;
-//	return IG_ERROR_NONE;
+// 	// TEST: unencrypted version
+// //	memcpy(data_out, data_in, data_in_len);
+// //	*bytes_written = data_in_len;
+// //	return IG_ERROR_NONE;
 
-	// generate random nonce
-	nrf_crypto_rng_vector_generate(data_out, kNonceLength);
+// 	// generate random nonce
+// 	nrf_crypto_rng_vector_generate(data_out, kNonceLength);
 	
-	// encrypt
-	encrypt_data(admin_key, data_in, data_in_len, data_out + kNonceLength, ig_encrypt_data_size(data_in_len), data_out, bytes_written);
-	*bytes_written = *bytes_written + kNonceLength;
-	return IG_ERROR_NONE;
-}
+// 	// encrypt
+// 	encrypt_data(admin_key, data_in, data_in_len, data_out + kNonceLength, ig_encrypt_data_size(data_in_len), data_out, bytes_written);
+// 	*bytes_written = *bytes_written + kNonceLength;
+// 	return IG_ERROR_NONE;
+// }
 
 
 

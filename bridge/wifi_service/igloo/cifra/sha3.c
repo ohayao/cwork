@@ -16,7 +16,7 @@
 
 #include "sha3.h"
 #include "blockwise.h"
-#include "handy.h"
+#include "ext/handy.h"
 #include "bitops.h"
 #include "tassert.h"
 

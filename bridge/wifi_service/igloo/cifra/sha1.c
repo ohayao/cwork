@@ -17,7 +17,7 @@
 #include "sha1.h"
 #include "blockwise.h"
 #include "bitops.h"
-#include "handy.h"
+#include "ext/handy.h"
 #include "tassert.h"
 
 void cf_sha1_init(cf_sha1_context *ctx)

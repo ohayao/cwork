@@ -15,7 +15,7 @@
 #include "hmac.h"
 #include "chash.h"
 #include "bitops.h"
-#include "handy.h"
+#include "ext/handy.h"
 #include "tassert.h"
 
 #include <string.h>

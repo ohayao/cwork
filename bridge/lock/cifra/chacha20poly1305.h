@@ -31,7 +31,7 @@
  */
 
 /* .. c:function:: $DECL
- * ChaCha20-Poly1305 authenticated Encryption.
+ * ChaCha20-Poly1305 authenticated encryption.
  *
  * :param key: key material.
  * :param nonce: per-message nonce.

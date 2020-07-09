@@ -15,14 +15,14 @@
 /* Normal MIN/MAX macros.  Evaluate argument expressions only once. */
 #ifndef MIN
   #define MIN(x, y) \
-    ({ __typeof__ (x) __x = (x); \
-       __typeof__ (y) __y = (y); \
+    ({ typeof (x) __x = (x); \
+       typeof (y) __y = (y); \
        __x < __y ? __x : __y; })
 #endif
 #ifndef MAX
   #define MAX(x, y) \
-    ({ __typeof__ (x) __x = (x); \
-       __typeof__ (y) __y = (y); \
+    ({ typeof (x) __x = (x); \
+       typeof (y) __y = (y); \
        __x > __y ? __x : __y; })
 #endif
 
@@ -30,7 +30,7 @@
 #ifndef SWAP
   #define SWAP(x, y) \
     do { \
-      __typeof__ (x) __tmp = (x); \
+      typeof (x) __tmp = (x); \
       (x) = (y); \
       (y) = __tmp; \
     } while (0)
@@ -48,7 +48,7 @@
 /** Error: return. 
  *  
  *  If the expression fails, return the error from this function. */
-#define ER(expr) do { __typeof__ (expr) err_ = (expr); if (err_) return err_; } while (0)
+#define ER(expr) do { typeof (expr) err_ = (expr); if (err_) return err_; } while (0)
 
 /** Error: goto.
  *

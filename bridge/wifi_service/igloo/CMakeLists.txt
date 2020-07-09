@@ -28,5 +28,5 @@ add_library(nrf_crypto
 
 add_executable(test ./test.c ./igloo.c ./serializer.c)
 target_link_libraries(test
-  ${igloo_LIB2} nrf_crypto
+   nrf_crypto
 )

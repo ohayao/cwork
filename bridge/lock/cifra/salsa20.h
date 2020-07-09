@@ -120,7 +120,7 @@ void cf_chacha20_init_custom(cf_chacha20_ctx *ctx, const uint8_t *key, size_t nk
                              const uint8_t nonce[16], size_t ncounter);
 
 /* .. c:function:: $DECL
- * Salsa20 Encryption/decryption function.
+ * Salsa20 encryption/decryption function.
  *
  * :param ctx: salsa20 context.
  * :param input: input data buffer (read), `count` bytes long.
@@ -129,7 +129,7 @@ void cf_chacha20_init_custom(cf_chacha20_ctx *ctx, const uint8_t *key, size_t nk
 void cf_salsa20_cipher(cf_salsa20_ctx *ctx, const uint8_t *input, uint8_t *output, size_t count);
 
 /* .. c:function:: $DECL
- * Chacha20 Encryption/decryption function.
+ * Chacha20 encryption/decryption function.
  *
  * :param ctx: chacha20 context.
  * :param input: input data buffer (read), `count` bytes long.

@@ -17,7 +17,7 @@
 
 #include "cf_config.h"
 #include "aes.h"
-#include "handy.h"
+#include "ext/handy.h"
 #include "bitops.h"
 #include "tassert.h"
 

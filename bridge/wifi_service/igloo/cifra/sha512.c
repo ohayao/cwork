@@ -17,7 +17,7 @@
 #include "sha2.h"
 #include "blockwise.h"
 #include "bitops.h"
-#include "handy.h"
+#include "ext/handy.h"
 #include "tassert.h"
 
 static const uint64_t K[80] = {
