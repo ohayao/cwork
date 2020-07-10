@@ -99,135 +99,141 @@ static void encrypt_data(uint8_t *aes_key, uint8_t *data_in, uint32_t data_in_le
 // 	return step2_size;
 // }
 
+// 生成步骤的运用
+// data_in 传入的 step1 的数据, 而非带有长度的数据
+// data_in_len 传入的 是 ste1 的长度, 
+// data_out 我们输出的长度
+// data_out_len 输出的buffer 的长度
+// bytes_written 实际使用的长度有多少
 IgErrorCode ig_pairing_step2(uint8_t *data_in, uint32_t data_in_len, uint8_t *data_out, uint32_t data_out_len, uint32_t *bytes_written) {
-	IgPairingStep1 step1;
-	ig_PairingStep1_init(&step1);
-	IgSerializerError step1_err = ig_PairingStep1_decode(data_in, data_in_len, &step1, 0);
-	if (step1_err || !ig_PairingStep1_is_valid(&step1)) {
-		ig_PairingStep1_deinit(&step1);
-		return IG_ERROR_INVALID_MESSAGE;
-	}
-	if (ig_PairingStep1_get_public_key_size(&step1) != IG_KEY_EXCHANGE_PUBLIC_LENGTH) {
-		ig_PairingStep1_deinit(&step1);
-		return IG_ERROR_INVALID_MESSAGE;
-	}
-	NRF_CRYPTO_ECC_PUBLIC_KEY_CREATE(public_key2, SECP256R1);
-	memcpy(public_key2.p_value, step1.public_key, step1.public_key_size);
-	// TEST: hardcoded phone public key
-//    uint8_t hardcoded_public_key2[IG_KEY_EXCHANGE_PUBLIC_LENGTH] = {
-//            0x5E, 0x64, 0x8A, 0x6C, 0x7C, 0x8E, 0x81, 0x3C,
-//            0x04, 0xAB, 0xF3, 0x4C, 0x45, 0x1C, 0x9B, 0x14,
-//            0x7D, 0xD6, 0x3B, 0x3B, 0xA5, 0xC1, 0x3B, 0xE4,
-//            0x66, 0x94, 0xCD, 0xE5, 0x24, 0x98, 0x78, 0x2B,
-//            0x7C, 0x3F, 0xA2, 0x77, 0x19, 0xFB, 0x85, 0x67,
-//            0xE5, 0x01, 0x1A, 0xD2, 0x86, 0xE5, 0xF5, 0xCF,
-//            0xE5, 0xD2, 0x3B, 0x69, 0x80, 0x32, 0xA9, 0x80,
-//            0x45, 0x65, 0x27, 0x4B, 0x1E, 0xC4, 0xE3, 0x47
-//    };
-//	memcpy(public_key2.p_value, hardcoded_public_key2, sizeof(hardcoded_public_key2));
-	// END TEST
+// 	IgPairingStep1 step1;
+// 	ig_PairingStep1_init(&step1);
+// 	IgSerializerError step1_err = ig_PairingStep1_decode(data_in, data_in_len, &step1, 0);
+// 	if (step1_err || !ig_PairingStep1_is_valid(&step1)) {
+// 		ig_PairingStep1_deinit(&step1);
+// 		return IG_ERROR_INVALID_MESSAGE;
+// 	}
+// 	if (ig_PairingStep1_get_public_key_size(&step1) != IG_KEY_EXCHANGE_PUBLIC_LENGTH) {
+// 		ig_PairingStep1_deinit(&step1);
+// 		return IG_ERROR_INVALID_MESSAGE;
+// 	}
+// 	NRF_CRYPTO_ECC_PUBLIC_KEY_CREATE(public_key2, SECP256R1);
+// 	memcpy(public_key2.p_value, step1.public_key, step1.public_key_size);
+// 	// TEST: hardcoded phone public key
+// //    uint8_t hardcoded_public_key2[IG_KEY_EXCHANGE_PUBLIC_LENGTH] = {
+// //            0x5E, 0x64, 0x8A, 0x6C, 0x7C, 0x8E, 0x81, 0x3C,
+// //            0x04, 0xAB, 0xF3, 0x4C, 0x45, 0x1C, 0x9B, 0x14,
+// //            0x7D, 0xD6, 0x3B, 0x3B, 0xA5, 0xC1, 0x3B, 0xE4,
+// //            0x66, 0x94, 0xCD, 0xE5, 0x24, 0x98, 0x78, 0x2B,
+// //            0x7C, 0x3F, 0xA2, 0x77, 0x19, 0xFB, 0x85, 0x67,
+// //            0xE5, 0x01, 0x1A, 0xD2, 0x86, 0xE5, 0xF5, 0xCF,
+// //            0xE5, 0xD2, 0x3B, 0x69, 0x80, 0x32, 0xA9, 0x80,
+// //            0x45, 0x65, 0x27, 0x4B, 0x1E, 0xC4, 0xE3, 0x47
+// //    };
+// //	memcpy(public_key2.p_value, hardcoded_public_key2, sizeof(hardcoded_public_key2));
+// 	// END TEST
 
 
-	IgPairingStep2 step2;
-	ig_PairingStep2_init(&step2);
-	// random nonce
-	nrf_crypto_rng_vector_generate(pairing_rx_nonce, kNonceLength);
-	ig_PairingStep2_set_nonce(&step2, pairing_rx_nonce, kNonceLength);
-	// TEST: hardcoded nonce
-//	uint8_t nonce[kNonceLength] = {0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1};
-//	memset(nonce, 0x0C, kNonceLength);
-//	memcpy(pairing_rx_nonce, nonce, kNonceLength);
-//	ig_PairingStep2_set_nonce(&step2, pairing_rx_nonce, kNonceLength);
-	// END TEST
+// 	IgPairingStep2 step2;
+// 	ig_PairingStep2_init(&step2);
+// 	// random nonce
+// 	nrf_crypto_rng_vector_generate(pairing_rx_nonce, kNonceLength);
+// 	ig_PairingStep2_set_nonce(&step2, pairing_rx_nonce, kNonceLength);
+// 	// TEST: hardcoded nonce
+// //	uint8_t nonce[kNonceLength] = {0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1};
+// //	memset(nonce, 0x0C, kNonceLength);
+// //	memcpy(pairing_rx_nonce, nonce, kNonceLength);
+// //	ig_PairingStep2_set_nonce(&step2, pairing_rx_nonce, kNonceLength);
+// 	// END TEST
 
 
-	// generate random private and public keys
-	NRF_CRYPTO_ECC_PRIVATE_KEY_CREATE(private_key1, SECP256R1);
-	NRF_CRYPTO_ECC_PUBLIC_KEY_CREATE(public_key1, SECP256R1);
-	nrf_crypto_ecc_key_pair_generate(NRF_CRYPTO_BLE_ECDH_CURVE_INFO, &private_key1, &public_key1);
-	ig_PairingStep2_set_public_key(&step2, public_key1.p_value, IG_KEY_EXCHANGE_PUBLIC_LENGTH);
+// 	// generate random private and public keys
+// 	NRF_CRYPTO_ECC_PRIVATE_KEY_CREATE(private_key1, SECP256R1);
+// 	NRF_CRYPTO_ECC_PUBLIC_KEY_CREATE(public_key1, SECP256R1);
+// 	nrf_crypto_ecc_key_pair_generate(NRF_CRYPTO_BLE_ECDH_CURVE_INFO, &private_key1, &public_key1);
+// 	ig_PairingStep2_set_public_key(&step2, public_key1.p_value, IG_KEY_EXCHANGE_PUBLIC_LENGTH);
 	
-	// TEST: hardcoded lock public/private key
-//    uint8_t private_key_test[IG_KEY_EXCHANGE_PRIVATE_LENGTH] = {
-//            0x66, 0x29, 0xED, 0xCE, 0xF5, 0x5A, 0xF2, 0x10,
-//            0x86, 0xC2, 0x9C, 0x77, 0x22, 0x07, 0x11, 0xC2,
-//            0x49, 0xF6, 0x51, 0xAA, 0x2D, 0x4C, 0x02, 0x2D,
-//            0xFB, 0x42, 0xDB, 0xA6, 0xBC, 0x7E, 0x18, 0xC1
-//    };
-//    uint8_t public_key_test[IG_KEY_EXCHANGE_PUBLIC_LENGTH] = {
-//            0x6B, 0x41, 0xE6, 0x98, 0xF7, 0x16, 0x1B, 0x48,
-//            0x64, 0xDB, 0x87, 0xBC, 0x50, 0x5F, 0x6E, 0x3B,
-//            0xB0, 0x69, 0x96, 0x9B, 0x27, 0x51, 0xD8, 0x9D,
-//            0xAE, 0xC4, 0x8A, 0x2E, 0xE7, 0x16, 0x15, 0x8B,
-//            0x24, 0xDC, 0x49, 0xA5, 0x9B, 0x91, 0x50, 0xAB,
-//            0x0F, 0xCB, 0xE3, 0x03, 0x0B, 0x64, 0xFB, 0x85,
-//            0x84, 0x73, 0x03, 0xA3, 0x7E, 0xC3, 0x27, 0x05,
-//            0x6B, 0xA4, 0xE1, 0x32, 0x1B, 0x4F, 0xE8, 0xB0
-//    };
-//	memcpy(private_key1.p_value, private_key_test, private_key1.length);
-//	memcpy(public_key1.p_value, public_key_test, public_key1.length);
-//	ig_PairingStep2_set_public_key(&step2, public_key_test, IG_KEY_EXCHANGE_PUBLIC_LENGTH);
-	// END TEST
+// 	// TEST: hardcoded lock public/private key
+// //    uint8_t private_key_test[IG_KEY_EXCHANGE_PRIVATE_LENGTH] = {
+// //            0x66, 0x29, 0xED, 0xCE, 0xF5, 0x5A, 0xF2, 0x10,
+// //            0x86, 0xC2, 0x9C, 0x77, 0x22, 0x07, 0x11, 0xC2,
+// //            0x49, 0xF6, 0x51, 0xAA, 0x2D, 0x4C, 0x02, 0x2D,
+// //            0xFB, 0x42, 0xDB, 0xA6, 0xBC, 0x7E, 0x18, 0xC1
+// //    };
+// //    uint8_t public_key_test[IG_KEY_EXCHANGE_PUBLIC_LENGTH] = {
+// //            0x6B, 0x41, 0xE6, 0x98, 0xF7, 0x16, 0x1B, 0x48,
+// //            0x64, 0xDB, 0x87, 0xBC, 0x50, 0x5F, 0x6E, 0x3B,
+// //            0xB0, 0x69, 0x96, 0x9B, 0x27, 0x51, 0xD8, 0x9D,
+// //            0xAE, 0xC4, 0x8A, 0x2E, 0xE7, 0x16, 0x15, 0x8B,
+// //            0x24, 0xDC, 0x49, 0xA5, 0x9B, 0x91, 0x50, 0xAB,
+// //            0x0F, 0xCB, 0xE3, 0x03, 0x0B, 0x64, 0xFB, 0x85,
+// //            0x84, 0x73, 0x03, 0xA3, 0x7E, 0xC3, 0x27, 0x05,
+// //            0x6B, 0xA4, 0xE1, 0x32, 0x1B, 0x4F, 0xE8, 0xB0
+// //    };
+// //	memcpy(private_key1.p_value, private_key_test, private_key1.length);
+// //	memcpy(public_key1.p_value, public_key_test, public_key1.length);
+// //	ig_PairingStep2_set_public_key(&step2, public_key_test, IG_KEY_EXCHANGE_PUBLIC_LENGTH);
+// 	// END TEST
 
 	
-	// TEST
-//	NRF_CRYPTO_ECC_PRIVATE_KEY_CREATE(private_key1, SECP256R1);
-//	NRF_CRYPTO_ECC_PUBLIC_KEY_CREATE(public_key1, SECP256R1);
-//	NRF_CRYPTO_ECC_PRIVATE_KEY_CREATE(private_key2, SECP256R1);
-//	NRF_CRYPTO_ECC_PUBLIC_KEY_CREATE(public_key2, SECP256R1);
-//	nrf_crypto_ecc_key_pair_generate(NRF_CRYPTO_BLE_ECDH_CURVE_INFO, &private_key1, &public_key1);
-//	nrf_crypto_ecc_key_pair_generate(NRF_CRYPTO_BLE_ECDH_CURVE_INFO, &private_key2, &public_key2);
-//	NRF_LOG_INFO("set 1\n");
-//	NRF_LOG_HEXDUMP_INFO(private_key1.p_value, private_key1.length);
-//	NRF_LOG_HEXDUMP_INFO(public_key1.p_value, public_key1.length);
-//	for (int i = 0; i < 1000000; i++) {volatile uint8_t a = 2+i;}
-//	NRF_LOG_INFO("set 2\n");
-//	NRF_LOG_HEXDUMP_INFO(private_key2.p_value, private_key2.length);
-//	NRF_LOG_HEXDUMP_INFO(public_key2.p_value, public_key2.length);
-//	ig_PairingStep2_set_public_key(&step2, public_key1.p_value, IG_KEY_EXCHANGE_PK_LENGTH);
+// 	// TEST
+// //	NRF_CRYPTO_ECC_PRIVATE_KEY_CREATE(private_key1, SECP256R1);
+// //	NRF_CRYPTO_ECC_PUBLIC_KEY_CREATE(public_key1, SECP256R1);
+// //	NRF_CRYPTO_ECC_PRIVATE_KEY_CREATE(private_key2, SECP256R1);
+// //	NRF_CRYPTO_ECC_PUBLIC_KEY_CREATE(public_key2, SECP256R1);
+// //	nrf_crypto_ecc_key_pair_generate(NRF_CRYPTO_BLE_ECDH_CURVE_INFO, &private_key1, &public_key1);
+// //	nrf_crypto_ecc_key_pair_generate(NRF_CRYPTO_BLE_ECDH_CURVE_INFO, &private_key2, &public_key2);
+// //	NRF_LOG_INFO("set 1\n");
+// //	NRF_LOG_HEXDUMP_INFO(private_key1.p_value, private_key1.length);
+// //	NRF_LOG_HEXDUMP_INFO(public_key1.p_value, public_key1.length);
+// //	for (int i = 0; i < 1000000; i++) {volatile uint8_t a = 2+i;}
+// //	NRF_LOG_INFO("set 2\n");
+// //	NRF_LOG_HEXDUMP_INFO(private_key2.p_value, private_key2.length);
+// //	NRF_LOG_HEXDUMP_INFO(public_key2.p_value, public_key2.length);
+// //	ig_PairingStep2_set_public_key(&step2, public_key1.p_value, IG_KEY_EXCHANGE_PK_LENGTH);
 
-	size_t step2_size = ig_PairingStep2_get_max_payload_in_bytes(&step2);
-	if (data_out_len < step2_size) {
-		ig_PairingStep1_deinit(&step1);
-		ig_PairingStep2_deinit(&step2);
-		return IG_ERROR_DATA_TOO_SHORT;
-	}
+// 	size_t step2_size = ig_PairingStep2_get_max_payload_in_bytes(&step2);
+// 	if (data_out_len < step2_size) {
+// 		ig_PairingStep1_deinit(&step1);
+// 		ig_PairingStep2_deinit(&step2);
+// 		return IG_ERROR_DATA_TOO_SHORT;
+// 	}
 
-	size_t step2_written_bytes = 0;
-	IgSerializerError err = ig_PairingStep2_encode(&step2, data_out, data_out_len, &step2_written_bytes);
-	if (err != IgSerializerNoError) {
-		ig_PairingStep1_deinit(&step1);
-		ig_PairingStep2_deinit(&step2);
-		return IG_ERROR_GENERIC_FAIL;
-	}
-	*bytes_written = (uint32_t)step2_written_bytes;
+// 	size_t step2_written_bytes = 0;
+// 	IgSerializerError err = ig_PairingStep2_encode(&step2, data_out, data_out_len, &step2_written_bytes);
+// 	if (err != IgSerializerNoError) {
+// 		ig_PairingStep1_deinit(&step1);
+// 		ig_PairingStep2_deinit(&step2);
+// 		return IG_ERROR_GENERIC_FAIL;
+// 	}
+// 	*bytes_written = (uint32_t)step2_written_bytes;
 	
-	// calculate ECDH shared secret from both private keys
-	NRF_CRYPTO_ECDH_SHARED_SECRET_INSTANCE_CREATE(shared_secret, SECP256R1);
-	nrf_crypto_ecdh_shared_secret_compute(NRF_CRYPTO_BLE_ECDH_CURVE_INFO, &private_key1, &public_key2, &shared_secret);
+// 	// calculate ECDH shared secret from both private keys
+// 	NRF_CRYPTO_ECDH_SHARED_SECRET_INSTANCE_CREATE(shared_secret, SECP256R1);
+// 	nrf_crypto_ecdh_shared_secret_compute(NRF_CRYPTO_BLE_ECDH_CURVE_INFO, &private_key1, &public_key2, &shared_secret);
 
-	// TODO: calculate SHA256 hash
-	uint8_t hashed_shared_secret[IG_KEY_EXCHANGE_PRIVATE_LENGTH];
-	memcpy(hashed_shared_secret, shared_secret.p_value, shared_secret.length);
+// 	// TODO: calculate SHA256 hash
+// 	uint8_t hashed_shared_secret[IG_KEY_EXCHANGE_PRIVATE_LENGTH];
+// 	memcpy(hashed_shared_secret, shared_secret.p_value, shared_secret.length);
 
-	// truncate to get admin key
-	memcpy(pairing_admin_key, hashed_shared_secret, IG_KEY_LENGTH);
+// 	// truncate to get admin key
+// 	memcpy(pairing_admin_key, hashed_shared_secret, IG_KEY_LENGTH);
 
-	// TEST: calculate admin key from both private keys
-//	uint32_t result = 1;
-//	uint32_t shared_secret_size; 
-//	result = nrf_crypto_ecdh_shared_secret_size_get(NRF_CRYPTO_CURVE_SECP256R1, &shared_secret_size);
-//	NRF_CRYPTO_ECDH_SHARED_SECRET_INSTANCE_CREATE(shared_secret, SECP256R1);
-//	nrf_crypto_ecdh_shared_secret_compute(NRF_CRYPTO_BLE_ECDH_CURVE_INFO, &private_key1, &public_key2, &shared_secret);
-//	NRF_CRYPTO_ECDH_SHARED_SECRET_INSTANCE_CREATE(shared_secret2, SECP256R1);
-//	nrf_crypto_ecdh_shared_secret_compute(NRF_CRYPTO_BLE_ECDH_CURVE_INFO, &private_key2, &public_key1, &shared_secret2);
-//	NRF_LOG_INFO("admin key 1, len = %i\n", shared_secret.length);
-//	NRF_LOG_HEXDUMP_INFO(shared_secret.p_value, shared_secret.length);
-//	NRF_LOG_INFO("admin key 2, len = %i\n", shared_secret2.length);
-//	NRF_LOG_HEXDUMP_INFO(shared_secret2.p_value, shared_secret2.length);
+// 	// TEST: calculate admin key from both private keys
+// //	uint32_t result = 1;
+// //	uint32_t shared_secret_size; 
+// //	result = nrf_crypto_ecdh_shared_secret_size_get(NRF_CRYPTO_CURVE_SECP256R1, &shared_secret_size);
+// //	NRF_CRYPTO_ECDH_SHARED_SECRET_INSTANCE_CREATE(shared_secret, SECP256R1);
+// //	nrf_crypto_ecdh_shared_secret_compute(NRF_CRYPTO_BLE_ECDH_CURVE_INFO, &private_key1, &public_key2, &shared_secret);
+// //	NRF_CRYPTO_ECDH_SHARED_SECRET_INSTANCE_CREATE(shared_secret2, SECP256R1);
+// //	nrf_crypto_ecdh_shared_secret_compute(NRF_CRYPTO_BLE_ECDH_CURVE_INFO, &private_key2, &public_key1, &shared_secret2);
+// //	NRF_LOG_INFO("admin key 1, len = %i\n", shared_secret.length);
+// //	NRF_LOG_HEXDUMP_INFO(shared_secret.p_value, shared_secret.length);
+// //	NRF_LOG_INFO("admin key 2, len = %i\n", shared_secret2.length);
+// //	NRF_LOG_HEXDUMP_INFO(shared_secret2.p_value, shared_secret2.length);
 
-	ig_PairingStep1_deinit(&step1);
-	ig_PairingStep2_deinit(&step2);
+// 	ig_PairingStep1_deinit(&step1);
+// 	ig_PairingStep2_deinit(&step2);
 	return IG_ERROR_NONE;
 }
 

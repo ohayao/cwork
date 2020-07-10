@@ -19,6 +19,16 @@
 #define IG_ACCESS_RIGHTS_SIZE 8
 #define IG_ERROR_MAX_CONNECTIONS 1001
 
+typedef enum IgErrorCode {
+	IG_ERROR_NONE = 0,
+	IG_ERROR_GENERIC_FAIL = 1,
+	IG_ERROR_INVALID_CONN_ID = 2,
+	IG_ERROR_DATA_TOO_SHORT = 3,
+	IG_ERROR_INVALID_MESSAGE = 4,
+	IG_ERROR_INVALID_PARAMS = 5,
+	IG_ERROR_INTERNAL_ERROR = 6,
+} IgErrorCode;
+
 typedef enum {
 	C_SUBSCRIBE = 0,
   C_WRITE_STEP1,
@@ -64,6 +74,10 @@ void recvData(RecvData *recv_pairing_data, uint8_t * data, uint16_t data_length)
 int getPkgFromRecvData(RecvData *recv_pairing_data, uint8_t *step_pkg_data);
 int getRecvPkgLen(RecvData *recv_pairing_data, size_t *return_size);
 
-
 uint32_t ig_pairing_step2_size();
+int server_gen_pairing_step2(
+  uint8_t *step1_bytes, uint32_t step1_len, 
+  uint8_t *step2_bytes, uint32_t step2_len, 
+  uint32_t *bytes_written);
+
 #endif

@@ -7,19 +7,48 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
-#include <bridge/bridge_main/log.h>
+#include "bridge/bridge_main/log.h"
+#include "bridge/lock/cifra/drbg.h"
+#include "bridge/lock/cifra/sha1.h"
 
 static const char *kTag = "JNI_connection_common";
 
 static Connection connections_[kMaxConnections];    // auto initialized to 0
 
 void generateRandomNonce(int nonceLength, uint8_t resultNonceArrar[]) {
+    // time_t t;
+    // srand((unsigned) time(&t));
+    // for (int i = 0; i < nonceLength; i++)
+    // {
+    //     resultNonceArrar[i] = rand() % 256; // [0 - 255]
+    // }
     time_t t;
     srand((unsigned) time(&t));
-    for (int i = 0; i < nonceLength; i++)
+    uint8_t entropy_size=16, nonce_size=8, reseed_size=16;
+    uint8_t entropy[entropy_size], nonce[nonce_size], reseed[reseed_size];
+    
+    for (int i = 0; i < entropy_size; i++)
     {
-        resultNonceArrar[i] = rand() % 256; // [0 - 255]
+        entropy[i] = rand() % 256;
     }
+    for (int i = 0; i < nonce_size; i++)
+    {
+        nonce[i] = rand() % 256;
+    }
+    for (int i = 0; i < reseed_size; i++)
+    {
+        reseed[i] = rand() % 256;
+    }
+
+    cf_hmac_drbg ctx;
+    cf_hmac_drbg_init(
+        &ctx, &cf_sha1, 
+        entropy, sizeof entropy, 
+        nonce, sizeof nonce, NULL, 0);
+    cf_hmac_drbg_reseed(
+        &ctx, reseed, sizeof reseed, NULL, 0);
+    cf_hmac_drbg_gen(
+        &ctx, resultNonceArrar, nonceLength);
     return;
 }
 

@@ -11,7 +11,6 @@ set(TEST_DEPENDENCIES
   ign_proto
   ign_lib
   ign_wifi_service
-#  ign_wifi_fsm1
 )
 
 
@@ -95,14 +94,11 @@ target_link_libraries(set_wifi_info
 )
 
 # 测试状态基
-include_directories(${CMAKE_SOURCE_DIR}/bridge/wifi_service/igloo)
-find_library(igloo_LIB
-		    libigloo.a 
-		    ${CMAKE_SOURCE_DIR}/bridge/wifi_service/igloo)
-#add_executable(pairing_fsm ./pairing_fsm.c)
-#target_link_libraries(pairing_fsm
-#  ${TEST_DEPENDENCIES} ${igloo_LIB}
-#)
+add_executable(pairing_fsm ./pairing_fsm.c)
+target_link_libraries(pairing_fsm
+  ${TEST_DEPENDENCIES} 
+  ign_wifi_fsm1
+)
 
 # 测试长连接
 #add_executable(long_connection ./long_connection.c)

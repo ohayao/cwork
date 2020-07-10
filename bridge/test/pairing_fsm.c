@@ -10,8 +10,8 @@
 #include "bridge/lock/connection/pairing_connection.h"
 #include "bridge/ble/ble_operation.h"
 #include "bridge/wifi_service/pairing.h"
-#include "bridge/wifi_service/igloo/igloo.h"
 
+#include <stdint.h>
 
 
 
@@ -40,18 +40,38 @@ int handleWriteStep1(void *arg)
     serverLog(LL_ERROR, "getPkgFromRecvData error");
     return 1;
   }
-  serverLog(LL_NOTICE, "getPkgFromRecvData success");
-
-  uint8_t *data_out = NULL; 
-  uint32_t data_out_len = 100;
-  uint32_t bytes_written = 0;
-  data_out = malloc(data_out_len);
-  // ret = ig_pairing_step2(step1_payload_bytes, step1_len, data_out, data_out_len, &bytes_written);
-  
-  if (ret) {
-    serverLog(LL_ERROR, "ig_pairing_step2 err");
+  uint8_t *step2_bytes = NULL;
+  uint32_t step2_size = ig_pairing_step2_size();
+  uint32_t step2_writen_len = 0;
+  if (step2_size == 0)
+  {
+    serverLog(LL_ERROR, "ig_pairing_step2_size error");
+    return 1;
   }
-  serverLog(LL_NOTICE, "ig_pairing_step2 success");
+
+  step2_bytes = malloc(step2_size);
+  memset(step2_bytes, 0, step2_size);
+
+
+  serverLog(LL_NOTICE, "getPkgFromRecvData success");
+  if (server_gen_pairing_step2(
+    step1_payload_bytes, step1_len, step2_bytes, step2_size, &step2_writen_len))
+  {
+
+    serverLog(LL_ERROR, "server_gen_pairing_step2 error");
+    return 1;
+  }
+  
+  // uint8_t *data_out = NULL; 
+  // uint32_t data_out_len = 100;
+  // uint32_t bytes_written = 0;
+  // data_out = malloc(data_out_len);
+  // // ret = ig_pairing_step2(step1_payload_bytes, step1_len, data_out, data_out_len, &bytes_written);
+  
+  // if (ret) {
+  //   serverLog(LL_ERROR, "ig_pairing_step2 err");
+  // }
+  // serverLog(LL_NOTICE, "ig_pairing_step2 success");
   
   return ret;
 }
