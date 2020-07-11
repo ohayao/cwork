@@ -464,7 +464,7 @@ int write_pairing_step3(void *arg)
 
   size_t payload_len = 0;
 	uint8_t *payloadBytes = NULL;
-  uint8_t *step3Bytes;
+  uint8_t *step3Bytes = NULL;
   size_t step3Bytes_len = 0;
 
   step3Bytes_len = 

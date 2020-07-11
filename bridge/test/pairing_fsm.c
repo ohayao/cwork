@@ -14,7 +14,8 @@
 #include <stdint.h>
 
 
-
+uint8_t *fake_transmit_payloadBytes = NULL;
+uint32_t fake_transmit_payloadBytes_len = 0;
 
 // 处理写的事件
 int handleWriteStep1(void *arg)
@@ -52,33 +53,71 @@ int handleWriteStep1(void *arg)
   step2_bytes = malloc(step2_size);
   memset(step2_bytes, 0, step2_size);
 
-
   serverLog(LL_NOTICE, "getPkgFromRecvData success");
   if (server_gen_pairing_step2(
     step1_payload_bytes, step1_len, step2_bytes, step2_size, &step2_writen_len))
   {
-
     serverLog(LL_ERROR, "server_gen_pairing_step2 error");
     return 1;
   }
-  
-  // uint8_t *data_out = NULL; 
-  // uint32_t data_out_len = 100;
-  // uint32_t bytes_written = 0;
-  // data_out = malloc(data_out_len);
-  // // ret = ig_pairing_step2(step1_payload_bytes, step1_len, data_out, data_out_len, &bytes_written);
-  
-  // if (ret) {
-  //   serverLog(LL_ERROR, "ig_pairing_step2 err");
-  // }
-  // serverLog(LL_NOTICE, "ig_pairing_step2 success");
-  
+
+  serverLog(LL_NOTICE, "server_gen_pairing_step2 success");
+
+  if (!ig_PairingStep2_is_valid((IgPairingStep2 *)step2_bytes))
+  {
+    serverLog(LL_ERROR, "step2 not valid error");
+    return 1;
+  }
+
+  serverLog(LL_NOTICE, "step 2 generate valid");
+
+  uint8_t *payloadBytes = NULL;
+  uint32_t payload_len = 0;
+
+  if (!build_msg_payload(
+    &payloadBytes, &payload_len, step2_bytes, step2_writen_len))
+	{
+    serverLog(LL_ERROR, "failed in build_msg_payload");
+		return 1;
+	}
+  serverLog(LL_NOTICE, "success in build_msg_payload, size: %u", payload_len);
+
+  fake_transmit_payloadBytes = (uint8_t *)malloc(payload_len);
+  fake_transmit_payloadBytes_len = payload_len;
+  memcpy(fake_transmit_payloadBytes, payloadBytes, payload_len);
+
+  // fake_transmit_payloadBytes
+  free(payloadBytes);
+  payloadBytes = NULL;
+  free(step2_bytes);
+  step2_bytes = NULL;
+  free(step1_payload_bytes);
+  step1_payload_bytes = NULL;
   return ret;
 }
 
 int handleReplyStep2(void *arg)
 {
+  serverLog(LL_NOTICE, "handleReplyStep2 --------");
+  uint16_t step2_len = 0;
+  uint16_t n_size_byte = 0;
+  uint16_t pkg_len = 0;
+  pkg_len = getDataLength(fake_transmit_payloadBytes, &n_size_byte, &step2_len);
+  if (pkg_len == 0)
+  {
+    serverLog(LL_ERROR, "getRecvPkgLen error");
+    return 1;
+  }
+  serverLog(LL_NOTICE, "handleReplyStep2 getDataLength success, pkg_len %u, n_size_byte %u, step2_len %u ", 
+      pkg_len, n_size_byte, step2_len);
+  
+  uint8_t *step3Bytes = NULL;
+  size_t step3Bytes_len = 0;
 
+  free(step3Bytes);
+  step3Bytes = NULL;
+  
+  return 0;
 }
 
 int handleWriteStep3(void *arg)
@@ -215,6 +254,7 @@ int main(int argc, char *argv[])
   // 初始化fsm
   initFSMCurState(fsm, PAIRING_BEGIN);
 
+  // ------------------- 上面是生成 step1 包 ----------------------
   // 假设开始写 write step1, 这些是外部产生的
   // 生成一个step 1 所需要如下的步骤
   ret = igloohome_ble_lock_crypto_PairingConnection_beginConnection();
@@ -253,7 +293,9 @@ int main(int argc, char *argv[])
     
   }
   printf("\n");
+  // ------------------- 上面是生成 step 1 包 ----------------------
 
+  // ------------------- 下面是接收 step1 的包的函数的验证 ----------------------
   // 到这里, 成功生成了 step1 的 步骤, 也就是 payloadBytes 
   // 会被成功传输到 brdige, 这就相当于, 我要开始接收这个字符串
   if (getRecvData(&recv_pairing_data))
@@ -323,6 +365,9 @@ int main(int argc, char *argv[])
   }
   printf("\n");
 
+  // ------------------- 上面是接收 step1 的包的函数的验证 ----------------------
+
+  // ------------------- 下面是接收 服务端开始处理 发送的step1 的包的函数的验证 ----------------------
   // 需要解开第一个包, 然后
   size_t step1_len = 0;
   if (getRecvPkgLen(recv_pairing_data, &step1_len))
@@ -357,6 +402,15 @@ int main(int argc, char *argv[])
   event = C_WRITE_STEP1;
   handleEvent(fsm, event, recv_pairing_data);
 
+  // ------------------- 上面是接收 服务端开始处理 收到的step1 的包的函数的验证 ----------------------
+
+  // ------------------- 下面是客户 接收到服务器的payload 收到的step2 的包的函数的验证 ----------------------
+  // 假设已经接收到所有数据, 因为 已经验证过接收数据了
+  handleReplyStep2(NULL);
+
+  // ------------------- 上面是客户 接收到服务器的payload 收到的step2 的包的函数的验证 ----------------------
+  
+  // fake_transmit_payloadBytes
   // getPkgFromRecvData()
   
   

@@ -143,8 +143,8 @@ int main(int argc, char *argv[])
   // client shared key
   ret = uECC_shared_secret(server_publicKey_, client_privateKey_, client_shared_key, p_curve);
   if (ret != 1) {
-    serverLog(LL_ERROR, "uECC_shared_secret");
-    return 0;
+    serverLog(LL_ERROR, "uECC_shared_secret error");
+    return 1;
   }
 
   serverLog(LL_NOTICE, "client_shared_key :");

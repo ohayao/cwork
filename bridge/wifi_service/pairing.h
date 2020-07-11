@@ -73,6 +73,7 @@ int initRecvData(RecvData *recv_data);
 void recvData(RecvData *recv_pairing_data, uint8_t * data, uint16_t data_length);
 int getPkgFromRecvData(RecvData *recv_pairing_data, uint8_t *step_pkg_data);
 int getRecvPkgLen(RecvData *recv_pairing_data, size_t *return_size);
+uint16_t getDataLength(uint8_t data[], uint16_t *n_size_byte, uint16_t *pkg_len);
 
 uint32_t ig_pairing_step2_size();
 int server_gen_pairing_step2(

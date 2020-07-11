@@ -8,6 +8,7 @@
 #include "bridge/lock/connection/connection_common.h"
 #include "bridge/lock/cifra/drbg.h"
 #include "bridge/lock/cifra/sha1.h"
+#include "bridge/lock/micro-ecc/uECC.h"
 
 #define kMaxConnections 64
 #define kNonceLength 12
@@ -21,6 +22,7 @@ enum {
   kPublicKeyLength=64
 };
 
+static uint8_t server_pairing_admin_key[IG_KEY_LENGTH];
 static uint8_t server_pairing_private_key[kPrivateKeyLength];
 static uint8_t server_pairing_public_key[kPublicKeyLength];
 static uint8_t server_nonce[kNonceLength];
@@ -374,6 +376,37 @@ int server_gen_pairing_step2(
   ig_PairingStep2_set_public_key(
     &step2, server_pairing_public_key, kPublicKeyLength);
   
-  
-  return 0;
+  uint32_t step2_size =ig_PairingStep2_get_max_payload_in_bytes(&step2);
+  if (step2_len < step2_size) {
+		ig_PairingStep1_deinit(&step1);
+		ig_PairingStep2_deinit(&step2);
+		return IG_ERROR_DATA_TOO_SHORT;
+	}
+
+  size_t step2_written_bytes = 0;
+  IgSerializerError err = ig_PairingStep2_encode(
+    &step2, step2_bytes, step2_len, &step2_written_bytes);
+
+  if (err != IgSerializerNoError) {
+		ig_PairingStep1_deinit(&step1);
+		ig_PairingStep2_deinit(&step2);
+		return IG_ERROR_GENERIC_FAIL;
+	}
+	*bytes_written = (uint32_t)step2_written_bytes;
+
+  uint8_t shared_secret[IG_KEY_EXCHANGE_PRIVATE_LENGTH];
+  ret = uECC_shared_secret(
+    client_pairing_public_key, server_pairing_private_key, shared_secret, p_curve);
+  if (ret != 1) {
+    serverLog(LL_ERROR, "uECC_shared_secret err");
+    return 1;
+  }
+
+  // truncate to get admin key
+	memcpy(server_pairing_admin_key, shared_secret, IG_KEY_LENGTH);
+
+  ig_PairingStep1_deinit(&step1);
+	ig_PairingStep2_deinit(&step2);
+
+  return IG_ERROR_NONE;
 }
