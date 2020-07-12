@@ -36,6 +36,7 @@ typedef enum {
   C_WRITE_STEP3,
   S_REPLY_STEP4,
   C_WRITE_COMMIT,
+	S_PAIRING_COMPLETE,
   ERR_EVENT,
 } PAIRING_EVENT;
 
@@ -45,6 +46,7 @@ typedef enum {
 	PAIRING_STEP2,
   PAIRING_STEP3,
 	PAIRING_STEP4,
+	PAIRING_COMMIT,
 	PAIRING_COMPLETE,
 	PAIRING_IDLE,
 } PAIRING_STATUS;
@@ -74,11 +76,18 @@ void recvData(RecvData *recv_pairing_data, uint8_t * data, uint16_t data_length)
 int getPkgFromRecvData(RecvData *recv_pairing_data, uint8_t *step_pkg_data);
 int getRecvPkgLen(RecvData *recv_pairing_data, size_t *return_size);
 uint16_t getDataLength(uint8_t data[], uint16_t *n_size_byte, uint16_t *pkg_len);
-
+int isRecvFullPkg(RecvData *recv_pairing_data);
 uint32_t ig_pairing_step2_size();
 int server_gen_pairing_step2(
   uint8_t *step1_bytes, uint32_t step1_len, 
   uint8_t *step2_bytes, uint32_t step2_len, 
   uint32_t *bytes_written);
+uint32_t ig_decrypt_data_size(uint32_t data_len);
 
+int decryptClientData(
+  uint8_t *data_in, uint32_t data_in_len, 
+  uint8_t *data_out, uint32_t data_out_len,
+  uint32_t *bytes_written);
+void incrementClientNonce();
+void incrementServerNonce();
 #endif

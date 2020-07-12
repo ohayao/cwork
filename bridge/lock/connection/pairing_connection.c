@@ -25,7 +25,9 @@ enum {
 static uint8_t privateKey_[kPrivateKeyLength] = {0x00};
 static uint8_t publicKey_[kPublicKeyLength] = {0x00};
 static uint8_t otherPublicKey_[kPublicKeyLength] = {0x00};
+// txNonce server 产生的
 static uint8_t txNonce_[kNonceLength] = {0x00};
+// rxNonce_ 自己产生的
 static uint8_t rxNonce_[kNonceLength] = {0x00};
 static uint8_t sharedKey_[kConnectionKeyLength] = {0x00};
 
@@ -97,8 +99,9 @@ int igloohome_ble_lock_crypto_PairingConnection_genPairingStep3Native(
      memcpy(hashedSharedSecret, sharedSecret, sizeof(sharedSecret));
      memcpy(sharedKey_, hashedSharedSecret, sizeof(sharedKey_));
 
-     IgPairingStep3 step3;
-     ig_PairingStep3_init(&step3);
+    // 下面是发送 step3 
+    IgPairingStep3 step3;
+    ig_PairingStep3_init(&step3);
     //  if (jStep3Params) {
     //     // start from the passed in step 3
     //     uint8_t *jStep3Params_end = jStep3Params;
@@ -115,7 +118,7 @@ int igloohome_ble_lock_crypto_PairingConnection_genPairingStep3Native(
     // step3.has_gmt_offset = true;
     // step3.gmt_offset = 28800;
 
-    // 只设置
+    // 只设置 自己产生的 rxNonce_ 
     ig_PairingStep3_set_nonce(&step3, rxNonce_, kNonceLength);
     size_t step3MaxLen = ig_PairingStep3_get_max_payload_in_bytes(&step3);
     uint8_t plaintextBytes[step3MaxLen];
@@ -137,6 +140,7 @@ int igloohome_ble_lock_crypto_PairingConnection_genPairingStep3Native(
             sharedKey_, kConnectionKeyLength,
             txNonce_, kNonceLength
     );
+    // 为下次加密做准备? 这是发送的 txNonce_
     incrementNonce(txNonce_);
     if (retvalLen < 0) {
         ig_PairingStep2_deinit(&step2);

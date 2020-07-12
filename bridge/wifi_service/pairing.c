@@ -25,6 +25,7 @@ enum {
 static uint8_t server_pairing_admin_key[IG_KEY_LENGTH];
 static uint8_t server_pairing_private_key[kPrivateKeyLength];
 static uint8_t server_pairing_public_key[kPublicKeyLength];
+
 static uint8_t server_nonce[kNonceLength];
 static uint8_t client_nonce[kNonceLength];
 static uint8_t client_pairing_public_key[kPublicKeyLength];
@@ -134,9 +135,8 @@ int copyData(RecvData *recv_pairing_data, uint8_t *data, uint16_t data_length)
   if (recv_pairing_data->data_len < recv_pairing_data->recv_len+data_length)
   {
     
-    serverLog(LL_ERROR, "recv_pairing_data->data_len too samll");
+    serverLog(LL_ERROR, "recv_pairing_data->data_len too samll, data len %d, recv len %d, data length %d", recv_pairing_data->data_len, recv_pairing_data->recv_len, data_length);
     return 3;
-  
   }
   memcpy(
     recv_pairing_data->data+recv_pairing_data->recv_len, 
@@ -149,7 +149,7 @@ int copyData(RecvData *recv_pairing_data, uint8_t *data, uint16_t data_length)
 // 
 void recvData(RecvData *recv_pairing_data, uint8_t * data, uint16_t data_length)
 {
-  serverLog(LL_NOTICE, "int recvData -------------------");
+  // serverLog(LL_NOTICE, "int recvData -------------------");
   int err = 0;
   uint16_t pkg_len = 0;
   switch (recv_pairing_data->recv_status)
@@ -157,10 +157,10 @@ void recvData(RecvData *recv_pairing_data, uint8_t * data, uint16_t data_length)
     case NONE:
     {
       // 创建新的存储空间, 准备接收
-      serverLog(LL_NOTICE, "recvData NONE-------------------");
+      // serverLog(LL_NOTICE, "recvData NONE-------------------");
       // 所获得的, 是 整个蓝牙包 (长度+加密报文)
       pkg_len = getDataLength(data, &(recv_pairing_data->n_size_byte), &recv_pairing_data->pkg_len);
-
+      // serverLog(LL_NOTICE, "pkg_len: %d", pkg_len);
       if (allocRecvData(recv_pairing_data, pkg_len))
       {
         serverLog(LL_ERROR, "recvData alloc data err");
@@ -178,7 +178,7 @@ void recvData(RecvData *recv_pairing_data, uint8_t * data, uint16_t data_length)
       break;
     }
     case GOT_PREV_DATA:
-      serverLog(LL_NOTICE, "recvData GOT_PREV_DATA-------------------");
+      // serverLog(LL_NOTICE, "recvData GOT_PREV_DATA-------------------");
       /* code */
       if (copyData(recv_pairing_data, data, data_length))
       {
@@ -190,7 +190,7 @@ void recvData(RecvData *recv_pairing_data, uint8_t * data, uint16_t data_length)
       }
       break;
     case FINISHED_SUCCESS:
-      serverLog(LL_NOTICE, "recvData FINISHED_SUCCESS-------------------");
+      // serverLog(LL_NOTICE, "recvData FINISHED_SUCCESS-------------------");
       /* code */
       break;
     case FINISHED_ERROR:
@@ -312,7 +312,7 @@ int server_gen_pairing_step2(
   uint8_t *step1_bytes, uint32_t step1_len, 
   uint8_t *step2_bytes, uint32_t step2_len, 
   uint32_t *bytes_written) {
-  serverLog(LL_NOTICE, "server_gen_pairing_step2");
+  // serverLog(LL_NOTICE, "server_gen_pairing_step2");
 
   int ret = 0;
   IgPairingStep1 step1;
@@ -323,7 +323,7 @@ int server_gen_pairing_step2(
 		ig_PairingStep1_deinit(&step1);
 		return IG_ERROR_INVALID_MESSAGE;
 	}
-  serverLog(LL_ERROR, "server_gen_pairing_step2 ig_PairingStep1_decode success");
+  // serverLog(LL_ERROR, "server_gen_pairing_step2 ig_PairingStep1_decode success");
 
   if (ig_PairingStep1_get_public_key_size(&step1) != IG_KEY_EXCHANGE_PUBLIC_LENGTH) {
 		ig_PairingStep1_deinit(&step1);
@@ -340,12 +340,12 @@ int server_gen_pairing_step2(
   IgPairingStep2 step2;
 	ig_PairingStep2_init(&step2);
   generateRandomNonce(kNonceLength, server_nonce);
-  serverLog(LL_NOTICE, "server_nonce: ");
-  for (int i = 0; i < kNonceLength; i++)
-  {
-    printf(" %x", server_nonce[i]);
-  }
-  printf("\n");
+  // serverLog(LL_NOTICE, "server_nonce: ");
+  // for (int i = 0; i < kNonceLength; i++)
+  // {
+  //   printf(" %x", server_nonce[i]);
+  // }
+  // printf("\n");
 
   ig_PairingStep2_set_nonce(&step2, server_nonce, kNonceLength);
 
@@ -359,19 +359,19 @@ int server_gen_pairing_step2(
   }
 
   // 显示输出 client
-  serverLog(LL_NOTICE, "client_publicKey_ :");
-  for (int i = 0; i < kPublicKeyLength; i++)
-  {
-    printf("%x ", server_pairing_public_key[i]);
-  }
-  printf("\n\n");
+  // serverLog(LL_NOTICE, "client_publicKey_ :");
+  // for (int i = 0; i < kPublicKeyLength; i++)
+  // {
+  //   printf("%x ", server_pairing_public_key[i]);
+  // }
+  // printf("\n\n");
 
-  serverLog(LL_NOTICE, "client_privateKey_ :");
-  for (int i = 0; i < kPrivateKeyLength; i++)
-  {
-    printf("%x ", server_pairing_private_key[i]);
-  }
-  printf("\n\n");
+  // serverLog(LL_NOTICE, "client_privateKey_ :");
+  // for (int i = 0; i < kPrivateKeyLength; i++)
+  // {
+  //   printf("%x ", server_pairing_private_key[i]);
+  // }
+  // printf("\n\n");
 
   ig_PairingStep2_set_public_key(
     &step2, server_pairing_public_key, kPublicKeyLength);
@@ -409,4 +409,52 @@ int server_gen_pairing_step2(
 	ig_PairingStep2_deinit(&step2);
 
   return IG_ERROR_NONE;
+}
+
+void incrementServerNonce() 
+{
+  uint8_t *nonce = server_nonce;
+  for (int i = kNonceLength-1; i >= 0; i--) {
+		if (nonce[i] == 255) {
+			nonce[i] = 0;
+		}
+		else {
+			nonce[i]++;
+			break;
+		}
+	}
+}
+
+void incrementClientNonce() {
+  uint8_t *nonce = client_nonce;
+	// nonce interpreted as big endian (most significant byte has lowest address/index)
+	for (int i = kNonceLength-1; i >= 0; i--) {
+		if (nonce[i] == 255) {
+			nonce[i] = 0;
+		}
+		else {
+			nonce[i]++;
+			break;
+		}
+	}
+}
+
+uint32_t ig_decrypt_data_size(uint32_t data_len) {
+	return data_len - kCcmTagLength;
+}
+
+int decryptClientData(
+  uint8_t *data_in, uint32_t data_in_len, 
+  uint8_t *data_out, uint32_t data_out_len,
+  uint32_t *bytes_written)
+{ 
+
+  *bytes_written = decryptData
+    (data_in, data_in_len, 
+    data_out, data_out_len, 
+    server_pairing_admin_key, kConnectionKeyLength,
+    client_nonce, kNonceLength
+  );
+  if (*bytes_written == 0) return 1;
+  return 0;
 }

@@ -4,7 +4,7 @@
 #include "bridge/bridge_main/log.h"
 
 
-static inline void transState(FSM *fsm, uint8_t state)
+void transState(FSM *fsm, uint8_t state)
 {
     fsm->cur_state = state;
 }
@@ -51,7 +51,7 @@ int initFSMCurState(FSM *fsm, uint8_t cur_state)
 
 int handleEvent(FSM *fsm, uint8_t event, void *arg)
 {
-    serverLog(LL_NOTICE, "------------------- handleEvent");
+    // serverLog(LL_NOTICE, "------------------- handleEvent");
     if (event == ERROR_EVENT)
     {
         serverLog(LL_ERROR, "event is ERROR_EVENT");
@@ -67,7 +67,8 @@ int handleEvent(FSM *fsm, uint8_t event, void *arg)
     serverLog(LL_NOTICE, "max_state_num %d", fsm->max_state_num);
     for (uint8_t i = 0; i < fsm->max_state_num; i++)// 遍历状态表
     {
-        serverLog(LL_NOTICE, "event %d cur_state %d", event, cur_state);
+        // serverLog(LL_NOTICE, "event %d cur_state %d, trans table state: %d, event : %d", 
+            // event, cur_state, trans_table[i].cur_state, trans_table[i].event);
         if (event == trans_table[i].event && cur_state == trans_table[i].cur_state)
         {
             flag = 1;
@@ -81,8 +82,18 @@ int handleEvent(FSM *fsm, uint8_t event, void *arg)
         if (event_act_func != NULL)
         {
             ret = event_act_func(arg);  // 执行相应动作
+            //只有没有出错的时候, 才进行转转状态
+            if (!ret)
+            {
+                transState(fsm, next_state); // 状态转换
+            }
+            else
+            {
+                serverLog(LL_ERROR, "fsm handle event is error");
+            }
+            
         }
-        transState(fsm, next_state); // 状态转换
+        
     }
     else
     {

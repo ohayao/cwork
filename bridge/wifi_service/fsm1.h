@@ -37,7 +37,7 @@ int fillFSMTransItem(FSM *fsm, FSMTransform *trans_item);
 int fillTransItem(FSMTransform *trans_item, 
     uint8_t event, uint8_t CurState, ActionFunc eventActFun, 
     uint8_t NextState);
-
+void transState(FSM *fsm, uint8_t state);
 // 处理函数
 int handleEvent(FSM *fsm, uint8_t event, void *arg);
 #endif
