@@ -164,7 +164,8 @@ void releaseAdminConnectionData(admin_connection_t *admin_connection) {
 	}
 }
 
-int releaseAdminConnection(admin_connection_t **pp_admin_connection) {
+int releaseAdminConnection(admin_connection_t **pp_admin_connection)
+{
 	admin_connection_t *admin_connection = *pp_admin_connection;
 	if (NULL == admin_connection) {
 		return 0;
@@ -177,28 +178,29 @@ int releaseAdminConnection(admin_connection_t **pp_admin_connection) {
 	}
 	releaseLock(&admin_connection->lock);
 	bleReleaseAdminResult(&admin_connection->ble_result);
-
-    if(NULL == admin_connection->gatt_connection) {
-    	free(*pp_admin_connection);
-	    *pp_admin_connection = NULL;
-        return 0;
-    }
-	ret = gattlib_notification_stop(admin_connection->gatt_connection, &admin_connection->admin_uuid);
-	if (GATTLIB_SUCCESS != ret) {
+	ret = gattlib_notification_stop(
+			admin_connection->gatt_connection, &admin_connection->admin_uuid);
+	if (ret != GATTLIB_SUCCESS)
+	{
 		serverLog(LL_ERROR, "clearAdminConnectionGattConenction gattlib_notification_stop error");
 		return ret;
 	}
 	ret = gattlib_disconnect(admin_connection->gatt_connection);
-	if (GATTLIB_SUCCESS != ret) {
+	if (ret != GATTLIB_SUCCESS)
+	{
 		serverLog(LL_ERROR, " gattlib_disconnect error");
 		return ret;
 	}
 	admin_connection->gatt_connection = NULL;
+	free(*pp_admin_connection);
+	*pp_admin_connection = NULL;
 	return 0;
 }
 
-static int clearAdminConnectionStepData(admin_connection_t *admin_connection) {
-	if (admin_connection->step_data && admin_connection->step_max_size) {
+static int clearAdminConnectionStepData(admin_connection_t *admin_connection)
+{
+	if (admin_connection->step_data && admin_connection->step_max_size)
+	{
 		admin_connection->step_max_size = 0;
 		admin_connection->step_cur_size = 0;
 		free(admin_connection->step_data);
@@ -346,7 +348,8 @@ int register_admin_notfication(void *arg) {
 	admin_connection->has_ble_result = 1;
 	admin_connection->ble_result = malloc(sizeof(ble_admin_result_t));
 	initAdminResult(admin_connection->ble_result);
-	setAdminResultAddr(admin_connection->ble_result, admin_connection->lock->addr, admin_connection->lock->addr_len);
+	setAdminResultAddr(admin_connection->ble_result, 
+			admin_connection->lock->addr, admin_connection->lock->addr_len);
 
 	ble_data->adapter_name = NULL;
 	ble_data->adapter = NULL;
@@ -354,13 +357,16 @@ int register_admin_notfication(void *arg) {
 	//*
 	ret = gattlib_adapter_open(ble_data->adapter_name, &(ble_data->adapter));
 	if (ret) {
-		serverLog(LL_ERROR, "ERROR: register_admin_notfication Failed to open adapter.");
+		serverLog(LL_ERROR, 
+				"ERROR: register_admin_notfication Failed to open adapter.");
 		goto ADMIN_ERROR_EXIT;
 	}
 
-	serverLog(LL_NOTICE, "register_admin_notfication ready to connection[%s]", admin_connection->lock->addr);
+	serverLog(LL_NOTICE, "register_admin_notfication ready to connection %s",
+			admin_connection->lock->addr);
 	//optimise this short connection to long!
-	admin_connection->gatt_connection = gattlib_connect(ble_data->adapter, admin_connection->lock->addr, GATTLIB_CONNECTION_OPTIONS_LEGACY_DEFAULT);
+	admin_connection->gatt_connection = gattlib_connect(
+			ble_data->adapter, admin_connection->lock->addr, GATTLIB_CONNECTION_OPTIONS_LEGACY_DEFAULT);
 	if (NULL == admin_connection->gatt_connection) {
 		serverLog(LL_ERROR, "Fail to connect to the bluetooth device." );
 		goto ADMIN_ERROR_EXIT;
@@ -415,8 +421,7 @@ int waiting_admin_step1(void *arg) {
 	serverLog(LL_NOTICE, "waiting_pairing_step2.");
 	task_node_t *task_node = (task_node_t *)arg;
 	ble_data_t *ble_data = (ble_data_t *)(task_node->ble_data);
-	admin_connection_t *admin_connection = 
-		(admin_connection_t *)ble_data->ble_connection;
+	admin_connection_t *admin_connection = (admin_connection_t *)ble_data->ble_connection;
 
 	serverLog(LL_NOTICE, "waiting_admin_step1 new loop waiting.");
 	g_main_loop_run(task_node->loop);
@@ -462,67 +467,64 @@ int handle_step1_message(const uint8_t* data, int data_length,void* user_data) {
 	}
 }
 
-int save_message_data(const uint8_t* data, int data_length, void* user_data) {
-	task_node_t *task_node = (task_node_t *)user_data;
-	ble_data_t *ble_data = task_node->ble_data;
-	admin_connection_t *admin_connection = 
-		(admin_connection_t *)ble_data->ble_connection;
+int save_message_data(const uint8_t* data, int data_length, void* user_data)
+{
+    task_node_t *task_node = (task_node_t *)user_data;
+    ble_data_t *ble_data = task_node->ble_data;
+    admin_connection_t *admin_connection = (admin_connection_t *)ble_data->ble_connection;
 
-	// 如果没有分配内存                            
-	if (admin_connection->step_max_size == 0) {
-		if (data_length<3) {
-			serverLog(LL_ERROR, "data_length < 3, can't get len");
-			return 1;
-		} else {
-			if (data[2] == 0xff) {
-				admin_connection->n_size_byte = 3;
-				admin_connection->step_max_size = data[0] * (0xfe) + data[1] + admin_connection->n_size_byte;
-				serverLog(LL_NOTICE, "2 bytes lenth %d", admin_connection->step_max_size);
-			} else {
-				serverLog(LL_NOTICE, "data[0] %d %02x", data[0], data[0]);
-				admin_connection->n_size_byte = 1;
-				admin_connection->step_max_size = data[0] + admin_connection->n_size_byte;
-			}
-			admin_connection->step_cur_size = 0;
-			admin_connection->step_data = (uint8_t *)malloc(
-					admin_connection->step_max_size);
-			if (!(admin_connection->step_data)) {
-				serverLog(LL_ERROR, "save_message_data malloc err");
-				return 1;
-			}
-		}
-	}
+    // 如果没有分配内存                            
+    if (admin_connection->step_max_size == 0) {
+        if (data_length<3) {
+            serverLog(LL_ERROR, "data_length < 3, can't get len");
+            return 1;
+        } else {
+            if (data[2] == 0xff) {
+                admin_connection->n_size_byte = 3;
+                admin_connection->step_max_size = data[0] * (0xfe) + data[1] + admin_connection->n_size_byte;
+                serverLog(LL_NOTICE, "2 bytes lenth %d", admin_connection->step_max_size);
+            } else {
+                serverLog(LL_NOTICE, "data[0] %d %02x", data[0], data[0]);
+                admin_connection->n_size_byte = 1;
+                admin_connection->step_max_size = data[0] + admin_connection->n_size_byte;
+            }
+            admin_connection->step_cur_size = 0;
+            admin_connection->step_data = (uint8_t *)malloc(admin_connection->step_max_size);
+            if (!(admin_connection->step_data)) {
+                serverLog(LL_ERROR, "save_message_data malloc err");
+                return 1;
+            }
+        }
+    }
 
-	int size_left = admin_connection->step_max_size - admin_connection->step_cur_size;
-	// 帕不够
-	if (size_left < data_length) {
-		serverLog(LL_NOTICE, "size_left < data_length");
-		admin_connection->step_max_size += 85;
-		uint8_t *old_data = admin_connection->step_data;
-		admin_connection->step_data = (uint8_t *)malloc(
-				admin_connection->step_max_size);
-		if (!admin_connection->step_data) {
-			serverLog(LL_ERROR, "save_message_data malloc err");
-			return 4;
-		}
-		memcpy(admin_connection->step_data, old_data, admin_connection->step_cur_size);
-		free(old_data);
-		old_data = NULL;
-	}
+    int size_left = admin_connection->step_max_size - admin_connection->step_cur_size;
+    // 帕不够
+    if (size_left < data_length) {
+        serverLog(LL_NOTICE, "size_left < data_length");
+        admin_connection->step_max_size += 85;
+        uint8_t *old_data = admin_connection->step_data;
+        admin_connection->step_data = (uint8_t *)malloc(admin_connection->step_max_size);
+        if (!admin_connection->step_data) {
+            serverLog(LL_ERROR, "save_message_data malloc err");
+            return 4;
+        }
+        memcpy( admin_connection->step_data, old_data, admin_connection->step_cur_size);
+        free(old_data);
+        old_data = NULL;
+    }
 
-  // 空间肯定足够, 直接放下空间里面
-	for (int j = 0; j < data_length; ) {
-		admin_connection->step_data[admin_connection->step_cur_size++] = data[j++];
-	}
+    // 空间肯定足够, 直接放下空间里面
+    for (int j = 0; j < data_length; ) {
+        admin_connection->step_data[admin_connection->step_cur_size++] = data[j++];
+    }
 }
 
 int write_admin_step2(void *arg) {
-	serverLog(LL_NOTICE, "write_admin_step2 start --------");
-	int ret;
+    serverLog(LL_NOTICE, "write_admin_step2 start --------");
+    int ret;
 	task_node_t *task_node = (task_node_t *)arg;
 	ble_data_t *ble_data = task_node->ble_data;
-	admin_connection_t *admin_connection = 
-		(admin_connection_t *)ble_data->ble_connection;
+	admin_connection_t *admin_connection = (admin_connection_t *)ble_data->ble_connection;
 
 	size_t step2Bytes_len = 0, payload_len = 0;
 	uint8_t *step2Bytes = NULL;
@@ -1366,7 +1368,8 @@ static int handleGetLogsResponce(const uint8_t* data, int data_length,void* user
 	serverLog(LL_NOTICE, "handleGetLogsResponce--------------------------------");
 	task_node_t *task_node = (task_node_t *)user_data;
 	ble_data_t *ble_data = task_node->ble_data;
-	admin_connection_t *admin_connection = (admin_connection_t *)ble_data->ble_connection;
+	admin_connection_t *admin_connection = 
+		(admin_connection_t *)ble_data->ble_connection;
 	int responceLen;
 	uint8_t *responceBytes = NULL;
 
@@ -1402,11 +1405,11 @@ static int handleGetLogsResponce(const uint8_t* data, int data_length,void* user
 
 		if (admin_connection->has_ble_result && admin_getlogs_responce.has_result) {
 			serverLog(LL_NOTICE, "set admin result to success");
-			admin_connection->ble_result->getlogs_result = admin_getlogs_responce.result;
+			admin_connection->ble_result->getlogs_result= admin_getlogs_responce.result;
 		}
 		// 返回参数给调用进程
 		serverLog(LL_NOTICE, "handle_step3_message bleSetBleResult to ble data");
-		setAdminResultCMDResponse(admin_connection->ble_result, &admin_getlogs_responce, sizeof(IgGetLogsResponse));
+		setAdminResultCMDResponse( admin_connection->ble_result, &admin_getlogs_responce, sizeof(IgGetLogsResponse));
 
 		bleSetBleResult( ble_data, admin_connection->ble_result);
 		// ig_GetLogsResponse_deinit(&admin_getlogs_responce);
@@ -3015,11 +3018,12 @@ int bleSetAdminParam(ble_admin_param_t *admin_param, igm_lock_t *lock)
   return 0;
 }
 
-int bleSetAdminRequest(ble_admin_param_t *admin_param, void *cmd_request, size_t cmd_request_size)
+int bleSetAdminRequest(
+		ble_admin_param_t *admin_param, void *cmd_request, size_t cmd_request_size)
 {
-	if (!cmd_request)
-		return 1;
-	if (admin_param->cmd_request) {
+	if (!cmd_request) return 1;
+	if (admin_param->cmd_request)
+	{
 		free(admin_param->cmd_request);
 		admin_param->cmd_request_size = 0;
 	} 

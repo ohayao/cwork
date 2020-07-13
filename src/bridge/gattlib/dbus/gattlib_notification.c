@@ -148,57 +148,57 @@ static gboolean on_handle_characteristic_indication(
 }
 
 static int connect_signal_to_characteristic_uuid(gatt_connection_t* connection, const uuid_t* uuid, void *callback) {
-	gattlib_context_t* conn_context = connection->context;
+    gattlib_context_t* conn_context = connection->context;
 
-	struct dbus_characteristic dbus_characteristic = get_characteristic_from_uuid(connection, uuid);
-	if (dbus_characteristic.type == TYPE_NONE) {
-		puts("Not found");
-		return GATTLIB_NOT_FOUND;
-	}
+    struct dbus_characteristic dbus_characteristic = get_characteristic_from_uuid(connection, uuid);
+    if (dbus_characteristic.type == TYPE_NONE) {
+        puts("Not found");
+        return GATTLIB_NOT_FOUND;
+    }
 #if BLUEZ_VERSION > BLUEZ_VERSIONS(5, 40)
-	else if (dbus_characteristic.type == TYPE_BATTERY_LEVEL) {
-		// Register a handle for notification
-		g_signal_connect(dbus_characteristic.battery,
-			"g-properties-changed",
-			G_CALLBACK (on_handle_battery_level_property_change),
-			connection);
+    else if (dbus_characteristic.type == TYPE_BATTERY_LEVEL) {
+        // Register a handle for notification
+        g_signal_connect(dbus_characteristic.battery,
+                "g-properties-changed",
+                G_CALLBACK (on_handle_battery_level_property_change),
+                connection);
 
-		return GATTLIB_SUCCESS;
-	} else {
-		assert(dbus_characteristic.type == TYPE_GATT);
-	}
+        return GATTLIB_SUCCESS;
+    } else {
+        assert(dbus_characteristic.type == TYPE_GATT);
+    }
 #endif
 
-	// Register a handle for notification
-	gulong signal_id = g_signal_connect(dbus_characteristic.gatt,
-		"g-properties-changed",
-		G_CALLBACK(callback),
-		connection);
-	if (signal_id == 0) {
-		fprintf(stderr, "Failed to connect signal to DBus GATT notification\n");
-		return GATTLIB_ERROR_DBUS;
-	}
+    // Register a handle for notification
+    gulong signal_id = g_signal_connect(dbus_characteristic.gatt,
+            "g-properties-changed",
+            G_CALLBACK(callback),
+            connection);
+    if (signal_id == 0) {
+        fprintf(stderr, "Failed to connect signal to DBus GATT notification\n");
+        return GATTLIB_ERROR_DBUS;
+    }
 
-	// Add signal to the list
-	struct gattlib_notification_handle *notification_handle = malloc(sizeof(struct gattlib_notification_handle));
-	if (notification_handle == NULL) {
-		return GATTLIB_OUT_OF_MEMORY;
-	}
-	notification_handle->gatt = dbus_characteristic.gatt;
-	notification_handle->signal_id = signal_id;
-	memcpy(&notification_handle->uuid, uuid, sizeof(*uuid));
-	conn_context->notified_characteristics = g_list_append(conn_context->notified_characteristics, notification_handle);
+    // Add signal to the list
+    struct gattlib_notification_handle *notification_handle = malloc(sizeof(struct gattlib_notification_handle));
+    if (notification_handle == NULL) {
+        return GATTLIB_OUT_OF_MEMORY;
+    }
+    notification_handle->gatt = dbus_characteristic.gatt;
+    notification_handle->signal_id = signal_id;
+    memcpy(&notification_handle->uuid, uuid, sizeof(*uuid));
+    conn_context->notified_characteristics = g_list_append(conn_context->notified_characteristics, notification_handle);
 
-	GError *error = NULL;
-	org_bluez_gatt_characteristic1_call_start_notify_sync(dbus_characteristic.gatt, NULL, &error);
+    GError *error = NULL;
+    org_bluez_gatt_characteristic1_call_start_notify_sync(dbus_characteristic.gatt, NULL, &error);
 
-	if (error) {
-		fprintf(stderr, "Failed to start DBus GATT notification: %s\n", error->message);
-		g_error_free(error);
-		return GATTLIB_ERROR_DBUS;
-	} else {
-		return GATTLIB_SUCCESS;
-	}
+    if (error) {
+        fprintf(stderr, "Failed to start DBus GATT notification: %s\n", error->message);
+        g_error_free(error);
+        return GATTLIB_ERROR_DBUS;
+    } else {
+        return GATTLIB_SUCCESS;
+    }
 }
 
 static int disconnect_signal_to_characteristic_uuid(gatt_connection_t* connection, const uuid_t* uuid, void *callback) {
