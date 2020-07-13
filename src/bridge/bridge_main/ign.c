@@ -53,7 +53,7 @@ int SendMQTTMsg(ign_MsgInfo* msg, char* topic) {
             serverLog(LL_ERROR, "MQTT_sendMessage err[%d], do reconnection.", ret);
             do {
                 ret = Init_MQTT(&g_sysif.mqtt_c);
-            } while (0 != ret);
+            } while (NULL == g_sysif.mqtt_c); //0 != ret);
 
 			ret = MQTTClient_subscribe(g_sysif.mqtt_c, TOPIC_SUB, 1);
 			if(MQTTCLIENT_SUCCESS != ret){
@@ -196,7 +196,7 @@ void saveTaskData(task_node_t* ptn) {
 						printf( "get lock logs error\n");
 					} else {
 						IgGetLogsResponse *get_logs_response = admin_get_logs_result->cmd_response;
-						printf( "get lock logs success data size [%lu]\n", get_logs_response->data_size);
+						printf( "get lock logs success size [%lu], data[%s]\n", get_logs_response->data_size, get_logs_response->data);
 						// send get_logs_response.data;
 						Sync_Activities(ptn->lock_id, get_logs_response->data, get_logs_response->data_size);
 					}   
@@ -213,7 +213,7 @@ void saveTaskData(task_node_t* ptn) {
 						igm_lock_t *lock = bleGetNResult(ble_data, j, sizeof(igm_lock_t));
 						serverLog(LL_NOTICE, "name %s  addr: %s", lock->name, lock->addr);
 						insertLock(lock);
-						// test 需要, 
+						// test éè¦, 
 						// if (!lock->paired)
 						// {
 						//     serverLog(LL_NOTICE, "try to pair name %s  addr: %s", lock->name, lock->addr);
@@ -227,8 +227,8 @@ void saveTaskData(task_node_t* ptn) {
 					serverLog(LL_NOTICE, "saving ble TASK_BLE_PAIRING data");
 					ble_pairing_result_t *pairing_result = (ble_pairing_result_t *)ble_data->ble_result;
 					igm_lock_t *lock = findLockByAddr(pairing_result->addr);
-					// 只有找到这把锁, 并且匹配成功, 成保存称为Paired
-					// 添加任务, 纯属测试需要
+					// åªææ¾å°è¿æé, å¹¶ä¸å¹éæå, æä¿å­ç§°ä¸ºPaired
+					// æ·»å ä»»å¡, çº¯å±æµè¯éè¦
 					if (lock && pairing_result->pairing_successed)
 					{
 						serverLog(LL_NOTICE, "set name %s addr %s to paired", lock->name, lock->addr);
@@ -404,20 +404,20 @@ int FSMHandle(task_node_t* tn) {
         serverLog(LL_ERROR, "sm_table is NULL.");
         return -1;
     }
-    // sizeof 在定义某数组的时候, sizeof 指针 返回整个数组的字节数
-    // sizeof 对指针的时候, 只能返回指针大小
-    // sizeof 对指针所知数组的某个内容的时候, 只能返回该项大小, 
-    // 也就是只会返回 sm_table 当中某一项的大小
-    // 所以我手动返回了长度.
+    // sizeof å¨å®ä¹ææ°ç»çæ¶å, sizeof æé è¿åæ´ä¸ªæ°ç»çå­èæ°
+    // sizeof å¯¹æéçæ¶å, åªè½è¿åæéå¤§å°
+    // sizeof å¯¹æéæç¥æ°ç»çæä¸ªåå®¹çæ¶å, åªè½è¿åè¯¥é¡¹å¤§å°, 
+    // ä¹å°±æ¯åªä¼è¿å sm_table å½ä¸­æä¸é¡¹çå¤§å°
+    // æä»¥ææå¨è¿åäºé¿åº¦.
 	unsigned int table_max_num = tn->sm_table_len;
     serverLog(LL_NOTICE, "table_max_num %d", table_max_num);
 	int flag = 0;
-    // 这儿是遍历所有的状态.
+    // è¿å¿æ¯éåææçç¶æ.
 	for (int i = 0; i<table_max_num; i++) {
         serverLog(LL_NOTICE, "FSMHandle state[%d].", i);
 		if (tn->cur_state == tn->task_sm_table[i].cur_state) {
 			serverLog(LL_NOTICE, "eventActFun begin---------------, tn->task_sm_table[%d].cur_state[%d].", i, tn->task_sm_table[i].cur_state);
-            // 增加一个判断当前函数, 是否当前函数出错. 0 表示没问题
+            // å¢å ä¸ä¸ªå¤æ­å½åå½æ°, æ¯å¦å½åå½æ°åºé. 0 è¡¨ç¤ºæ²¡é®é¢
 			int event_result = tn->task_sm_table[i].eventActFun(tn);
             if (event_result)
             {
@@ -509,18 +509,18 @@ int GetUserInfo(void* si) {
 
 int Init_MQTT(MQTTClient* p_mqtt){
     *p_mqtt = MQTT_initClients(HOST, g_sysif.mac, 60, 1, CA_PATH, TRUST_STORE, PRIVATE_KEY, KEY_STORE);
-    if(NULL == p_mqtt) {
+    if(NULL == *p_mqtt) {
         serverLog(LL_ERROR, "MQTT_initClients err, mqtt_c is NULL.");
         return -1;
     }
-	printf("MQTT_initClients, mqtt_c[%x], addr[%x]\n", p_mqtt, &p_mqtt);
+	serverLog(LL_DEBUG, "MQTT_initClients succ, mqtt_c[%x], addr[%x]\n", p_mqtt, &p_mqtt);
 	return 0;
 }
 
 int Init_Ble(sysinfo_t* si) {
 	char device_address[] = "EC:09:02:7F:4B:09";
-	char admin_key[] = "BD3967AE24FD72B750C4E48B89294592";
-	char passwd[] = "7E2113D9235EA288";
+	char admin_key[] = "96eb72d2852d41df94dac37eb3241caa";
+	char passwd[] = "63c5bd7dd34fe863";
 
 	LockInfo_t *li = (LockInfo_t*) malloc(sizeof(LockInfo_t));
 	if (NULL==li) {
@@ -651,7 +651,7 @@ int Init(void* tn) {
     return 0;
 }
 
-//处理web端消息
+//å¤çwebç«¯æ¶æ¯
 int DoWebMsg(char *topic,void *payload){
     printf("^^^^^^^^^^^^^^^^web msg^^^^^^^^^^^^^^^\n");
     cJSON *root=NULL;
@@ -689,7 +689,7 @@ void WaitMQTT(sysinfo_t *si) {
 		char *topic = NULL;
 		int topicLen;
 		MQTTClient_message *msg = NULL;
-		printf("will do MQTTClient_receive, mqtt_c[%x], addr[%s]\n", si->mqtt_c, &si->mqtt_c);
+		//printf("will do MQTTClient_receive, mqtt_c[%x], addr[%s]\n", si->mqtt_c, &si->mqtt_c);
 		int rc = MQTTClient_receive(si->mqtt_c, &topic, &topicLen, &msg, 1e3);
 		if (0 != rc) {
 			serverLog(LL_ERROR, "MQTTClient_receive err[%d], topic[%s].", rc, topic);
@@ -741,7 +741,8 @@ void WaitMQTT(sysinfo_t *si) {
 							ign_ServerEventData *psd = &tmsg.server_data;
 							psd->lock_entries_count = 5;
 							int tl=0;
-							for(int i=0;i<5;i++){
+							printf("recv User Info, lock_count[%u].\n", imsg.server_data.lock_entries_count);
+							for(int i=0; i<imsg.server_data.lock_entries_count; i++){
 								if(strlen(imsg.server_data.lock_entries[i].bt_id)>0){
 									tl++;
 									strcpy(psd->lock_entries[i].bt_id,imsg.server_data.lock_entries[i].bt_id);
@@ -796,8 +797,8 @@ void WaitMQTT(sysinfo_t *si) {
 							//char passwd[] = "35f1cfb6f8bee257";
 
 							char device_address[] = "EC:09:02:7F:4B:09";
-							char admin_key[] = "BD3967AE24FD72B750C4E48B89294592";
-							char passwd[] = "7E2113D9235EA288";
+							char admin_key[] = "96eb72d2852d41df94dac37eb3241caa";
+							char passwd[] = "63c5bd7dd34fe863";
 
 							setLockName(lock, imsg.server_data.demo_job.bt_id, strlen(imsg.server_data.demo_job.bt_id));
 							setLockAddr(lock, device_address, strlen(device_address));
@@ -926,29 +927,29 @@ void visitScanResult(ble_data_t *ble_data)
     bleReleaseData(&ble_data);
 }
 
-// 添加扫描方式样例
-// ble_data 里面全市
+// æ·»å æ«ææ¹å¼æ ·ä¾
+// ble_data éé¢å¨å¸
 void addDiscoverTask(int msg_id)
 {
-    // 设置需要的参数
+    // è®¾ç½®éè¦çåæ°
     serverLog(LL_NOTICE, "Add Discover task");
     serverLog(LL_NOTICE, "1. set ble parameters");
     ble_discover_param_t discover_param;
     serverLog(LL_NOTICE, "1. set scan_timeout to 3");
     discover_param.scan_timeout = 2;
     serverLog(LL_NOTICE, "2. set msg_id to 0(or anything you want)");
-    // 把参数写入data, 当前有个问题就是, 使用完, 得访问的人记的释放.
+    // æåæ°åå¥data, å½åæä¸ªé®é¢å°±æ¯, ä½¿ç¨å®, å¾è®¿é®çäººè®°çéæ¾.
     serverLog(LL_NOTICE, "3. alloc ble data datatype, ble_data is used to devliver parameters and get result data");
     ble_data_t *ble_data = calloc(sizeof(ble_data_t), 1);
     serverLog(LL_NOTICE, "3. init ble_data");
     bleInitData(ble_data);
     serverLog(LL_NOTICE, "3. set ble parametes to ble data");
     bleSetBleParam(ble_data, &discover_param, sizeof(ble_discover_param_t));
-    // 与记有多少个结果, 30个锁
+    // ä¸è®°æå¤å°ä¸ªç»æ, 30ä¸ªé
     serverLog(LL_NOTICE, "3. init ble result memory, suppose the max num of locks is 30");
     bleInitResults(ble_data, 30, sizeof(igm_lock_t));
 
-    // 插入系统的队列
+    // æå¥ç³»ç»çéå
     serverLog(LL_NOTICE, "4. used InsertBle2DFront to insert the task to system.");
     InsertBle2DTail(msg_id, BLE_DISCOVER_BEGIN, 
         ble_data, sizeof(ble_data_t),
@@ -1022,10 +1023,10 @@ int main() {
         } else {
             serverLog(LL_NOTICE,"doing_task_head not empty, do it.-----------");
         // if doing list has task
-            // 获取当前doing list 的头部
+            // è·åå½ådoing list çå¤´é¨
             task_node_t *ptn = GetDHeadNode();
             while (ptn) {
-                // TODO, 当任务完成,需要怎么处理?
+                // TODO, å½ä»»å¡å®æ,éè¦æä¹å¤ç?
                 int ret = FSMHandle(ptn);
                 if(ret) {
                     serverLog(LL_NOTICE, "one mission error[%d].", ret);
@@ -1033,7 +1034,7 @@ int main() {
                     serverLog(LL_NOTICE, "one mission finished, delete this task");
                 }
                 saveTaskData(ptn);
-                DeleteDTask(&ptn); // 自动置 ptn 为 NULL
+                DeleteDTask(&ptn); // èªå¨ç½® ptn ä¸º NULL
                 
                 task_node_t *tmp = NextDTask(ptn);
                 if (tmp) {
@@ -1052,7 +1053,7 @@ int main() {
 
 /*
 void addAdminDoLockTask(igm_lock_t *lock) {
-    // 设置需要的参数
+    // è®¾ç½®éè¦çåæ°
     serverLog(LL_NOTICE, "Add Admin Unlock task");
     serverLog(LL_NOTICE, "1. set ble admin Unlock parameters");
     ble_admin_param_t *admin_param = (ble_admin_param_t *)calloc(sizeof(ble_admin_param_t), 1);
@@ -1060,7 +1061,7 @@ void addAdminDoLockTask(igm_lock_t *lock) {
     bleSetAdminParam(admin_param, lock);
     serverLog(LL_NOTICE, "2. set msg_id to 4(or anything you want)");
 	int msg_id = GetMsgID();
-    // 把参数写入data, 当前有个问题就是, 使用完, 得访问的人记的释放.
+    // æåæ°åå¥data, å½åæä¸ªé®é¢å°±æ¯, ä½¿ç¨å®, å¾è®¿é®çäººè®°çéæ¾.
     serverLog(LL_NOTICE, "3. alloc ble data datatype, ble_data is used to devliver parameters and get result data");
     ble_data_t *ble_data = calloc(sizeof(ble_data_t), 1);
     serverLog(LL_NOTICE, "3. init ble_data");
@@ -1068,7 +1069,7 @@ void addAdminDoLockTask(igm_lock_t *lock) {
     serverLog(LL_NOTICE, "3. set ble parametes to ble data");
     bleSetBleParam(ble_data, admin_param, sizeof(ble_admin_param_t));
 
-    // 插入系统的队列
+    // æå¥ç³»ç»çéå
     serverLog(LL_NOTICE, "4. used InsertBle2DFront to insert the task to system.");
     InsertBle2DFront(msg_id, BLE_ADMIN_BEGIN, 
         ble_data, sizeof(ble_data_t), lock->lock_cmd, lock->lock_cmd_size,
@@ -1156,7 +1157,7 @@ int testGetLockBattery(igm_lock_t *lock) {
 
     for (int j = 0; j < fsm_max_n; j++) {
         if (current_state == tn->task_sm_table[j].cur_state) {
-            // 增加一个判断当前函数, 是否当前函数出错. 0 表示没问题
+            // å¢å ä¸ä¸ªå¤æ­å½åå½æ°, æ¯å¦å½åå½æ°åºé. 0 è¡¨ç¤ºæ²¡é®é¢
 			int event_result = tn->task_sm_table[j].eventActFun(tn);
             if (event_result) {
                 printf("%d step error[%d]\n", j, event_result);
@@ -1210,7 +1211,7 @@ int testLock(igm_lock_t *lock) {
 
     for (int j = 0; j < fsm_max_n; j++) {
         if (current_state == tn->task_sm_table[j].cur_state) {
-            // 增加一个判断当前函数, 是否当前函数出错. 0 表示没问题
+            // å¢å ä¸ä¸ªå¤æ­å½åå½æ°, æ¯å¦å½åå½æ°åºé. 0 è¡¨ç¤ºæ²¡é®é¢
 			int event_result = tn->task_sm_table[j].eventActFun(tn);
             if (event_result) {
                 serverLog(LL_ERROR, "%d step error", j);
@@ -1229,7 +1230,7 @@ int testLock(igm_lock_t *lock) {
     //saveTaskData(tn);
     ble_admin_result_t *admin_unlock_result = (ble_admin_result_t *)ble_data->ble_result;
     ig_AdminLockResponse_deinit(admin_unlock_result->cmd_response);
-    // 这儿是释放结果, 因为已经用完
+    // è¿å¿æ¯éæ¾ç»æ, å ä¸ºå·²ç»ç¨å®
     releaseAdminResult(&admin_unlock_result);
     bleReleaseBleResult(ble_data);
     free(ble_data);
@@ -1269,7 +1270,7 @@ int testCreatePin(igm_lock_t *lock, IgCreatePinRequest *request) {
 
     for (int j = 0; j < fsm_max_n; j++) {
         if (current_state == tn->task_sm_table[j].cur_state) {
-            // 增加一个判断当前函数, 是否当前函数出错. 0 表示没问题
+            // å¢å ä¸ä¸ªå¤æ­å½åå½æ°, æ¯å¦å½åå½æ°åºé. 0 è¡¨ç¤ºæ²¡é®é¢
 			int event_result = tn->task_sm_table[j].eventActFun(tn);
             if (event_result) {
                 printf("%d step error.\n", j);
@@ -1295,8 +1296,8 @@ int testCreatePin(igm_lock_t *lock, IgCreatePinRequest *request) {
     ble_data = NULL;
     free(tn);
     tn = NULL;
-    // 一定要等到现在才能释放, 因为里面的内容, 是会
-    // 被复制, 然后使用
+    // ä¸å®è¦ç­å°ç°å¨æè½éæ¾, å ä¸ºéé¢çåå®¹, æ¯ä¼
+    // è¢«å¤å¶, ç¶åä½¿ç¨
     free(admin_param);
     admin_param = NULL;
     printf( "lock end-------\n");
@@ -1330,7 +1331,7 @@ int testDeletePin(igm_lock_t *lock, IgDeletePinRequest *request) {
 
     for (int j = 0; j < fsm_max_n; j++) {
         if (current_state == tn->task_sm_table[j].cur_state) {
-            // 增加一个判断当前函数, 是否当前函数出错. 0 表示没问题
+            // å¢å ä¸ä¸ªå¤æ­å½åå½æ°, æ¯å¦å½åå½æ°åºé. 0 è¡¨ç¤ºæ²¡é®é¢
             int event_result = tn->task_sm_table[j].eventActFun(tn);
             if (event_result) {
                 printf("[%d] step error.\n", j);
