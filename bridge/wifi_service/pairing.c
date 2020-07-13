@@ -16,6 +16,7 @@
 #define kCcmInternalCounterLength 3
 #define kDstArrayLen 256
 #define kSha256Len 32
+// #define UINT32_MAX 4294967295
 
 enum {
   kPrivateKeyLength=32,
@@ -43,6 +44,15 @@ static uint8_t client_pairing_public_key[kPublicKeyLength];
 
 
 static PAIRING_STATUS flag_pairing_status;
+
+void printRecvData(RecvData *recv_data)
+{
+  printf("RecvData: \n");
+  printf("data_len: %u\n", recv_data->data_len);
+  printf("recv_len: %u\n", recv_data->recv_len);
+  printf("pkg_len: %u\n", recv_data->pkg_len);
+  return;
+}
 
 //传递数据, 获得这段数据的长度
 uint16_t getDataLength(uint8_t data[], uint16_t *n_size_byte, uint16_t *pkg_len)
@@ -77,6 +87,7 @@ int freeRecvAllocData(RecvData *recv_pairing_data)
     return 1;
   }
   free(recv_pairing_data->data);
+  recv_pairing_data->data = NULL;
   recv_pairing_data->data_len = 0;
   recv_pairing_data->recv_len = 0;
   recv_pairing_data->n_size_byte = 0;
@@ -146,10 +157,26 @@ int copyData(RecvData *recv_pairing_data, uint8_t *data, uint16_t data_length)
   return 0;
 }
 
+void resetRecvData(RecvData *recv_pairing_data)
+{
+  if (!recv_pairing_data)
+    return;
+  if (recv_pairing_data->data)
+  {
+    freeRecvAllocData(recv_pairing_data);
+  }
+  setRecvDataStatus(recv_pairing_data, NONE);
+}
+
 // 
 void recvData(RecvData *recv_pairing_data, uint8_t * data, uint16_t data_length)
 {
   // serverLog(LL_NOTICE, "int recvData -------------------");
+  if (!recv_pairing_data) return;
+  // if (recv_pairing_data->recv_status == FINISHED_SUCCESS)
+  // {
+  //   resetRecvData(recv_pairing_data);
+  // }
   int err = 0;
   uint16_t pkg_len = 0;
   switch (recv_pairing_data->recv_status)
@@ -159,6 +186,7 @@ void recvData(RecvData *recv_pairing_data, uint8_t * data, uint16_t data_length)
       // 创建新的存储空间, 准备接收
       // serverLog(LL_NOTICE, "recvData NONE-------------------");
       // 所获得的, 是 整个蓝牙包 (长度+加密报文)
+      // 首先释放数据
       pkg_len = getDataLength(data, &(recv_pairing_data->n_size_byte), &recv_pairing_data->pkg_len);
       // serverLog(LL_NOTICE, "pkg_len: %d", pkg_len);
       if (allocRecvData(recv_pairing_data, pkg_len))
@@ -448,13 +476,28 @@ int decryptClientData(
   uint8_t *data_out, uint32_t data_out_len,
   uint32_t *bytes_written)
 { 
-
+  // printf("==========================\n");
+  // printf("data_in_len: %u\n", data_in_len);
+  // for(int i = 0; i < data_in_len; i += 20)
+  // {
+  //   for (int j = 0; j < 20; ++j)
+  //   {
+  //     printf(" %x", data_in[i+j]);
+  //   }
+  //   printf("\n");
+  // }
+  // for (int i = 0; i < kNonceLength; i++)
+  // {
+  //   printf(" %x", server_nonce[i]);
+  // }
+  // printf("\n");
   *bytes_written = decryptData
     (data_in, data_in_len, 
     data_out, data_out_len, 
     server_pairing_admin_key, kConnectionKeyLength,
-    client_nonce, kNonceLength
+    server_nonce, kNonceLength
   );
-  if (*bytes_written == 0) return 1;
+  // printf("bytes_written: %u\n", *bytes_written);
+  if (*bytes_written == UINT32_MAX) return 1;
   return 0;
 }

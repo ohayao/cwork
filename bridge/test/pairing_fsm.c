@@ -74,6 +74,8 @@ int fakeRecvData(void *arg)
     serverLog(LL_ERROR, "fakeRecvData  recv_pairing_data null");
     return 1;
   }
+  //
+  // printRecvData(recv_pairing_data);
 
   // 接收数据部分
   for (int i = 0 ; i < fake_transmit_payloadBytes_len; )
@@ -110,6 +112,7 @@ int fakeRecvData(void *arg)
     }
     i += copy_len;
   }
+  printRecvData(recv_pairing_data);
 }
 
 // 处理写的事件
@@ -124,10 +127,33 @@ int handleWriteStep1(void *arg)
     return 1;
   }
 
+  // test 
+  printf("=============== handleWriteStep1 ==================\n");
+  printf("fake_transmit_payloadBytes_len: %u\n", fake_transmit_payloadBytes_len);
+  for (int i = 0; i < fake_transmit_payloadBytes_len; i += ble_pkg_limit)
+  {
+    for (int j = 0; j < ble_pkg_limit; ++j)
+    {
+      printf(" %x", fake_transmit_payloadBytes[i+j]);
+    }
+    printf("\n");
+  }
+
   fakeRecvData(arg);  
 
   if(isRecvFullPkg(recv_pairing_data))
   {
+    printf("-------handleWriteStep1 recv_pairing_data----------- \n");
+    printf("recv_pairing_data->data_len: %u\n", recv_pairing_data->data_len);
+    for (int i = 0; i < recv_pairing_data->data_len; i+=20)
+    {
+      for (int j = 0; j < 20; j++)
+      {
+        printf(" %x", recv_pairing_data->data[i+j]);
+      }
+      printf("\n");
+    }
+
     // 收到的包, 是全部的,需要自己取出来
     serverLog(LL_NOTICE, "isRecvFullPkg");
     size_t step1_len = 0;
@@ -202,8 +228,7 @@ int handleWriteStep1(void *arg)
     free(step1_payload_bytes);
     step1_payload_bytes = NULL;
   }
-
-  
+  resetRecvData(recv_pairing_data);
   return ret;
 }
 
@@ -225,9 +250,6 @@ int handleReplyStep2(void *arg)
   uint8_t *step3Bytes = NULL;
   size_t step3Bytes_len = 0;
 
-  free(step3Bytes);
-  step3Bytes = NULL;
-
   step3Bytes_len = igloohome_ble_lock_crypto_PairingConnection_genPairingStep3Native(
     step2_len, fake_transmit_payloadBytes+n_size_byte, &step3Bytes);
   free(fake_transmit_payloadBytes);
@@ -241,14 +263,34 @@ int handleReplyStep2(void *arg)
   }
   serverLog(LL_NOTICE, "genPairingStep3Native Success");
 
+  uint8_t *payloadBytes = NULL;
+  size_t payload_len = 0;
+
+  if (!build_msg_payload(
+		&payloadBytes, &payload_len, step3Bytes, step3Bytes_len))
+	{
+    serverLog(LL_ERROR, "build_msg_payload failed!");
+		return 1;
+	}
+  // serverLog(LL_NOTICE, "build_msg_payload success!");
+
   // 在这儿, 成功生成了 step3
   // 我们 把它拷贝到 fake_transmit_payloadBytes, 假装发送
   if(fake_transmit_payloadBytes) free(fake_transmit_payloadBytes);
   fake_transmit_payloadBytes = NULL;
-  fake_transmit_payloadBytes = malloc(step3Bytes_len);
-  memcpy(fake_transmit_payloadBytes, step3Bytes, step3Bytes_len);
-  fake_transmit_payloadBytes_len = step3Bytes_len;
-
+  fake_transmit_payloadBytes = malloc(payload_len);
+  memcpy(fake_transmit_payloadBytes, payloadBytes, payload_len);
+  fake_transmit_payloadBytes_len = payload_len;
+  if (step3Bytes)
+  {
+    free(step3Bytes);
+    step3Bytes = NULL;
+  }
+  if (payloadBytes)
+  {
+    free(payloadBytes);
+    payloadBytes = NULL;
+  }
   return 0;
 }
 
@@ -264,7 +306,31 @@ int handleWriteStep3(void *arg)
     return 1;
   }
 
+  // test 
+  // printf("=============== handleWriteStep3 ==================\n");
+  // printf("fake_transmit_payloadBytes_len: %u\n", fake_transmit_payloadBytes_len);
+  // for (int i = 0; i < fake_transmit_payloadBytes_len; i += ble_pkg_limit)
+  // {
+  //   for (int j = 0; j < ble_pkg_limit; ++j)
+  //   {
+  //     printf(" %x", fake_transmit_payloadBytes[i+j]);
+  //   }
+  //   printf("\n");
+  // }
+  
   fakeRecvData(arg); 
+  // printf("-------handleWriteStep3 recv_pairing_data----------- \n");
+  // printf("recv_pairing_data->data_len: %u\n", recv_pairing_data->data_len);
+  // for (int i = 0; i < recv_pairing_data->data_len; i+=20)
+  // {
+  //   for (int j = 0; j < 20; j++)
+  //   {
+  //     printf(" %x", recv_pairing_data->data[i+j]);
+  //   }
+  //   printf("\n");
+  // }
+
+
   // 开始处理 step3 =============================
   // 确定step3 有加密
   if(isRecvFullPkg(recv_pairing_data))
@@ -289,10 +355,10 @@ int handleWriteStep3(void *arg)
       return 1;
     }
 
-
     uint32_t decrypted_data_in_len = ig_decrypt_data_size(step3_len);
     uint8_t decrypted_data_in[decrypted_data_in_len];
     uint32_t decrypted_bytes_written = 0;
+
     int decrypt_result = decryptClientData(
       step3_payload_bytes, step3_len, 
       decrypted_data_in, decrypted_data_in_len, 
@@ -310,20 +376,19 @@ int handleWriteStep3(void *arg)
     IgPairingStep3 step3;
 	  ig_PairingStep3_init(&step3);
 	  ig_PairingStep3_decode(decrypted_data_in, decrypted_bytes_written, &step3, 0);
-    if (!ig_PairingStep3_is_valid(&step3) 
-    // ||
-		// (step3.has_nonce && ig_PairingStep3_get_nonce_size(&step3) != kNonceLength) ||
-		// (step3.has_pin_key && ig_PairingStep3_get_pin_key_size(&step3) != IG_PIN_KEY_LENGTH) ||
-		// (step3.has_password && ig_PairingStep3_get_password_size(&step3) != IG_PASSWORD_LENGTH) ||
-		// (step3.has_master_pin && ig_PairingStep3_get_master_pin_size(&step3) > IG_MASTER_PIN_MAX_LENGTH) ||
-		// (step3.has_master_pin && ig_PairingStep3_get_master_pin_size(&step3) < IG_MASTER_PIN_MIN_LENGTH)
+    if (!ig_PairingStep3_is_valid(&step3)  ||
+		(step3.has_nonce && ig_PairingStep3_get_nonce_size(&step3) != kNonceLength) ||
+		(step3.has_pin_key && ig_PairingStep3_get_pin_key_size(&step3) != IG_PIN_KEY_LENGTH) ||
+		(step3.has_password && ig_PairingStep3_get_password_size(&step3) != IG_PASSWORD_LENGTH) ||
+		(step3.has_master_pin && ig_PairingStep3_get_master_pin_size(&step3) > IG_MASTER_PIN_MAX_LENGTH) ||
+		(step3.has_master_pin && ig_PairingStep3_get_master_pin_size(&step3) < IG_MASTER_PIN_MIN_LENGTH)
     ) 
     {
       serverLog(LL_ERROR, "ig_PairingStep3_is_valid error");
       ig_PairingStep3_deinit(&step3);
       return IG_ERROR_INVALID_MESSAGE;
     }
-
+    serverLog(LL_NOTICE, "ig_PairingStep3_is_valid");
 
   }
 

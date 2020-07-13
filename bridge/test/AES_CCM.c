@@ -211,7 +211,7 @@ int main(int argc, char *argv[])
           server_shared_key, kConnectionKeyLength,
           client_Nonce_, kNonceLength
   );
-
+  printf("----------- server_decrypt_data_len: %u\n", server_decrypt_data_len);
   if (server_decrypt_data_len < 0) {
     serverLog(LL_ERROR, "decryptData error");
     return 1;

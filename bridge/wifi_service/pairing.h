@@ -90,4 +90,6 @@ int decryptClientData(
   uint32_t *bytes_written);
 void incrementClientNonce();
 void incrementServerNonce();
+void printRecvData(RecvData *recv_data);
+void resetRecvData(RecvData *recv_pairing_data);
 #endif

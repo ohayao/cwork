@@ -99,7 +99,6 @@ int32_t decryptData(uint8_t *dataIn, uint32_t dataInLen, uint8_t *dataOut,
         return -1;
     }
         
-
     cf_aes_context aes_ctx;
     cf_aes_init(&aes_ctx, key, keyLen);
 
