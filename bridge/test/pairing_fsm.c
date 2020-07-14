@@ -359,10 +359,44 @@ int handleWriteStep3(void *arg)
     if (payloadBytes) free(payloadBytes);
     payloadBytes = NULL;
   }
+  return 0;
+}
+
+// client 接收到了 step4
+int handleReplyStep4(void *arg)
+{
+  serverLog(LL_NOTICE, "handleReplyStep4 ----------------");
+  int ret = 0;
+  uint16_t step4_len = 0;
+  uint16_t n_size_byte = 0;
+  uint16_t pkg_len = 0;
+  pkg_len = getDataLength(
+    fake_transmit_payloadBytes, &n_size_byte, &step4_len);
+  if (pkg_len == 0)
+  {
+    serverLog(LL_ERROR, "getRecvPkgLen error");
+    return 1;
+  }
+  serverLog(LL_NOTICE, "step4_len: %u, n_size_byte %u, pkg_len %u", step4_len, n_size_byte, pkg_len);
+
+  uint8_t *encrypt_step4_bytes = NULL;
+  size_t encrypt_step4_bytes_len = 0;
+
+  encrypt_step4_bytes_len = igloohome_ble_lock_crypto_PairingConnection_recPairingStep4Native(
+		step4_len, 
+    fake_transmit_payloadBytes+n_size_byte, 
+    &encrypt_step4_bytes
+	);
+  if (!encrypt_step4_bytes_len)
+	{
+    serverLog(LL_ERROR, "igloohome_ble_lock_crypto_PairingConnection_recPairingStep4Native error");
+    return 1;
+  }
 
   
 
-  return 0;
+  if (encrypt_step4_bytes) free(encrypt_step4_bytes);
+  encrypt_step4_bytes = NULL;
 }
 
 int handleWriteCommit(void *arg)
@@ -519,6 +553,8 @@ int main(int argc, char *argv[])
   // serverLog(LL_NOTICE, "recv_pairing_data->n_size_byte: %u", recv_pairing_data->n_size_byte);
 
   // 到这儿, server生成了 step4 给client, 然后client要接收
+  handleReplyStep4(argv);
+
   // // 打印复制的包, 肉眼可以看到是拷贝对了
   // serverLog(LL_NOTICE, "printf copy data");
   // for (int i = 0; i < payload_len; i++)

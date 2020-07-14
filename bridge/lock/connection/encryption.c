@@ -98,7 +98,7 @@ int32_t decryptData(uint8_t *dataIn, uint32_t dataInLen, uint8_t *dataOut,
         serverLog(LL_ERROR, "decryptData nonceLen != kNonceLength");
         return -1;
     }
-        
+    
     cf_aes_context aes_ctx;
     cf_aes_init(&aes_ctx, key, keyLen);
 
@@ -112,6 +112,7 @@ int32_t decryptData(uint8_t *dataIn, uint32_t dataInLen, uint8_t *dataOut,
         NULL, 0, nonce, kNonceLength, tag, tagLen, dataOut);
     // serverLog(LL_NOTICE, "decryptData result %d", result);
 //    Log_d(kTag, "decrypt result = %i", result);
+    printf("xxxxxxxxxxxxx result %d\n", result);
     uint32_t bytesWritten = decryptDataSize(dataInLen);
     cf_aes_finish(&aes_ctx);
     if (result) {

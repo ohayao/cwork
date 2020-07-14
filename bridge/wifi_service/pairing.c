@@ -384,6 +384,12 @@ int server_gen_pairing_step2(
     serverLog(LL_ERROR, "uECC_make_key for client error");
     return 1;
   }
+  printf("------------- server_pairing_public_key: ");
+  for (int i = 0; i< 64; i++)
+  {
+    printf(" %x", server_pairing_public_key[i]);
+  }
+  printf("\n");
 
   // 显示输出 client
   // serverLog(LL_NOTICE, "client_publicKey_ :");
@@ -428,10 +434,33 @@ int server_gen_pairing_step2(
     serverLog(LL_ERROR, "uECC_shared_secret err");
     return 1;
   }
+  printf("------------- client_pairing_public_key: ");
+  for (int i = 0; i< 64; i++)
+  {
+    printf(" %x", client_pairing_public_key[i]);
+  }
+  printf("\n");
+  printf("------------- server_pairing_private_key: ");
+  for (int i = 0; i< 64; i++)
+  {
+    printf(" %x", server_pairing_private_key[i]);
+  }
+  printf("\n");
+  printf("------------- shared_secret: ");
+  for (int i = 0; i< 32; i++)
+  {
+    printf(" %x", shared_secret[i]);
+  }
+  printf("\n");
 
   // truncate to get admin key
 	memcpy(server_pairing_admin_key, shared_secret, IG_KEY_LENGTH);
-
+  printf("------------- shared_secret: ");
+  for (int i = 0; i< 16; i++)
+  {
+    printf(" %x", server_pairing_admin_key[i]);
+  }
+  printf("\n");
   ig_PairingStep1_deinit(&step1);
 	ig_PairingStep2_deinit(&step2);
 
@@ -703,6 +732,18 @@ IgErrorCode ig_pairing_step4(
 	}
 
   uint32_t encrypted_bytes_written = 0;
+  printf("-----------server_pairing_admin_key: ");
+  for (int i = 0; i < 16; i++)
+  {
+    printf(" %x", server_pairing_admin_key[i]);
+  }
+  printf("\n");
+  printf("-----------client_nonce: ");
+  for (int i = 0; i < 12; i++)
+  {
+    printf(" %x", client_nonce[i]);
+  }
+  printf("\n");
   encrypted_bytes_written = encryptData(
     step4_serialized, step4_written_bytes, encrypt_step4_bytes, encrypt_step4_bytes_len,
     server_pairing_admin_key, kConnectionKeyLength, client_nonce, kNonceLength);
