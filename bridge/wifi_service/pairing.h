@@ -1,9 +1,13 @@
 #ifndef _PAIRING_H_
 #define _PAIRING_H_
-
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include "bridge/lock/messages/PairingStep1.h"
+#include "bridge/lock/messages/PairingStep2.h"
+#include "bridge/lock/messages/PairingStep3.h"
+#include "bridge/lock/messages/PairingStep4.h"
+#include "bridge/lock/messages/PairingCommit.h"
 
 #define IG_KEY_EXCHANGE_PUBLIC_LENGTH 64
 #define IG_KEY_EXCHANGE_PRIVATE_LENGTH 32
@@ -92,4 +96,16 @@ void incrementClientNonce();
 void incrementServerNonce();
 void printRecvData(RecvData *recv_data);
 void resetRecvData(RecvData *recv_pairing_data);
+int setPairingPinKey(IgPairingStep3 *step3);
+int setPairingPassword(IgPairingStep3 *step3);
+int setMasterPin(IgPairingStep3 *step3);
+int setClientNonce(IgPairingStep3 *step3);
+int setGmtOffset(IgPairingStep3 *step3);
+int setDstTimes(IgPairingStep3 *step3);
+int setIgStep4(IgPairingStep4 *step4);
+uint32_t ig_pairing_step4_size();
+IgErrorCode ig_pairing_step4(
+  uint8_t *encrypt_step3_bytes, uint32_t encrypt_step3_bytes_len, 
+  uint8_t *encrypt_step4_bytes, uint32_t encrypt_step4_bytes_len, 
+  uint32_t *bytes_written);
 #endif

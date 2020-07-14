@@ -1,14 +1,11 @@
 #include "bridge/wifi_service/pairing.h"
+
 #include "bridge/bridge_main/log.h"
-#include "bridge/lock/messages/PairingStep1.h"
-#include "bridge/lock/messages/PairingStep2.h"
-#include "bridge/lock/messages/PairingStep3.h"
-#include "bridge/lock/messages/PairingStep4.h"
-#include "bridge/lock/messages/PairingCommit.h"
-#include "bridge/lock/connection/connection_common.h"
 #include "bridge/lock/cifra/drbg.h"
 #include "bridge/lock/cifra/sha1.h"
 #include "bridge/lock/micro-ecc/uECC.h"
+#include "bridge/lock/connection/connection_common.h"
+
 
 #define kMaxConnections 64
 #define kNonceLength 12
@@ -34,13 +31,15 @@ static uint8_t client_pairing_public_key[kPublicKeyLength];
 // static uint8_t pairing_admin_key[IG_KEY_LENGTH];
 // static uint8_t pairing_rx_nonce[kNonceLength];
 // static uint8_t pairing_tx_nonce[kNonceLength];
-// static uint8_t pairing_pin_key[IG_PIN_KEY_LENGTH];
-// static uint8_t pairing_password[IG_PASSWORD_LENGTH];
-// static uint32_t pairing_master_pin_length;
-// static uint8_t pairing_master_pin[IG_MASTER_PIN_MAX_LENGTH];
-// static int32_t pairing_gmt_offset;
-// static uint32_t pairing_dst_len;
-// static uint8_t pairing_dst[kDstArrayLen];
+
+// 锁的相关设置
+static uint8_t pairing_pin_key[IG_PIN_KEY_LENGTH];
+static uint8_t pairing_password[IG_PASSWORD_LENGTH];
+static uint32_t pairing_master_pin_length;
+static uint8_t pairing_master_pin[IG_MASTER_PIN_MAX_LENGTH];
+static int32_t pairing_gmt_offset;
+static uint32_t pairing_dst_len;
+static uint8_t pairing_dst[kDstArrayLen];
 
 
 static PAIRING_STATUS flag_pairing_status;
@@ -501,3 +500,216 @@ int decryptClientData(
   if (*bytes_written == UINT32_MAX) return 1;
   return 0;
 }
+
+void genRandomVector(int vector_len, uint8_t resultNonceArrar[]) {
+    // time_t t;
+    // srand((unsigned) time(&t));
+    // for (int i = 0; i < vector_len; i++)
+    // {
+    //     resultNonceArrar[i] = rand() % 256; // [0 - 255]
+    // }
+    time_t t;
+    srand((unsigned) time(&t));
+    uint8_t entropy_size=16, nonce_size=8, reseed_size=16;
+    uint8_t entropy[entropy_size], nonce[nonce_size], reseed[reseed_size];
+    
+    for (int i = 0; i < entropy_size; i++)
+    {
+        entropy[i] = rand() % 256;
+    }
+    for (int i = 0; i < nonce_size; i++)
+    {
+        nonce[i] = rand() % 256;
+    }
+    for (int i = 0; i < reseed_size; i++)
+    {
+        reseed[i] = rand() % 256;
+    }
+
+    cf_hmac_drbg ctx;
+    cf_hmac_drbg_init(
+        &ctx, &cf_sha1, 
+        entropy, sizeof entropy, 
+        nonce, sizeof nonce, NULL, 0);
+    cf_hmac_drbg_reseed(
+        &ctx, reseed, sizeof reseed, NULL, 0);
+    cf_hmac_drbg_gen(
+        &ctx, resultNonceArrar, vector_len);
+    return;
+}
+
+int setPairingPinKey(IgPairingStep3 *step3)
+{
+  if (step3->has_pin_key) {
+		memcpy(pairing_pin_key, step3->pin_key, ig_PairingStep3_get_pin_key_size(step3));
+	}
+	else {
+    genRandomVector(sizeof(pairing_pin_key), pairing_pin_key);
+		// nrf_crypto_rng_vector_generate(pairing_pin_key, sizeof(pairing_pin_key));
+		// TEST: hardcoded value
+  //		memset(pairing_pin_key, 0x2, sizeof(pairing_pin_key));
+	}
+  return 0;
+}
+
+int setPairingPassword(IgPairingStep3 *step3)
+{
+  if (step3->has_password) {
+		memcpy(pairing_password, step3->password, ig_PairingStep3_get_password_size(step3));
+	}
+	else {
+		genRandomVector(sizeof(pairing_password), pairing_password);
+		// TEST: hardcoded value
+//		memset(pairing_password, 0x3, sizeof(pairing_password));
+	}
+  return 0;
+}
+
+int setMasterPin(IgPairingStep3 *step3)
+{
+  if (step3->has_master_pin && 
+			ig_PairingStep3_get_master_pin_size(step3) >= IG_MASTER_PIN_MIN_LENGTH && 
+			ig_PairingStep3_get_master_pin_size(step3) <= IG_MASTER_PIN_MAX_LENGTH) {
+		pairing_master_pin_length = ig_PairingStep3_get_master_pin_size(step3);
+		memcpy(pairing_master_pin, step3->master_pin, pairing_master_pin_length);
+	}
+	else {
+		pairing_master_pin_length = IG_MASTER_PIN_DEFAULT_LENGTH;
+		genRandomVector(IG_MASTER_PIN_DEFAULT_LENGTH, pairing_master_pin);
+		for (int i = 0; i < IG_MASTER_PIN_DEFAULT_LENGTH; ++i) {
+			pairing_master_pin[i] = pairing_master_pin[i] % 10;
+			pairing_master_pin[i] = pairing_master_pin[i] + 0x30;
+		}
+	}
+  return 0;
+}
+
+int setClientNonce(IgPairingStep3 *step3)
+{
+  memcpy(client_nonce, step3->nonce, step3->nonce_size);
+  return 0;
+}
+
+int setGmtOffset(IgPairingStep3 *step3)
+{
+  pairing_gmt_offset = step3->has_gmt_offset ? step3->gmt_offset : 0;
+  return 0;
+}
+
+int setDstTimes(IgPairingStep3 *step3)
+{
+  if (step3->has_dst_times) {
+	   	if (ig_PairingStep3_get_dst_times_size(step3) <= kDstArrayLen) {
+			pairing_dst_len = ig_PairingStep3_get_dst_times_size(step3);
+			memcpy(pairing_dst, step3->dst_times, pairing_dst_len);
+		}
+		else {
+			return IG_ERROR_INTERNAL_ERROR;
+		}
+	}
+	else {
+		pairing_dst_len = 0;
+	}
+  return 0;
+}
+
+int setIgStep4(IgPairingStep4 *step4)
+{
+  ig_PairingStep4_init(step4);
+  ig_PairingStep4_set_success(step4, true);
+  ig_PairingStep4_set_pin_key(step4, pairing_pin_key, sizeof(pairing_pin_key));
+  ig_PairingStep4_set_password(step4, pairing_password, sizeof(pairing_password));
+  ig_PairingStep4_set_master_pin(step4, pairing_master_pin, pairing_master_pin_length);
+  ig_PairingStep4_set_gmt_offset(step4, pairing_gmt_offset);
+  return 0;
+}
+
+uint32_t ig_pairing_step4_size() {
+	IgPairingStep4 step4;
+	ig_PairingStep4_init(&step4);
+	ig_PairingStep4_set_success(&step4, true);
+	ig_PairingStep4_set_pin_key(&step4, pairing_pin_key, sizeof(pairing_pin_key));
+	ig_PairingStep4_set_password(&step4, pairing_password, sizeof(pairing_password));
+	ig_PairingStep4_set_master_pin(&step4, pairing_master_pin, sizeof(pairing_master_pin));
+	size_t step4_size = ig_PairingStep4_get_max_payload_in_bytes(&step4);
+
+	ig_PairingStep4_deinit(&step4);
+	return step4_size;
+}
+
+IgErrorCode ig_pairing_step4(
+  uint8_t *encrypt_step3_bytes, uint32_t encrypt_step3_bytes_len, 
+  uint8_t *encrypt_step4_bytes, uint32_t encrypt_step4_bytes_len, 
+  uint32_t *bytes_written)
+{
+  uint32_t decrypted_data_in_len = ig_decrypt_data_size(encrypt_step3_bytes_len);
+  uint8_t decrypted_data_in[decrypted_data_in_len];
+  uint32_t decrypted_bytes_written = 0;
+
+  int decrypt_result = decryptClientData(
+    encrypt_step3_bytes, encrypt_step3_bytes_len, 
+    decrypted_data_in, decrypted_data_in_len, 
+    &decrypted_bytes_written
+  );
+
+  if (decrypt_result)
+  {
+    serverLog(LL_ERROR, "decryptClientData err");
+    return 1;
+  }
+
+  incrementClientNonce();
+
+  IgPairingStep3 step3;
+  ig_PairingStep3_init(&step3);
+  ig_PairingStep3_decode(decrypted_data_in, decrypted_bytes_written, &step3, 0);
+  if (!ig_PairingStep3_is_valid(&step3)  ||
+    (step3.has_nonce && ig_PairingStep3_get_nonce_size(&step3) != kNonceLength) ||
+    (step3.has_pin_key && ig_PairingStep3_get_pin_key_size(&step3) != IG_PIN_KEY_LENGTH) ||
+    (step3.has_password && ig_PairingStep3_get_password_size(&step3) != IG_PASSWORD_LENGTH) ||
+    (step3.has_master_pin && ig_PairingStep3_get_master_pin_size(&step3) > IG_MASTER_PIN_MAX_LENGTH) ||
+    (step3.has_master_pin && ig_PairingStep3_get_master_pin_size(&step3) < IG_MASTER_PIN_MIN_LENGTH)) 
+  {
+    serverLog(LL_ERROR, "ig_PairingStep3_is_valid error");
+    ig_PairingStep3_deinit(&step3);
+    return IG_ERROR_INVALID_MESSAGE;
+  }
+  serverLog(LL_NOTICE, "ig_PairingStep3_is_valid");
+  
+  setPairingPinKey(&step3);
+  setPairingPassword(&step3);
+  setMasterPin(&step3);
+  setClientNonce(&step3);
+  setGmtOffset(&step3);
+  setDstTimes(&step3);
+
+  IgPairingStep4 step4;
+  setIgStep4(&step4);
+
+  size_t step4_size = ig_PairingStep4_get_max_payload_in_bytes(&step4);
+  if (encrypt_step4_bytes_len < step4_size) {
+    ig_PairingStep3_deinit(&step3);
+    ig_PairingStep4_deinit(&step4);
+    return IG_ERROR_DATA_TOO_SHORT;
+  }
+
+  uint8_t step4_serialized[step4_size];
+	size_t step4_written_bytes = 0;
+  IgSerializerError err = ig_PairingStep4_encode(&step4, step4_serialized, step4_size, &step4_written_bytes);
+	if (err != IgSerializerNoError) {
+		ig_PairingStep3_deinit(&step3);
+		ig_PairingStep4_deinit(&step4);
+		return IG_ERROR_GENERIC_FAIL;
+	}
+
+  uint32_t encrypted_bytes_written = 0;
+  encrypted_bytes_written = encryptData(
+    step4_serialized, step4_written_bytes, encrypt_step4_bytes, encrypt_step4_bytes_len,
+    server_pairing_admin_key, kConnectionKeyLength, client_nonce, kNonceLength);
+	*bytes_written = encrypted_bytes_written;
+
+  ig_PairingStep3_deinit(&step3);
+	ig_PairingStep4_deinit(&step4);
+  return IG_ERROR_NONE;
+}
+

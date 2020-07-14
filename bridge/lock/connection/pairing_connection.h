@@ -1,7 +1,7 @@
 #ifndef PAIRING_CONNECTION_H
 #define PAIRING_CONNECTION_H
 #include <stdint.h>
-
+#include <stdbool.h>
 
 bool igloohome_ble_lock_crypto_PairingConnection_beginConnection();
 int igloohome_ble_lock_crypto_PairingConnection_genPairingStep1Native(uint8_t **ret);

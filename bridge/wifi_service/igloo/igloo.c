@@ -237,18 +237,18 @@ IgErrorCode ig_pairing_step2(uint8_t *data_in, uint32_t data_in_len, uint8_t *da
 	return IG_ERROR_NONE;
 }
 
-// uint32_t ig_pairing_step4_size() {
-// 	IgPairingStep4 step4;
-// 	ig_PairingStep4_init(&step4);
-// 	ig_PairingStep4_set_success(&step4, true);
-// 	ig_PairingStep4_set_pin_key(&step4, pairing_pin_key, sizeof(pairing_pin_key));
-// 	ig_PairingStep4_set_password(&step4, pairing_password, sizeof(pairing_password));
-// 	ig_PairingStep4_set_master_pin(&step4, pairing_master_pin, sizeof(pairing_master_pin));
-// 	size_t step4_size = ig_PairingStep4_get_max_payload_in_bytes(&step4);
+uint32_t ig_pairing_step4_size() {
+	IgPairingStep4 step4;
+	ig_PairingStep4_init(&step4);
+	ig_PairingStep4_set_success(&step4, true);
+	ig_PairingStep4_set_pin_key(&step4, pairing_pin_key, sizeof(pairing_pin_key));
+	ig_PairingStep4_set_password(&step4, pairing_password, sizeof(pairing_password));
+	ig_PairingStep4_set_master_pin(&step4, pairing_master_pin, sizeof(pairing_master_pin));
+	size_t step4_size = ig_PairingStep4_get_max_payload_in_bytes(&step4);
 
-// 	ig_PairingStep4_deinit(&step4);
-// 	return step4_size;
-// }
+	ig_PairingStep4_deinit(&step4);
+	return step4_size;
+}
 
 // IgErrorCode ig_pairing_step4(uint8_t *data_in, uint32_t data_in_len, uint8_t *data_out, uint32_t data_out_len, uint32_t *bytes_written) {
 // 	// decrypt key with calculated admin key

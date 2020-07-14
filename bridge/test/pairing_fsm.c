@@ -1,12 +1,6 @@
 #include "bridge/wifi_service/fsm1.h"
 
-
 // for pairing
-#include "bridge/lock/messages/PairingStep1.h"
-#include "bridge/lock/messages/PairingStep2.h"
-#include "bridge/lock/messages/PairingStep3.h"
-#include "bridge/lock/messages/PairingStep4.h"
-#include "bridge/lock/messages/PairingCommit.h"
 #include "bridge/lock/connection/pairing_connection.h"
 #include "bridge/ble/ble_operation.h"
 #include "bridge/wifi_service/pairing.h"
@@ -306,30 +300,7 @@ int handleWriteStep3(void *arg)
     return 1;
   }
 
-  // test 
-  // printf("=============== handleWriteStep3 ==================\n");
-  // printf("fake_transmit_payloadBytes_len: %u\n", fake_transmit_payloadBytes_len);
-  // for (int i = 0; i < fake_transmit_payloadBytes_len; i += ble_pkg_limit)
-  // {
-  //   for (int j = 0; j < ble_pkg_limit; ++j)
-  //   {
-  //     printf(" %x", fake_transmit_payloadBytes[i+j]);
-  //   }
-  //   printf("\n");
-  // }
-  
   fakeRecvData(arg); 
-  // printf("-------handleWriteStep3 recv_pairing_data----------- \n");
-  // printf("recv_pairing_data->data_len: %u\n", recv_pairing_data->data_len);
-  // for (int i = 0; i < recv_pairing_data->data_len; i+=20)
-  // {
-  //   for (int j = 0; j < 20; j++)
-  //   {
-  //     printf(" %x", recv_pairing_data->data[i+j]);
-  //   }
-  //   printf("\n");
-  // }
-
 
   // 开始处理 step3 =============================
   // 确定step3 有加密
@@ -355,42 +326,41 @@ int handleWriteStep3(void *arg)
       return 1;
     }
 
-    uint32_t decrypted_data_in_len = ig_decrypt_data_size(step3_len);
-    uint8_t decrypted_data_in[decrypted_data_in_len];
-    uint32_t decrypted_bytes_written = 0;
-
-    int decrypt_result = decryptClientData(
+    uint32_t encrypt_step4_bytes_len = ig_pairing_step4_size();
+    uint8_t encrypt_step4_bytes[encrypt_step4_bytes_len];
+    uint32_t encrypt_step4_writen_len = 0;
+    ig_pairing_step4(
       step3_payload_bytes, step3_len, 
-      decrypted_data_in, decrypted_data_in_len, 
-      &decrypted_bytes_written
-    );
-
-    if (decrypt_result)
+      encrypt_step4_bytes, encrypt_step4_bytes_len, &encrypt_step4_writen_len);
+    if (encrypt_step4_writen_len == UINT32_MAX)
     {
-      serverLog(LL_ERROR, "decryptClientData err");
+      serverLog(LL_ERROR, "ig_pairing_step4 error");
       return 1;
     }
+    // serverLog(LL_NOTICE, "ig_pairing_step4 success");
 
-    incrementClientNonce();
-
-    IgPairingStep3 step3;
-	  ig_PairingStep3_init(&step3);
-	  ig_PairingStep3_decode(decrypted_data_in, decrypted_bytes_written, &step3, 0);
-    if (!ig_PairingStep3_is_valid(&step3)  ||
-		(step3.has_nonce && ig_PairingStep3_get_nonce_size(&step3) != kNonceLength) ||
-		(step3.has_pin_key && ig_PairingStep3_get_pin_key_size(&step3) != IG_PIN_KEY_LENGTH) ||
-		(step3.has_password && ig_PairingStep3_get_password_size(&step3) != IG_PASSWORD_LENGTH) ||
-		(step3.has_master_pin && ig_PairingStep3_get_master_pin_size(&step3) > IG_MASTER_PIN_MAX_LENGTH) ||
-		(step3.has_master_pin && ig_PairingStep3_get_master_pin_size(&step3) < IG_MASTER_PIN_MIN_LENGTH)
-    ) 
+    // 建立step4 完成, 然后就要发送除去
+    uint32_t payload_len = 0;
+    uint8_t *payloadBytes = NULL;
+    if (!build_msg_payload(
+      &payloadBytes, &payload_len, 
+      encrypt_step4_bytes, encrypt_step4_bytes_len))
     {
-      serverLog(LL_ERROR, "ig_PairingStep3_is_valid error");
-      ig_PairingStep3_deinit(&step3);
-      return IG_ERROR_INVALID_MESSAGE;
+      serverLog(LL_ERROR, "failed in build_msg_payload");
+      return 1;
     }
-    serverLog(LL_NOTICE, "ig_PairingStep3_is_valid");
+    if (fake_transmit_payloadBytes) free(fake_transmit_payloadBytes);
+    fake_transmit_payloadBytes = malloc(payload_len);
+    memcpy(fake_transmit_payloadBytes, encrypt_step4_bytes, payload_len);
+    fake_transmit_payloadBytes_len = payload_len;
 
+    if (step3_payload_bytes) free(step3_payload_bytes);
+    step3_payload_bytes = NULL;
+    if (payloadBytes) free(payloadBytes);
+    payloadBytes = NULL;
   }
+
+  
 
   return 0;
 }
@@ -548,6 +518,7 @@ int main(int argc, char *argv[])
   serverLog(LL_NOTICE, "fsm state: %d", fsm->cur_state);
   // serverLog(LL_NOTICE, "recv_pairing_data->n_size_byte: %u", recv_pairing_data->n_size_byte);
 
+  // 到这儿, server生成了 step4 给client, 然后client要接收
   // // 打印复制的包, 肉眼可以看到是拷贝对了
   // serverLog(LL_NOTICE, "printf copy data");
   // for (int i = 0; i < payload_len; i++)
