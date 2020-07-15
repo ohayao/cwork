@@ -83,23 +83,11 @@ int igloohome_ble_lock_crypto_PairingConnection_genPairingStep3Native(
         *ret = NULL;
         return 0;
     }
-    printf("------------------------- step2.nonce\n");
-    for (int i = 0; i < step2.nonce_size; i++)
-    {
-        printf(" %x", step2.nonce[i]);
-    }
-    printf("\n");
     memcpy(txNonce_, step2.nonce, step2.nonce_size);
     memcpy(otherPublicKey_, step2.public_key, kPublicKeyLength);
 
     uint8_t sharedSecret[kPrivateKeyLength] = {0};
     const struct uECC_Curve_t * p_curve = uECC_secp256r1();
-    printf("------------- otherPublicKey_: ");
-    for (int i = 0; i< 64; i++)
-    {
-        printf(" %x", otherPublicKey_[i]);
-    }
-    printf("\n");
     int shared_secret_ret = uECC_shared_secret(otherPublicKey_, privateKey_, sharedSecret, p_curve);
     if (shared_secret_ret != 1) {
         serverLog(LL_ERROR, "shared_secret_ret");
@@ -229,13 +217,6 @@ int igloohome_ble_lock_crypto_PairingConnection_recPairingStep4Native(
     }
     uint8_t messageBytes[messageLen];
     memcpy(messageBytes, jPairingStep4, messageLen);
-
-    printf("------------- sharedKey_ ???????: ");
-    for (int i = 0; i< 16; i++)
-    {
-        printf(" %x", sharedKey_[i]);
-    }
-    printf("\n");
 
     uint32_t step4MaxLen = decryptDataSize(messageLen);
     uint8_t step4Bytes[step4MaxLen];

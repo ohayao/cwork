@@ -56,11 +56,9 @@ void printRecvData(RecvData *recv_data)
 //传递数据, 获得这段数据的长度
 uint16_t getDataLength(uint8_t data[], uint16_t *n_size_byte, uint16_t *pkg_len)
 {
-  printf(" getDataLength \n");
 	uint16_t temp_result = 0;
 	if(data[2] == 0xff)
 	{
-    printf(" getDataLength 3\n");
     *n_size_byte = 3;
     temp_result = data[0] * (0xfe) + data[1] + *n_size_byte;
     *pkg_len = temp_result - *n_size_byte;
@@ -68,8 +66,6 @@ uint16_t getDataLength(uint8_t data[], uint16_t *n_size_byte, uint16_t *pkg_len)
 	}
 	else
 	{
-    printf(" getDataLength 1\n");
-    printf(" getDataLength data[0] %u \n", data[0]);
     *n_size_byte = 1;
     temp_result = data[0] + *n_size_byte;
     *pkg_len = data[0];
@@ -388,12 +384,6 @@ int server_gen_pairing_step2(
     serverLog(LL_ERROR, "uECC_make_key for client error");
     return 1;
   }
-  printf("------------- server_pairing_public_key: ");
-  for (int i = 0; i< 64; i++)
-  {
-    printf(" %x", server_pairing_public_key[i]);
-  }
-  printf("\n");
 
   // 显示输出 client
   // serverLog(LL_NOTICE, "client_publicKey_ :");
@@ -438,33 +428,10 @@ int server_gen_pairing_step2(
     serverLog(LL_ERROR, "uECC_shared_secret err");
     return 1;
   }
-  printf("------------- client_pairing_public_key: ");
-  for (int i = 0; i< 64; i++)
-  {
-    printf(" %x", client_pairing_public_key[i]);
-  }
-  printf("\n");
-  printf("------------- server_pairing_private_key: ");
-  for (int i = 0; i< 64; i++)
-  {
-    printf(" %x", server_pairing_private_key[i]);
-  }
-  printf("\n");
-  printf("------------- shared_secret: ");
-  for (int i = 0; i< 32; i++)
-  {
-    printf(" %x", shared_secret[i]);
-  }
-  printf("\n");
+  
 
   // truncate to get admin key
 	memcpy(server_pairing_admin_key, shared_secret, IG_KEY_LENGTH);
-  printf("------------- shared_secret: ");
-  for (int i = 0; i< 16; i++)
-  {
-    printf(" %x", server_pairing_admin_key[i]);
-  }
-  printf("\n");
   ig_PairingStep1_deinit(&step1);
 	ig_PairingStep2_deinit(&step2);
 

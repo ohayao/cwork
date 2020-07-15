@@ -106,7 +106,7 @@ int fakeRecvData(void *arg)
     }
     i += copy_len;
   }
-  printRecvData(recv_pairing_data);
+  // printRecvData(recv_pairing_data);
 }
 
 // 处理写的事件
@@ -381,7 +381,7 @@ int handleReplyStep4(void *arg)
 
   uint8_t *encrypt_step4_bytes = NULL;
   size_t encrypt_step4_bytes_len = 0;
-  printf("----------------- step4_len %u", step4_len);
+
   encrypt_step4_bytes_len = igloohome_ble_lock_crypto_PairingConnection_recPairingStep4Native(
 		step4_len, 
     fake_transmit_payloadBytes+n_size_byte, 
