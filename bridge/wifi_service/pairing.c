@@ -56,9 +56,11 @@ void printRecvData(RecvData *recv_data)
 //传递数据, 获得这段数据的长度
 uint16_t getDataLength(uint8_t data[], uint16_t *n_size_byte, uint16_t *pkg_len)
 {
+  printf(" getDataLength \n");
 	uint16_t temp_result = 0;
 	if(data[2] == 0xff)
 	{
+    printf(" getDataLength 3\n");
     *n_size_byte = 3;
     temp_result = data[0] * (0xfe) + data[1] + *n_size_byte;
     *pkg_len = temp_result - *n_size_byte;
@@ -66,6 +68,8 @@ uint16_t getDataLength(uint8_t data[], uint16_t *n_size_byte, uint16_t *pkg_len)
 	}
 	else
 	{
+    printf(" getDataLength 1\n");
+    printf(" getDataLength data[0] %u \n", data[0]);
     *n_size_byte = 1;
     temp_result = data[0] + *n_size_byte;
     *pkg_len = data[0];
@@ -504,28 +508,13 @@ int decryptClientData(
   uint8_t *data_out, uint32_t data_out_len,
   uint32_t *bytes_written)
 { 
-  // printf("==========================\n");
-  // printf("data_in_len: %u\n", data_in_len);
-  // for(int i = 0; i < data_in_len; i += 20)
-  // {
-  //   for (int j = 0; j < 20; ++j)
-  //   {
-  //     printf(" %x", data_in[i+j]);
-  //   }
-  //   printf("\n");
-  // }
-  // for (int i = 0; i < kNonceLength; i++)
-  // {
-  //   printf(" %x", server_nonce[i]);
-  // }
-  // printf("\n");
   *bytes_written = decryptData
     (data_in, data_in_len, 
     data_out, data_out_len, 
     server_pairing_admin_key, kConnectionKeyLength,
     server_nonce, kNonceLength
   );
-  // printf("bytes_written: %u\n", *bytes_written);
+
   if (*bytes_written == UINT32_MAX) return 1;
   return 0;
 }
@@ -687,7 +676,7 @@ IgErrorCode ig_pairing_step4(
     return 1;
   }
 
-  incrementClientNonce();
+  incrementServerNonce();
 
   IgPairingStep3 step3;
   ig_PairingStep3_init(&step3);
@@ -732,23 +721,12 @@ IgErrorCode ig_pairing_step4(
 	}
 
   uint32_t encrypted_bytes_written = 0;
-  printf("-----------server_pairing_admin_key: ");
-  for (int i = 0; i < 16; i++)
-  {
-    printf(" %x", server_pairing_admin_key[i]);
-  }
-  printf("\n");
-  printf("-----------client_nonce: ");
-  for (int i = 0; i < 12; i++)
-  {
-    printf(" %x", client_nonce[i]);
-  }
-  printf("\n");
+  // printf ("-----------------------step4_written_bytes  %u\n", step4_written_bytes);
+  //  printf ("-----------------------step4_size  %u\n", step4_size);
   encrypted_bytes_written = encryptData(
     step4_serialized, step4_written_bytes, encrypt_step4_bytes, encrypt_step4_bytes_len,
     server_pairing_admin_key, kConnectionKeyLength, client_nonce, kNonceLength);
 	*bytes_written = encrypted_bytes_written;
-
   ig_PairingStep3_deinit(&step3);
 	ig_PairingStep4_deinit(&step4);
   return IG_ERROR_NONE;

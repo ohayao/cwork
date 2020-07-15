@@ -83,6 +83,12 @@ int igloohome_ble_lock_crypto_PairingConnection_genPairingStep3Native(
         *ret = NULL;
         return 0;
     }
+    printf("------------------------- step2.nonce\n");
+    for (int i = 0; i < step2.nonce_size; i++)
+    {
+        printf(" %x", step2.nonce[i]);
+    }
+    printf("\n");
     memcpy(txNonce_, step2.nonce, step2.nonce_size);
     memcpy(otherPublicKey_, step2.public_key, kPublicKeyLength);
 
@@ -101,12 +107,7 @@ int igloohome_ble_lock_crypto_PairingConnection_genPairingStep3Native(
         *ret = NULL;
         return 0;
     }
-    printf("------------- sharedSecret ???????: ");
-    for (int i = 0; i< 32; i++)
-    {
-        printf(" %x", sharedSecret[i]);
-    }
-    printf("\n");
+    
      uint8_t hashedSharedSecret[kPublicKeyLength];
      memcpy(hashedSharedSecret, sharedSecret, sizeof(sharedSecret));
      memcpy(sharedKey_, hashedSharedSecret, sizeof(sharedKey_));
@@ -226,21 +227,16 @@ int igloohome_ble_lock_crypto_PairingConnection_recPairingStep4Native(
         *ret = NULL;
         return 0;
     }
-    
     uint8_t messageBytes[messageLen];
     memcpy(messageBytes, jPairingStep4, messageLen);
-    printf("-----------sharedKey_: ");
-    for (int i = 0; i < 16; i++)
+
+    printf("------------- sharedKey_ ???????: ");
+    for (int i = 0; i< 16; i++)
     {
         printf(" %x", sharedKey_[i]);
     }
     printf("\n");
-    printf("-----------rxNonce_: ");
-    for (int i = 0; i < 12; i++)
-    {
-        printf(" %x", rxNonce_[i]);
-    }
-    printf("\n");
+
     uint32_t step4MaxLen = decryptDataSize(messageLen);
     uint8_t step4Bytes[step4MaxLen];
     int32_t step4Len = decryptData(
@@ -249,7 +245,7 @@ int igloohome_ble_lock_crypto_PairingConnection_recPairingStep4Native(
             sharedKey_, kConnectionKeyLength,
             rxNonce_, kNonceLength
     );
-    printf("---------------- step4Len: %d\n", step4Len);
+
     incrementNonce(rxNonce_);
     if (step4Len < 0) {
         *ret = NULL;
@@ -260,20 +256,7 @@ int igloohome_ble_lock_crypto_PairingConnection_recPairingStep4Native(
     ig_PairingStep4_init(&step4);
     ig_PairingStep4_decode(step4Bytes, (size_t)step4Len, &step4, 0);
     serverLog(LL_NOTICE, "step4.has_success = %i, step4.success = %i", step4.has_success, step4.success);
-    // if (step4.has_success && step4.success)
-    // {
-    //     printf("-------------------------step4.has_success \n");
-        
-    //     if (step4.has_password)
-    //     {
-    //         printf("step4.has_password: ");
-    //         for (int j = 0; j < step4.password_size;j++)
-    //         {
-    //             printf("%02x ", (step4.password)[j]);
-    //         }
-    //         printf("\n");
-    //     }
-    // }
+   
     if (!ig_PairingStep4_is_valid(&step4) || !step4.success) {
         ig_PairingStep4_deinit(&step4);
         *ret = NULL;

@@ -344,14 +344,14 @@ int handleWriteStep3(void *arg)
     uint8_t *payloadBytes = NULL;
     if (!build_msg_payload(
       &payloadBytes, &payload_len, 
-      encrypt_step4_bytes, encrypt_step4_bytes_len))
+      encrypt_step4_bytes, encrypt_step4_writen_len))
     {
       serverLog(LL_ERROR, "failed in build_msg_payload");
       return 1;
     }
     if (fake_transmit_payloadBytes) free(fake_transmit_payloadBytes);
     fake_transmit_payloadBytes = malloc(payload_len);
-    memcpy(fake_transmit_payloadBytes, encrypt_step4_bytes, payload_len);
+    memcpy(fake_transmit_payloadBytes, payloadBytes, payload_len);
     fake_transmit_payloadBytes_len = payload_len;
 
     if (step3_payload_bytes) free(step3_payload_bytes);
@@ -365,7 +365,7 @@ int handleWriteStep3(void *arg)
 // client 接收到了 step4
 int handleReplyStep4(void *arg)
 {
-  serverLog(LL_NOTICE, "handleReplyStep4 ----------------");
+  
   int ret = 0;
   uint16_t step4_len = 0;
   uint16_t n_size_byte = 0;
@@ -381,12 +381,13 @@ int handleReplyStep4(void *arg)
 
   uint8_t *encrypt_step4_bytes = NULL;
   size_t encrypt_step4_bytes_len = 0;
-
+  printf("----------------- step4_len %u", step4_len);
   encrypt_step4_bytes_len = igloohome_ble_lock_crypto_PairingConnection_recPairingStep4Native(
 		step4_len, 
     fake_transmit_payloadBytes+n_size_byte, 
     &encrypt_step4_bytes
 	);
+  serverLog(LL_NOTICE, "encrypt_step4_bytes_len: %u", encrypt_step4_bytes_len);
   if (!encrypt_step4_bytes_len)
 	{
     serverLog(LL_ERROR, "igloohome_ble_lock_crypto_PairingConnection_recPairingStep4Native error");
