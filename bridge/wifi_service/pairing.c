@@ -54,9 +54,9 @@ void printRecvData(RecvData *recv_data)
 }
 
 //传递数据, 获得这段数据的长度
-uint16_t getDataLength(uint8_t data[], uint16_t *n_size_byte, uint16_t *pkg_len)
+uint32_t getDataLength(uint8_t data[], uint32_t *n_size_byte, uint32_t *pkg_len)
 {
-	uint16_t temp_result = 0;
+	uint32_t temp_result = 0;
 	if(data[2] == 0xff)
 	{
     *n_size_byte = 3;
@@ -176,6 +176,12 @@ void recvData(RecvData *recv_pairing_data, uint8_t * data, uint16_t data_length)
   // {
   //   resetRecvData(recv_pairing_data);
   // }
+  printf("data length: %u\n", data_length);
+  for (int i = 0; i < data_length; ++i)
+  {
+    printf(" %x", data[i]);
+  }
+  printf("\n");
   int err = 0;
   uint16_t pkg_len = 0;
   switch (recv_pairing_data->recv_status)
@@ -183,7 +189,7 @@ void recvData(RecvData *recv_pairing_data, uint8_t * data, uint16_t data_length)
     case NONE:
     {
       // 创建新的存储空间, 准备接收
-      // serverLog(LL_NOTICE, "recvData NONE-------------------");
+      serverLog(LL_NOTICE, "recvData NONE-------------------");
       // 所获得的, 是 整个蓝牙包 (长度+加密报文)
       // 首先释放数据
       pkg_len = getDataLength(data, &(recv_pairing_data->n_size_byte), &recv_pairing_data->pkg_len);
@@ -200,12 +206,26 @@ void recvData(RecvData *recv_pairing_data, uint8_t * data, uint16_t data_length)
         serverLog(LL_ERROR, "copyData err");
         return;
       }
+      printf("--------------data length: %u\n", recv_pairing_data->data_len);
+      for (int i = 0; i < data_length; ++i)
+      {
+        printf(" %x", recv_pairing_data->data[i]);
+      }
+      printf("\n");
       // 设置为已经开始接收数据
-      setRecvDataStatus(recv_pairing_data, GOT_PREV_DATA);
+      if (recv_pairing_data && isRecvFullPkg(recv_pairing_data))
+      {
+        setRecvDataStatus(recv_pairing_data, FINISHED_SUCCESS);
+      }
+      else
+      {
+        setRecvDataStatus(recv_pairing_data, GOT_PREV_DATA);
+      }
+      
       break;
     }
     case GOT_PREV_DATA:
-      // serverLog(LL_NOTICE, "recvData GOT_PREV_DATA-------------------");
+      serverLog(LL_NOTICE, "recvData GOT_PREV_DATA-------------------");
       /* code */
       if (copyData(recv_pairing_data, data, data_length))
       {
@@ -217,7 +237,7 @@ void recvData(RecvData *recv_pairing_data, uint8_t * data, uint16_t data_length)
       }
       break;
     case FINISHED_SUCCESS:
-      // serverLog(LL_NOTICE, "recvData FINISHED_SUCCESS-------------------");
+      serverLog(LL_NOTICE, "recvData FINISHED_SUCCESS-------------------");
       /* code */
       break;
     case FINISHED_ERROR:
@@ -699,3 +719,42 @@ IgErrorCode ig_pairing_step4(
   return IG_ERROR_NONE;
 }
 
+IgErrorCode ig_commit_pairing(uint8_t *encrypt_commit_Bytes, uint32_t encrypt_commit_Bytes_len, IgPairingResult *pairing_result_out) {
+  uint32_t decrypted_data_in_len = ig_decrypt_data_size(encrypt_commit_Bytes_len);
+  uint8_t decrypted_data_in[decrypted_data_in_len];
+  uint32_t decrypted_bytes_written = 0;
+
+  int decrypt_result = decryptClientData(
+    encrypt_commit_Bytes, encrypt_commit_Bytes_len, 
+    decrypted_data_in, decrypted_data_in_len, 
+    &decrypted_bytes_written
+  );
+
+  if (decrypt_result)
+  {
+    serverLog(LL_ERROR, "decryptClientData err");
+    return 1;
+  }
+  serverLog(LL_NOTICE, "decryptClientData success");
+
+  incrementNonce(server_nonce);
+
+  IgPairingCommit pairing_commit;
+  ig_PairingCommit_init(&pairing_commit);
+  ig_PairingCommit_decode(decrypted_data_in, decrypted_data_in_len, &pairing_commit, 0);
+  if (!ig_PairingCommit_is_valid(&pairing_commit)) {
+		ig_PairingCommit_deinit(&pairing_commit);
+		return IG_ERROR_INVALID_MESSAGE;
+	}
+  pairing_result_out->current_time = pairing_commit.current_time;
+  memcpy(pairing_result_out->admin_key, server_pairing_admin_key, IG_KEY_LENGTH);
+	memcpy(pairing_result_out->pin_key, pairing_pin_key, IG_PIN_KEY_LENGTH);
+	memcpy(pairing_result_out->password, pairing_password, IG_PASSWORD_LENGTH);
+  pairing_result_out->master_pin_length = pairing_master_pin_length;
+  memcpy(pairing_result_out->master_pin, pairing_master_pin, pairing_master_pin_length);
+  pairing_result_out->gmt_offset = pairing_gmt_offset;
+	pairing_result_out->dst = pairing_dst;
+	pairing_result_out->dst_length = pairing_dst_len;
+  ig_PairingCommit_deinit(&pairing_commit);
+  return IG_ERROR_NONE;
+}

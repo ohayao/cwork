@@ -75,15 +75,9 @@ int fakeRecvData(void *arg)
   for (int i = 0 ; i < fake_transmit_payloadBytes_len; )
   {
     int copy_len = (fake_transmit_payloadBytes_len-i-ble_pkg_limit>0?ble_pkg_limit:fake_transmit_payloadBytes_len-i);
-    // serverLog(LL_NOTICE, "copy_len: %d", copy_len);
     memset(ble_pkg, 0, sizeof(ble_pkg));
     memcpy(ble_pkg, fake_transmit_payloadBytes+i, copy_len);
     // 输出每次的包, 用来验证是否全部输出
-    // for (int j = 0; j < copy_len; j++)
-    // {
-    //   printf("%x ", ble_pkg[j]);
-    // }
-    // printf("\n");
 
     // 这里验证开始接收到的pkg
     // serverLog(LL_NOTICE, "before copy status: %d", recv_pairing_data->recv_status);
@@ -137,19 +131,19 @@ int handleWriteStep1(void *arg)
 
   if(isRecvFullPkg(recv_pairing_data))
   {
-    printf("-------handleWriteStep1 recv_pairing_data----------- \n");
-    printf("recv_pairing_data->data_len: %u\n", recv_pairing_data->data_len);
-    for (int i = 0; i < recv_pairing_data->data_len; i+=20)
-    {
-      for (int j = 0; j < 20; j++)
-      {
-        printf(" %x", recv_pairing_data->data[i+j]);
-      }
-      printf("\n");
-    }
+    // printf("-------handleWriteStep1 recv_pairing_data----------- \n");
+    // printf("recv_pairing_data->data_len: %u\n", recv_pairing_data->data_len);
+    // for (int i = 0; i < recv_pairing_data->data_len; i+=20)
+    // {
+    //   for (int j = 0; j < 20; j++)
+    //   {
+    //     printf(" %x", recv_pairing_data->data[i+j]);
+    //   }
+    //   printf("\n");
+    // }
 
     // 收到的包, 是全部的,需要自己取出来
-    serverLog(LL_NOTICE, "isRecvFullPkg");
+    serverLog(LL_NOTICE, "handleWriteStep1 isRecvFullPkg");
     size_t step1_len = 0;
     uint8_t *step1_payload_bytes = NULL;
     if (getRecvPkgLen(recv_pairing_data, &step1_len))
@@ -229,9 +223,9 @@ int handleWriteStep1(void *arg)
 int handleReplyStep2(void *arg)
 {
   serverLog(LL_NOTICE, "handleReplyStep2 ----------------");
-  uint16_t step2_len = 0;
-  uint16_t n_size_byte = 0;
-  uint16_t pkg_len = 0;
+  uint32_t step2_len = 0;
+  uint32_t n_size_byte = 0;
+  uint32_t pkg_len = 0;
   pkg_len = getDataLength(fake_transmit_payloadBytes, &n_size_byte, &step2_len);
   if (pkg_len == 0)
   {
@@ -359,6 +353,8 @@ int handleWriteStep3(void *arg)
     if (payloadBytes) free(payloadBytes);
     payloadBytes = NULL;
   }
+  // 别忘了这个
+  resetRecvData(recv_pairing_data);
   return 0;
 }
 
@@ -367,9 +363,9 @@ int handleReplyStep4(void *arg)
 {
   
   int ret = 0;
-  uint16_t step4_len = 0;
-  uint16_t n_size_byte = 0;
-  uint16_t pkg_len = 0;
+  uint32_t step4_len = 0;
+  uint32_t n_size_byte = 0;
+  uint32_t pkg_len = 0;
   pkg_len = getDataLength(
     fake_transmit_payloadBytes, &n_size_byte, &step4_len);
   if (pkg_len == 0)
@@ -379,30 +375,145 @@ int handleReplyStep4(void *arg)
   }
   serverLog(LL_NOTICE, "step4_len: %u, n_size_byte %u, pkg_len %u", step4_len, n_size_byte, pkg_len);
 
-  uint8_t *encrypt_step4_bytes = NULL;
-  size_t encrypt_step4_bytes_len = 0;
+  uint8_t *decrypt_step4_bytes = NULL;
+  size_t decrypt_step4_bytes_len = 0;
 
-  encrypt_step4_bytes_len = igloohome_ble_lock_crypto_PairingConnection_recPairingStep4Native(
+  decrypt_step4_bytes_len = igloohome_ble_lock_crypto_PairingConnection_recPairingStep4Native(
 		step4_len, 
     fake_transmit_payloadBytes+n_size_byte, 
-    &encrypt_step4_bytes
+    &decrypt_step4_bytes
 	);
-  serverLog(LL_NOTICE, "encrypt_step4_bytes_len: %u", encrypt_step4_bytes_len);
-  if (!encrypt_step4_bytes_len)
+  serverLog(LL_NOTICE, "encrypt_step4_bytes_len: %u", decrypt_step4_bytes);
+  if (!decrypt_step4_bytes_len)
 	{
     serverLog(LL_ERROR, "igloohome_ble_lock_crypto_PairingConnection_recPairingStep4Native error");
     return 1;
   }
 
-  
+  IgPairingStep4 *step4 = (IgPairingStep4 *)decrypt_step4_bytes;
 
-  if (encrypt_step4_bytes) free(encrypt_step4_bytes);
-  encrypt_step4_bytes = NULL;
+  if (step4->has_success && step4->success)
+  {
+    serverLog(LL_NOTICE, " step4 success");
+  }
+
+  // 生成 Commit
+  size_t commitBytes_len = 0;
+	uint8_t *commitBytes = NULL;
+  time_t current_time = time(NULL);
+  commitBytes_len = igloohome_ble_lock_crypto_PairingConnection_genPairingCommitNative(
+    current_time, &commitBytes);  
+  if (!commitBytes_len)
+	{
+    serverLog(LL_ERROR, "genPairingCommitNative failed!");
+		return 1;
+	}
+
+  size_t payload_len = 0;
+	uint8_t *payloadBytes = NULL;
+  if (!build_msg_payload(
+		&payloadBytes, &payload_len, commitBytes, commitBytes_len))
+	{
+    serverLog(LL_ERROR, "build_msg_payload failed!");
+		return 1;
+	}
+
+  if(fake_transmit_payloadBytes) free(fake_transmit_payloadBytes);
+  fake_transmit_payloadBytes = malloc(payload_len);
+  memcpy(fake_transmit_payloadBytes, payloadBytes, payload_len);
+  fake_transmit_payloadBytes_len = payload_len;
+
+  printf("commit payloadBytes: %u\n", payload_len);
+  for (int i = 0; i < fake_transmit_payloadBytes_len; ++i)
+  {
+    printf(" %x", payloadBytes[i]);
+    
+  }
+  printf("\n");
+
+  if (decrypt_step4_bytes) free(decrypt_step4_bytes);
+  decrypt_step4_bytes = NULL;
+  if (commitBytes) free(commitBytes);
+  commitBytes = NULL;
+  if (payloadBytes) free(payloadBytes);
+  payloadBytes = NULL;
+
+  return 0;
 }
 
 int handleWriteCommit(void *arg)
 {
-  
+  serverLog(LL_NOTICE, "--------------------------- handleWriteCommit ----------------");
+  int ret = 0;
+  RecvData *recv_pairing_data = (RecvData *)arg;
+  if (recv_pairing_data == NULL)
+  {
+    serverLog(LL_ERROR, "handleWriteStep1  recv_pairing_data null");
+    return 1;
+  }
+
+  printf("fake_transmit_payloadBytes_len: %u\n", fake_transmit_payloadBytes_len);
+  for (int i = 0; i < fake_transmit_payloadBytes_len; ++i)
+  {
+    printf(" %x", fake_transmit_payloadBytes[i]);
+    
+  }
+  printf("\n");
+
+  fakeRecvData(arg);  
+
+  if(isRecvFullPkg(recv_pairing_data))
+  { 
+    serverLog(LL_NOTICE, "handleWriteCommit isRecvFullPkg");
+    uint8_t *encrypt_commit_bytes = NULL;
+    uint32_t encrypt_commit_len = 0;
+    uint32_t n_size_byte = 0;
+    uint32_t pkg_len = 0;
+    printf("recv_pairing_data: ");
+    for (int i = 0; i < recv_pairing_data->data_len; i++)
+    {
+      printf(" %x", recv_pairing_data->data[i]);
+    }
+    printf("\n");
+
+     pkg_len = getDataLength(
+        fake_transmit_payloadBytes, &n_size_byte, &encrypt_commit_len);
+    if (pkg_len == 0)
+    {
+      serverLog(LL_ERROR, "getRecvPkgLen error");
+      return 1;
+    }
+    serverLog(LL_NOTICE, "getRecvPkgLen success, size %u", encrypt_commit_len);
+    
+    encrypt_commit_bytes = malloc(encrypt_commit_len);
+    if (getPkgFromRecvData(recv_pairing_data, encrypt_commit_bytes))
+    {
+      serverLog(LL_ERROR, "getPkgFromRecvData error");
+      return 1;
+    }
+    printf("-------------encrypt_commit_bytes: ");
+    for (int i = 0; i < encrypt_commit_len; ++i)
+    {
+      printf(" %x", encrypt_commit_bytes[i]);
+    }
+    printf("\n");
+
+    size_t decrypt_commit_len = 0;
+    IgPairingResult decrypt_commit;
+
+    decrypt_commit_len = ig_commit_pairing(encrypt_commit_bytes, encrypt_commit_len, &decrypt_commit);
+    if (getRecvPkgLen(recv_pairing_data, &encrypt_commit_len))
+    {
+      serverLog(LL_ERROR, "getRecvPkgLen error");
+      return 1;
+    }
+    serverLog(LL_NOTICE, "ig_commit_pairing success");
+
+    if (encrypt_commit_bytes) free(encrypt_commit_bytes);
+    encrypt_commit_bytes = NULL;
+  }
+  resetRecvData(recv_pairing_data);
+  return 0;
 }
 
 int handlePairingComplete(void *arg)
@@ -486,7 +597,7 @@ int main(int argc, char *argv[])
   // S_REPLY_STEP4, from PAIRING_STEP4 to PAIRING_STEP4
   // handleWriteCommit: 客户接收到 到一个 Commit 消息, 然后会返回一个
   if (fillTransItem(&trans_item, 
-    S_REPLY_STEP4, PAIRING_COMMIT, handleWriteCommit, PAIRING_COMPLETE))
+    C_WRITE_COMMIT, PAIRING_COMMIT, handleWriteCommit, PAIRING_COMPLETE))
   {
     serverLog(LL_ERROR, "fillTransItem err");
     return 1;
@@ -555,6 +666,10 @@ int main(int argc, char *argv[])
 
   // 到这儿, server生成了 step4 给client, 然后client要接收
   handleReplyStep4(argv);
+
+  // 到这里,  client 写回了 commit
+  event = C_WRITE_COMMIT;
+  handleEvent(fsm, event, recv_pairing_data);
 
   // // 打印复制的包, 肉眼可以看到是拷贝对了
   // serverLog(LL_NOTICE, "printf copy data");

@@ -65,21 +65,35 @@ typedef enum{
 typedef struct 
 {
 	uint8_t *data;
-	uint16_t data_len;
-	uint16_t recv_len;
+	uint32_t data_len;
+	uint32_t recv_len;
 	// 
-	uint16_t n_size_byte;
-	uint16_t pkg_len;
+	uint32_t n_size_byte;
+	uint32_t pkg_len;
 	RCEV_STATUS recv_status;
 }RecvData;
+
+typedef struct IgPairingResult {
+	uint8_t admin_key[IG_KEY_LENGTH];
+	uint8_t pin_key[IG_PIN_KEY_LENGTH];
+	uint8_t password[IG_PASSWORD_LENGTH];
+	uint32_t master_pin_length;
+	uint8_t master_pin[IG_MASTER_PIN_MAX_LENGTH];
+	uint32_t current_time;
+	int32_t gmt_offset;
+	uint32_t dst_length;
+	uint8_t *dst;	// do not free
+} IgPairingResult;
 
 int getRecvData(RecvData **p_recv_data);
 int freeRecvData(RecvData **p_recv_data);
 int initRecvData(RecvData *recv_data);
 void recvData(RecvData *recv_pairing_data, uint8_t * data, uint16_t data_length);
 int getPkgFromRecvData(RecvData *recv_pairing_data, uint8_t *step_pkg_data);
-int getRecvPkgLen(RecvData *recv_pairing_data, size_t *return_size);
-uint16_t getDataLength(uint8_t data[], uint16_t *n_size_byte, uint16_t *pkg_len);
+int getRecvPkgLen(
+	RecvData *recv_pairing_data, size_t *return_size);
+uint32_t getDataLength(
+	uint8_t data[], uint32_t *n_size_byte, uint32_t *pkg_len);
 int isRecvFullPkg(RecvData *recv_pairing_data);
 uint32_t ig_pairing_step2_size();
 int server_gen_pairing_step2(
@@ -108,4 +122,6 @@ IgErrorCode ig_pairing_step4(
   uint8_t *encrypt_step3_bytes, uint32_t encrypt_step3_bytes_len, 
   uint8_t *encrypt_step4_bytes, uint32_t encrypt_step4_bytes_len, 
   uint32_t *bytes_written);
+IgErrorCode ig_commit_pairing(
+  uint8_t *encrypt_commit_Bytes, uint32_t encrypt_commit_Bytes_len, IgPairingResult *pairing_result_out);
 #endif
