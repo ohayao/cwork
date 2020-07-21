@@ -1,5 +1,5 @@
-// version: 0.0.10
-// date: 18/06/2020
+// version: 0.0.11
+// date: 19/07/2020
 syntax = "proto3";
 package ign;
 //-----------------------------------------------
@@ -14,8 +14,8 @@ enum EventType {
   LOCK_LOG           = 2;
   // Get user account information
   GET_USER_INFO      = 3;
-  // Updates server on lock status
-  UPDATE_LOCK_LIST   = 4;
+  // Updates server on connection test results of the selected locks
+  LOCKS_TEST_UPDATE  = 4;
   // Adds a lock to bridge's list of connected lock
   ADD_LOCK           = 5;
   // Request for jobs
@@ -52,11 +52,13 @@ message BridgeEventData {
   repeated string bt_ids = 2;
   // List of activity logs
   repeated LockLog lock_log = 3;
+  // List of lock id that failed the connection test
+  LocksTestUpdate locks_test_update = 4;
   // Demo events
-  string demo_lockId = 4;
-  DemoUpdateLockBattery demo_update_lock_battery = 5;
-  DemoUpdateLockStatus demo_update_lock_status = 6;
-  DemoUpdateLockActivities demo_update_lock_activities = 7;
+  string demo_lockId = 16;
+  DemoUpdateLockBattery demo_update_lock_battery = 17;
+  DemoUpdateLockStatus demo_update_lock_status = 18;
+  DemoUpdateLockActivities demo_update_lock_activities = 19;
 }
 enum OSType {
   UKNOWN = 0;
@@ -86,6 +88,10 @@ message LockLog {
   // Contains (admin key) encrypted activity logs
   bytes  log_data = 2;
 }
+message LocksTestUpdate {
+  // Bt id of lock that failed connection test
+  repeated string bt_id = 1;
+}
 message DemoUpdateLockBattery {
   uint32 battery = 1;
 }
@@ -104,11 +110,18 @@ message LockJob {
   // Contains (admin key) encrypted bluetooth commands
   bytes  lock_cmd = 2;
 }
+message Ekey {
+  bytes guest_aes_key = 1;
+  bytes guest_token   = 2;
+  bytes password      = 3;
+  // Random 31-bit integer
+  int32 keyId         = 4;
+}
 message LockEntry {
   // Lock bluetooth ID
   string bt_id = 1;
   // 'ekey' (with permissions) used to communicate with lock
-  bytes  ekey  = 2;
+  Ekey   ekey  = 2;
 }
 message ServerEventData {
   // List of lock entries
