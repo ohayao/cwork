@@ -537,7 +537,12 @@ void WaitMQTT(sysinfo_t *si){
            if(strlen(imsg.server_data.lock_entries[i].bt_id)>0){
                tl++;
                strcpy(tsd.lock_entries[i].bt_id,imsg.server_data.lock_entries[i].bt_id);
-               strcpy(tsd.lock_entries[i].ekey.bytes,imsg.server_data.lock_entries[i].ekey.bytes);
+               //strcpy(tsd.lock_entries[i].ekey.bytes,imsg.server_data.lock_entries[i].ekey.bytes);
+               tsd.lock_entries[i].has_ekey=true;
+               strcpy(tsd.lock_entries[i].ekey.guest_token.bytes,imsg.server_data.lock_entries[i].ekey.guest_token.bytes);
+               strcpy(tsd.lock_entries[i].ekey.guest_aes_key.bytes,imsg.server_data.lock_entries[i].ekey.guest_aes_key.bytes);
+               strcpy(tsd.lock_entries[i].ekey.password.bytes,imsg.server_data.lock_entries[i].ekey.password.bytes);
+               tsd.lock_entries[i].ekey.keyId=imsg.server_data.lock_entries[i].ekey.keyId;
            }
        }
        tsd.lock_entries_count=tl;

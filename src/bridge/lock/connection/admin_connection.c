@@ -31,10 +31,8 @@ int igloohome_ble_lock_crypto_AdminConnection_genConnStep2Native(int connectionI
 
 	IgAdminConnectionStep1 step1;
 	ig_AdminConnectionStep1_init(&step1);
-	IgSerializerError step1_err = ig_AdminConnectionStep1_decode(
-			step1Bytes, (size_t)step1Len, &step1, 0);
-	if (step1_err || !ig_AdminConnectionStep1_is_valid(&step1) 
-			|| step1.nonce_size != kNonceLength) {
+	IgSerializerError step1_err = ig_AdminConnectionStep1_decode( step1Bytes, (size_t)step1Len, &step1, 0);
+	if (step1_err || !ig_AdminConnectionStep1_is_valid(&step1) || step1.nonce_size != kNonceLength) {
 		ig_AdminConnectionStep1_deinit(&step1);
 		serverLog(LL_ERROR, "step1_err");
 		return 0;
@@ -48,8 +46,7 @@ int igloohome_ble_lock_crypto_AdminConnection_genConnStep2Native(int connectionI
 	size_t step2MaxLen = ig_AdminConnectionStep2_get_max_payload_in_bytes(&step2);
 	uint8_t plaintextBytes[step2MaxLen];
 	size_t plaintextLen = 0;
-	IgSerializerError err = ig_AdminConnectionStep2_encode(
-			&step2, plaintextBytes, step2MaxLen, &plaintextLen);
+	IgSerializerError err = ig_AdminConnectionStep2_encode(&step2, plaintextBytes, step2MaxLen, &plaintextLen);
 	if (err != IgSerializerNoError) {
 		ig_AdminConnectionStep1_deinit(&step1);
 		ig_AdminConnectionStep2_deinit(&step2);

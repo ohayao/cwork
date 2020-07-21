@@ -10,7 +10,12 @@ ign.DemoLockJob.pin max_size:100
 
 
 ign.LockEntry.bt_id max_size:100
-ign.LockEntry.ekey max_size:100
+
+
+ign.Ekey.guest_aes_key max_size:500
+ign.Ekey.guest_token max_size:500
+ign.Ekey.password max_size:500
+
 
 ign.BridgeEventData.demo_lockId max_size:100
 
