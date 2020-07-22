@@ -113,13 +113,19 @@ target_link_libraries(red_black_tree
 )
 
 # 测试ecdh
-add_executable(ecdh ./ecdh.c)
-target_link_libraries(ecdh
-  ${TEST_DEPENDENCIES} mbedtls mbedcrypto
-)
+#add_executable(ecdh ./ecdh.c)
+#target_link_libraries(ecdh
+#  ${TEST_DEPENDENCIES} mbedtls mbedcrypto
+#)
 
 # 测试 AES_CCM.c
 add_executable(AES_CCM ./AES_CCM.c)
 target_link_libraries(AES_CCM
+  ${TEST_DEPENDENCIES}
+)
+
+# 测试 wifi_pairing 功能
+add_executable(wifi_pairing ./wifi_pairing.c)
+target_link_libraries(wifi_pairing
   ${TEST_DEPENDENCIES}
 )

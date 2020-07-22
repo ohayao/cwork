@@ -40,6 +40,9 @@
 
 #include "bridge/wifi_service/error.h"
 #include "bridge/wifi_service/SetWifiInfoRequest.h"
+#include "bridge/wifi_service/pairing.h"
+#include "bridge/wifi_service/fsm1.h"
+#include "bridge/bridge_main/log.h"
 
 #define GATT_MGR_IFACE			"org.bluez.GattManager1"
 #define GATT_SERVICE_IFACE		"org.bluez.GattService1"
@@ -92,6 +95,35 @@ struct descriptor {
  */
 static const char *wifi_info_props[] = { "write-without-response", "notify", NULL };
 static const char *desc_props[] = { "read", "write", NULL };
+
+static FSM *fsm = NULL;
+
+int getGlobalFSM()
+{
+	if(getFSM(&fsm))
+  {
+    serverLog(LL_ERROR, "getFSM err");
+    return 1;
+  }
+	return 0;
+}
+
+// 写死的 fsm 过程, 所以不需要参数设置
+// 然后, 需要适配以下数据的不同
+// 在server 当中, 是什么数据呢
+int initPairingFsm()
+{
+	uint8_t max_trans_num;
+	max_trans_num = 7;
+  if (getFSMTransTable(fsm, max_trans_num))
+  {
+    serverLog(LL_ERROR, "getFSMTransTable err");
+    return 1;
+  }
+  serverLog(LL_NOTICE, "getFSMTransTable success");
+
+
+}
 
 
 // functions
@@ -303,9 +335,6 @@ static gboolean chr_get_props(const GDBusPropertyTable *property,
 	return TRUE;
 }
 
-
-
-
 static void chr_set_value(const GDBusPropertyTable *property,
 				DBusMessageIter *iter,
 				GDBusPendingPropertySet id, void *user_data)
@@ -500,7 +529,7 @@ static void chr_write(struct characteristic *chr, const uint8_t *value, int len)
 }
 
 // 因为 process_message method->function的调用, 就是调的这个函数, 所以我直接在这里写状态机
-// 
+// 这个主体, 先用于进行一个派对的实现.
 static DBusMessage *chr_write_value(DBusConnection *conn, DBusMessage *msg,
 							void *user_data)
 {
@@ -521,7 +550,6 @@ static DBusMessage *chr_write_value(DBusConnection *conn, DBusMessage *msg,
 		return g_dbus_create_error(msg, DBUS_ERROR_INVALID_ARGS,
 							"Invalid arguments");
 	}
-		
 
 	if (parse_options(&iter, &device))
 	{

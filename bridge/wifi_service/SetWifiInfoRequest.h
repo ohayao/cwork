@@ -14,6 +14,9 @@ typedef struct SetWIFIInfoRequest{
   bool has_password;
   char password[PASSWORD_MAX_NUM+1];
   size_t password_len;
+  bool has_token;
+  char *token;
+  size_t token_len;
 }SetWIFIInfoRequest;
 
 int getWifiInfoRequest(SetWIFIInfoRequest **pp_wifi_info);
@@ -24,6 +27,8 @@ int setWifiInfoRequestPassword(SetWIFIInfoRequest * wifi_info, char *password, s
 int encodeWifiInfoRequest(SetWIFIInfoRequest * obj, uint8_t *retval,uint32_t length,size_t *written_length);
 int decodeWifiInfoRequest(uint8_t *buf,size_t buf_size, SetWIFIInfoRequest *retval,size_t index);
 int isWifiInfoRequestValid(SetWIFIInfoRequest * obj);
+
+
 
 
 #endif
