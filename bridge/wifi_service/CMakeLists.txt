@@ -51,6 +51,9 @@ set(WIFI_FSM_SRC
 add_library(ign_wifi_fsm1
   ${WIFI_FSM_HDR} ${WIFI_FSM_SRC}
 )
+target_link_libraries(ign_wifi_fsm1
+  lock
+)
 
 
 add_executable(server ./server.c ./error.c)

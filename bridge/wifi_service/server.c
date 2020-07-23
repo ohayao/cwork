@@ -77,6 +77,9 @@ struct characteristic {
 	uint16_t mtu;
 	struct io *write_io;
 	struct io *notify_io;
+	RecvData *recv_pairing_data;
+	uint8_t *pairing_value;
+	uint8_t event;
 };
 
 struct descriptor {
@@ -88,6 +91,8 @@ struct descriptor {
 	const char **props;
 };
 
+// 状态机结构体
+// struct connection
 /*
  * Alert Level support Write Without Response only. Supported
  * properties are defined at doc/gatt-api.txt. See "Flags"
@@ -96,7 +101,33 @@ struct descriptor {
 static const char *wifi_info_props[] = { "write-without-response", "notify", NULL };
 static const char *desc_props[] = { "read", "write", NULL };
 
+// 状态机相关代码
 static FSM *fsm = NULL;
+
+// 总体和 pairing_fsm.c 的一致
+// 还没写, 根据现在的不同, 等待改写
+int handleWriteStep1(void *arg)
+{
+
+}
+
+// 还没写, 根据现在的不同, 等待改写
+int handleWriteStep3(void *arg)
+{
+
+}
+
+// 还没写, 根据现在的不同, 等待改写
+int handleWriteCommit(void *arg)
+{
+
+}
+
+// 还没写, 根据现在的不同, 等待改写
+int handlePairingComplete(void *arg)
+{
+
+}
 
 int getGlobalFSM()
 {
@@ -111,10 +142,13 @@ int getGlobalFSM()
 // 写死的 fsm 过程, 所以不需要参数设置
 // 然后, 需要适配以下数据的不同
 // 在server 当中, 是什么数据呢
+// 在这儿, 初始化状态机的处理函数
 int initPairingFsm()
 {
 	uint8_t max_trans_num;
+	FSMTransform trans_item;
 	max_trans_num = 7;
+  
   if (getFSMTransTable(fsm, max_trans_num))
   {
     serverLog(LL_ERROR, "getFSMTransTable err");
@@ -122,6 +156,81 @@ int initPairingFsm()
   }
   serverLog(LL_NOTICE, "getFSMTransTable success");
 
+	// 1 事件, 从 PAIRING_BEGIN -> PAIRING_STEP2
+  // C_WRITE_STEP1, from PAIRING_BEGIN to  PAIRING_STEP2
+  // handleWriteStep1: client 写入一个 step1, 那么就会有把状态从 PAIRING_BEGIN -> PAIRING_STEP2,
+  // 因为接收到了之后, 就会直接返回一个pairing step2, 所以是到pairing step2
+  if (fillTransItem(&trans_item, 
+    PAIRING_STEP1, PAIRING_BEGIN, handleWriteStep1, PAIRING_STEP2))
+  {
+    serverLog(LL_ERROR, "fillTransItem err");
+    return 1;
+  }
+  // serverLog(LL_NOTICE, "fillTransItem event C_WRITE_STEP1");
+
+  if (fillFSMTransItem(fsm, &trans_item))
+  {
+    serverLog(LL_ERROR, "fillFSMTransItem err");
+    return 1;
+  }
+
+	// 2 事件, 从 PAIRING_STEP2 到 PAIRING_STEP4  
+  // 因为会我们会返回 step3 给客户端
+  // C_WRITE_STEP3, from PAIRING_STEP2 to PAIRING_STEP3
+  // handleWriteStep3: client 写入一个 step3, 那么就会有把状态从 PAIRING_STEP2 -> PAIRING_STEP4,
+  // 因为服务器会发送一个step3, 返回给客户一个step4,然后等待commit
+  if (fillTransItem(&trans_item, 
+    C_WRITE_STEP3, PAIRING_STEP2, handleWriteStep3, PAIRING_COMMIT))
+  {
+    serverLog(LL_ERROR, "fillTransItem err");
+    return 1;
+  }
+  serverLog(LL_NOTICE, "fillTransItem event C_WRITE_STEP3");
+
+  if (fillFSMTransItem(fsm, &trans_item))
+  {
+    serverLog(LL_ERROR, "fillFSMTransItem err");
+    return 1;
+  }
+  serverLog(LL_NOTICE, "fillFSMTransItem event C_WRITE_STEP3");
+
+	// 3
+  // S_REPLY_STEP4, from PAIRING_STEP4 to PAIRING_STEP4
+  // handleWriteCommit: 客户接收到 到一个 Commit 消息, 然后会返回一个
+  if (fillTransItem(&trans_item, 
+    C_WRITE_COMMIT, PAIRING_COMMIT, handleWriteCommit, PAIRING_COMPLETE))
+  {
+    serverLog(LL_ERROR, "fillTransItem err");
+    return 1;
+  }
+  // serverLog(LL_NOTICE, "fillTransItem event S_REPLY_STEP4");
+
+  if (fillFSMTransItem(fsm, &trans_item))
+  {
+    serverLog(LL_ERROR, "fillFSMTransItem err");
+    return 1;
+  }
+  // serverLog(LL_NOTICE, "fillFSMTransItem event S_REPLY_STEP4");
+
+  // 4
+  // S_PAIRING_COMPLETE, from PAIRING_COMPLETE to PAIRING_BEGIN
+  if (fillTransItem(&trans_item, 
+    S_PAIRING_COMPLETE, PAIRING_COMPLETE, handlePairingComplete, PAIRING_BEGIN))
+  {
+    serverLog(LL_ERROR, "fillTransItem err");
+    return 1;
+  }
+  // serverLog(LL_NOTICE, "fillTransItem event C_WRITE_COMMIT");
+
+  if (fillFSMTransItem(fsm, &trans_item))
+  {
+    serverLog(LL_ERROR, "fillFSMTransItem err");
+    return 1;
+  }
+  // serverLog(LL_NOTICE, "fillFSMTransItem event C_WRITE_COMMIT");
+
+	// 把虚拟机, 弄成 PAIRING_BEGIN, 也就是空闲的意思啦
+	initFSMCurState(fsm, PAIRING_BEGIN);
 
 }
 
@@ -346,6 +455,7 @@ static void chr_set_value(const GDBusPropertyTable *property,
 
 	printf("Characteristic(%s): Set('Value', ...)\n", chr->uuid);
 
+	// parse_value 是什么?
 	if (!parse_value(iter, &value, &len)) {
 		printf("Invalid value for Set('Value'...)\n");
 		g_dbus_pending_property_error(id,
@@ -354,6 +464,7 @@ static void chr_set_value(const GDBusPropertyTable *property,
 		return;
 	}
 	if (!len) return;
+	
 	chr_write(chr, value, len);
 
 	g_dbus_pending_property_success(id);
@@ -530,6 +641,10 @@ static void chr_write(struct characteristic *chr, const uint8_t *value, int len)
 
 // 因为 process_message method->function的调用, 就是调的这个函数, 所以我直接在这里写状态机
 // 这个主体, 先用于进行一个派对的实现.
+// DBusConnection conn 是一个 dbus 的连接
+// DBusMessage *msg,  对方传递过来的消息
+// void *user_data, struct characteristic 的数据
+// chr_write_value, 是 写到 chr 里面 的, 发送过来进行接收的函数
 static DBusMessage *chr_write_value(DBusConnection *conn, DBusMessage *msg,
 							void *user_data)
 {
@@ -562,9 +677,21 @@ static DBusMessage *chr_write_value(DBusConnection *conn, DBusMessage *msg,
 		printf("len is zero\n");
 		return dbus_message_new_method_return(msg);
 	}
-	printf("value len %d----------\n", len);
 
+	recvData(chr->recv_pairing_data, value, len);
+	// printf("value len %d----------\n", len);
+	// printf("------------------- write value: \n");
+	// for (int i = 0; i < len; ++i)
+	// {
+	// 	printf(" %x", value[i]);
+	// }
+	// printf("\n");
+
+	//确实在这儿写状态机, 上面是不断的接受写过来的值,
+	// 会分开几个包, 
+	// 
 	// 这里就是状态机开始?
+
 	chr_write(chr, value, len);
 
 	return dbus_message_new_method_return(msg);
@@ -742,7 +869,9 @@ static gboolean register_characteristic(const char *chr_uuid,
 	chr->props = props;
 	chr->service = g_strdup(service_path);
 	chr->path = g_strdup_printf("%s/characteristic%d", service_path, id++);
-
+	getRecvData(&chr->recv_pairing_data);
+	initRecvData(&chr->recv_pairing_data);
+	
 	if (!g_dbus_register_interface(connection, chr->path, GATT_CHR_IFACE,
 					chr_methods, NULL, chr_properties,
 					chr, chr_iface_destroy)) {

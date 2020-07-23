@@ -123,8 +123,14 @@ int write_pairing_step1()
     serverLog(LL_ERROR, "write_char_by_uuid_multi_atts failed in writing th packags");
 		return 1;
 	}
-  serverLog(LL_NOTICE, "write_char_by_uuid_multi_atts success in writing packages");
-
+  serverLog(LL_NOTICE, 
+    "write_char_by_uuid_multi_atts success in writing packages, len %u ", payload_len);
+  printf("-------------------- payloadBytes: \n");
+  for (int i = 0; i < payload_len; ++i)
+  {
+    printf(" %x", payloadBytes[i]);
+  }
+  printf("\n");
   if (step1Bytes) 
   {
     free(step1Bytes);
@@ -139,6 +145,7 @@ int write_pairing_step1()
   return 0;
 }
 
+// 没有这一步, 就不会收到回复
 int waiting_pairing_step2()
 {
   serverLog(LL_NOTICE, "waiting_pairing_step2");
