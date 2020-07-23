@@ -7,12 +7,16 @@
 #include "bridge/lock/connection/pairing_connection.h"
 #include "bridge/gattlib/gattlib.h"
 #include "bridge/ble/ble_operation.h"
+#include <glib.h>
 
 static char wifi_pairing_str[] = "12345678-0000-1000-8000-00805f9b34fb";
 uuid_t wifi_pairing_uuid = {};
 gatt_connection_t* gatt_connection = NULL;
 char *bridge_addr = "DC:A6:32:10:C7:DC";
 bool is_registered = false;
+
+GMainLoop *loop = NULL;
+
 static void message_handler(
 	const uuid_t* uuid, const uint8_t* data, size_t data_length, void* user_data) {
   serverLog(LL_NOTICE, "----------- message_handler ---------------");
@@ -135,6 +139,21 @@ int write_pairing_step1()
   return 0;
 }
 
+int waiting_pairing_step2()
+{
+  serverLog(LL_NOTICE, "waiting_pairing_step2");
+  // task_node_t *task_node = (task_node_t *)arg;
+
+  // // 在这儿用g_main_loop_run等待, 用线程锁和睡眠的方法不行, 就像是bluez不会调用
+  // // 我的回调函数, 在 rtos 应该会有相应的方法实现这样的等待事件到来的方法.
+  // // 当前 Linux 下, 这样用, works 
+  // serverLog(LL_NOTICE, "waiting_pairing_step2 new loop waiting");
+  loop = g_main_loop_new(NULL, 0);
+  // task_node->loop = g_main_loop_new(NULL, 0);
+  g_main_loop_run(loop);
+  // serverLog(LL_NOTICE, "waiting_pairing_step2 exit task_node->loop");
+  // return 0;
+}
 // 对方一定要advertise, 否则不会收得到得.
 
 int main(int argc, char *argv[])
@@ -148,6 +167,6 @@ int main(int argc, char *argv[])
 
   // 写第一步阿
   write_pairing_step1();
-
+  waiting_pairing_step2();
   endGattConnection();
 }

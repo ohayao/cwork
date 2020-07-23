@@ -339,7 +339,7 @@ static void chr_set_value(const GDBusPropertyTable *property,
 				DBusMessageIter *iter,
 				GDBusPendingPropertySet id, void *user_data)
 {
-	fprintf(stdout, "chr_set_value\n");
+	fprintf(stdout, "-------------------------------------chr_set_value\n");
 	struct characteristic *chr = user_data;
 	const uint8_t *value;
 	int len;
