@@ -256,41 +256,41 @@ static DBusHandlerResult process_message(DBusConnection *connection,
 			DBusMessage *message, const GDBusMethodTable *method,
 							void *iface_user_data)
 {
-	printf("process_message\n");
+	// printf("process_message\n");
 	DBusMessage *reply;
-	printf("process_message method->function\n");
+	// printf("process_message method->function\n");
 	reply = method->function(connection, message, iface_user_data);
 
 	// start notify 会调用 chr_start_notify
 	// stop notify 会调用 chr_stop_notify
-	printf("method->flags & G_DBUS_METHOD_FLAG_NOREPLY\n");
+	// printf("method->flags & G_DBUS_METHOD_FLAG_NOREPLY\n");
 	if (method->flags & G_DBUS_METHOD_FLAG_NOREPLY ||
 					dbus_message_get_no_reply(message)) {
 		if (reply != NULL)
 			dbus_message_unref(reply);
-		printf("DBUS_HANDLER_RESULT_HANDLED 1\n");
+		// printf("DBUS_HANDLER_RESULT_HANDLED 1\n");
 		return DBUS_HANDLER_RESULT_HANDLED;
 	}
 
-	printf("method->flags & G_DBUS_METHOD_FLAG_ASYNC\n");
+	// printf("method->flags & G_DBUS_METHOD_FLAG_ASYNC\n");
 	if (method->flags & G_DBUS_METHOD_FLAG_ASYNC) {
 		if (reply == NULL)
 		{	
 			return DBUS_HANDLER_RESULT_HANDLED;
 		}
-		printf("DBUS_HANDLER_RESULT_HANDLED 2\n");
+		// printf("DBUS_HANDLER_RESULT_HANDLED 2\n");
 	}
 
-	printf("reply == NULL\n");
+	// printf("reply == NULL\n");
 	if (reply == NULL)
 	{
-		printf("DBUS_HANDLER_RESULT_NEED_MEMORY 3\n");
+		// printf("DBUS_HANDLER_RESULT_NEED_MEMORY 3\n");
 		return DBUS_HANDLER_RESULT_NEED_MEMORY;
 	}
 		
-	printf("g_dbus_send_message(connection, reply)\n");
+	// printf("g_dbus_send_message(connection, reply)\n");
 	g_dbus_send_message(connection, reply);
-	printf("DBUS_HANDLER_RESULT_HANDLED 4\n");
+	// printf("DBUS_HANDLER_RESULT_HANDLED 4\n");
 	return DBUS_HANDLER_RESULT_HANDLED;
 }
 
@@ -302,7 +302,7 @@ static const GDBusSecurityTable *security_table = NULL;
 void g_dbus_pending_success(DBusConnection *connection,
 					GDBusPendingReply pending)
 {
-	printf("g_dbus_pending_success\n");
+	// printf("g_dbus_pending_success\n");
 	GSList *list;
 
 	for (list = pending_security; list; list = list->next) {
@@ -1065,56 +1065,56 @@ static void generic_unregister(DBusConnection *connection, void *user_data)
 static DBusHandlerResult generic_message(DBusConnection *connection,
 					DBusMessage *message, void *user_data)
 {
-	printf("generic_message \n");
+	// printf("generic_message \n");
 	struct generic_data *data = user_data;
 	struct interface_data *iface;
 	const GDBusMethodTable *method;
 	const char *interface;
-	printf("dbus_message_get_interface \n");
+	// printf("dbus_message_get_interface \n");
 	interface = dbus_message_get_interface(message);
 
-	printf("find_interface \n");
+	// printf("find_interface \n");
 	iface = find_interface(data->interfaces, interface);
 	if (iface == NULL)
 	{
-		printf("DBUS_HANDLER_RESULT_NOT_YET_HANDLED \n");
+		// printf("DBUS_HANDLER_RESULT_NOT_YET_HANDLED \n");
 		return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
 	}
 		
-	printf("for (method = iface->methods; method \n");
+	// printf("for (method = iface->methods; method \n");
 	for (method = iface->methods; method &&
 			method->name && method->function; method++) {
 		
-		printf("dbus_message_is_method_call \n");
+		// printf("dbus_message_is_method_call \n");
 		if (dbus_message_is_method_call(message, iface->name,
 							method->name) == FALSE)
 			continue;
 
-		printf("check_experimental \n");
+		// printf("check_experimental \n");
 		if (check_experimental(method->flags,
 					G_DBUS_METHOD_FLAG_EXPERIMENTAL))
 		{
-			printf("DBUS_HANDLER_RESULT_NOT_YET_HANDLED \n");
+			// printf("DBUS_HANDLER_RESULT_NOT_YET_HANDLED \n");
 			return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
 		}
 			
-		printf("g_dbus_args_have_signature \n");
+		// printf("g_dbus_args_have_signature \n");
 		if (g_dbus_args_have_signature(method->in_args,
 							message) == FALSE)
 		{
-			printf("g_dbus_args_have_signature \n");
+			// printf("g_dbus_args_have_signature \n");
 			continue;
 		}
 			
-		printf("check_privilege \n");
+		// printf("check_privilege \n");
 		if (check_privilege(connection, message, method,
 						iface->user_data) == TRUE)
 		{
-			printf("check_privilege \n");
+			// printf("check_privilege \n");
 			return DBUS_HANDLER_RESULT_HANDLED;
 		}
 			
-		printf("process_message 33333\n");
+		// printf("process_message 33333\n");
 		return process_message(connection, message, method,
 							iface->user_data);
 	}
@@ -1136,7 +1136,7 @@ static const GDBusMethodTable introspect_methods[] = {
 
 static void append_interfaces(struct generic_data *data, DBusMessageIter *iter)
 {
-	printf("append_interfaces \n");
+	// printf("append_interfaces \n");
 	DBusMessageIter array;
 
 	dbus_message_iter_open_container(iter, DBUS_TYPE_ARRAY,
@@ -1156,7 +1156,7 @@ static void append_interfaces(struct generic_data *data, DBusMessageIter *iter)
 
 static void append_object(gpointer data, gpointer user_data)
 {
-	printf("append_object \n");
+	// printf("append_object \n");
 	struct generic_data *child = data;
 	DBusMessageIter *array = user_data;
 	DBusMessageIter entry;
@@ -1214,7 +1214,7 @@ static const GDBusMethodTable manager_methods[] = {
 		GDBUS_ARGS({ "objects", "a{oa{sa{sv}}}" }), get_objects) },
 	{ }
 };
-
+// dbus_connection_send
 static const GDBusSignalTable manager_signals[] = {
 	{ GDBUS_SIGNAL("InterfacesAdded",
 		GDBUS_ARGS({ "object", "o" },
@@ -1705,7 +1705,7 @@ fail:
 static void process_properties_from_interface(struct generic_data *data,
 						struct interface_data *iface)
 {
-	printf("process_properties_from_interface\n");
+	// printf("process_properties_from_interface\n");
 	GSList *l;
 	DBusMessage *signal;
 	DBusMessageIter iter, dict, array;
@@ -1715,7 +1715,7 @@ static void process_properties_from_interface(struct generic_data *data,
 		return;
 
 	// 这个是一定要发的,感觉就像是协议
-	printf("dbus_message_new_signal\n");
+	// printf("dbus_message_new_signal\n");
 	signal = dbus_message_new_signal(data->path,
 			DBUS_INTERFACE_PROPERTIES, "PropertiesChanged");
 	if (signal == NULL) {
@@ -1734,7 +1734,7 @@ static void process_properties_from_interface(struct generic_data *data,
 			DBUS_DICT_ENTRY_END_CHAR_AS_STRING, &dict);
 
 	invalidated = NULL;
-	printf("for (l = iface->pending_prop; l != NULL; l = l->next)\n");
+	// printf("for (l = iface->pending_prop; l != NULL; l = l->next)\n");
 	for (l = iface->pending_prop; l != NULL; l = l->next) {
 		GDBusPropertyTable *p = l->data;
 
@@ -1748,15 +1748,15 @@ static void process_properties_from_interface(struct generic_data *data,
 
 		append_property(iface, p, &dict);
 	}
-	printf("dbus_message_iter_close_container\n");
+	// printf("dbus_message_iter_close_container\n");
 	dbus_message_iter_close_container(&iter, &dict);
 
-	printf("dbus_message_iter_open_container 2\n");
+	// printf("dbus_message_iter_open_container 2\n");
 	dbus_message_iter_open_container(&iter, DBUS_TYPE_ARRAY,
 				DBUS_TYPE_STRING_AS_STRING, &array);
 	for (l = invalidated; l != NULL; l = g_slist_next(l)) {
 		GDBusPropertyTable *p = l->data;
-		printf("dbus_message_iter_open_container 2 for\n");
+		// printf("dbus_message_iter_open_container 2 for\n");
 		dbus_message_iter_append_basic(&array, DBUS_TYPE_STRING,
 								&p->name);
 	}
@@ -1767,7 +1767,7 @@ static void process_properties_from_interface(struct generic_data *data,
 	iface->pending_prop = NULL;
 
 	/* Use dbus_connection_send to avoid recursive calls to g_dbus_flush */
-	printf("dbus_connection_send 2\n");
+	// printf("dbus_connection_send 2\n");
 	dbus_connection_send(data->conn, signal, NULL);
 	dbus_message_unref(signal);
 }
@@ -1790,7 +1790,7 @@ void g_dbus_emit_property_changed_full(DBusConnection *connection,
 				const char *name,
 				GDbusPropertyChangedFlags flags)
 {
-	printf("g_dbus_emit_property_changed_full\n");
+	// printf("g_dbus_emit_property_changed_full\n");
 	const GDBusPropertyTable *property;
 	struct generic_data *data;
 	struct interface_data *iface;
@@ -1798,21 +1798,21 @@ void g_dbus_emit_property_changed_full(DBusConnection *connection,
 	
 	if (path == NULL)
 	{
-		printf("path == NULL\n", path);
+		// printf("path == NULL\n", path);
 		return;
 	}
-	printf("path %s\n", path);
+	// printf("path %s\n", path);
 
-	printf("pdbus_connection_get_object_path_data\n");
+	// printf("pdbus_connection_get_object_path_data\n");
 	if (!dbus_connection_get_object_path_data(connection, path,
 					(void **) &data) || data == NULL)
 	{
-		printf("return \n");
+		// printf("return \n");
 		return;
 	}
 		
 
-	printf("find_interface\n");
+	// printf("find_interface\n");
 	iface = find_interface(data->interfaces, interface);
 	if (iface == NULL)
 		return;
@@ -1821,11 +1821,11 @@ void g_dbus_emit_property_changed_full(DBusConnection *connection,
 	 * If ObjectManager is attached, don't emit property changed if
 	 * interface is not yet published
 	 */
-	printf("g_slist_find\n");
+	// printf("g_slist_find\n");
 	if (root && g_slist_find(data->added, iface))
 		return;
 
-	printf("find_property\n");
+	// printf("find_property\n");
 	property = find_property(iface->properties, name);
 	if (property == NULL) {
 		error("Could not find property %s in %p", name,
@@ -1833,7 +1833,7 @@ void g_dbus_emit_property_changed_full(DBusConnection *connection,
 		return;
 	}
 
-	printf("g_slist_find(iface->pending_prop, (void *) property) != NULL\n");
+	// printf("g_slist_find(iface->pending_prop, (void *) property) != NULL\n");
 	if (g_slist_find(iface->pending_prop, (void *) property) != NULL)
 		return;
 
@@ -1841,7 +1841,7 @@ void g_dbus_emit_property_changed_full(DBusConnection *connection,
 	iface->pending_prop = g_slist_prepend(iface->pending_prop,
 						(void *) property);
 
-	printf("flags & G_DBUS_PROPERTY_CHANGED_FLAG_FLUSH\n");
+	// printf("flags & G_DBUS_PROPERTY_CHANGED_FLAG_FLUSH\n");
 	if (flags & G_DBUS_PROPERTY_CHANGED_FLAG_FLUSH)
 		process_property_changes(data);
 	else

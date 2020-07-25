@@ -127,6 +127,7 @@ int isRecvDataAlloc(RecvData *recv_pairing_data)
 
 int isRecvFullPkg(RecvData *recv_pairing_data)
 {
+  printf("---------- recv len %u, data len %u\n", recv_pairing_data->recv_len, recv_pairing_data->data_len);
   return recv_pairing_data->recv_len == recv_pairing_data->data_len;
 }
 
@@ -192,21 +193,22 @@ void recvData(RecvData *recv_pairing_data, uint8_t * data, uint16_t data_length)
       serverLog(LL_NOTICE, "recvData NONE-------------------");
       // 所获得的, 是 整个蓝牙包 (长度+加密报文)
       // 首先释放数据
-      pkg_len = getDataLength(data, &(recv_pairing_data->n_size_byte), &recv_pairing_data->pkg_len);
-      // serverLog(LL_NOTICE, "pkg_len: %d", pkg_len);
+      pkg_len = getDataLength(data, &(recv_pairing_data->n_size_byte), &(recv_pairing_data->pkg_len));
+      serverLog(LL_NOTICE, "pkg_len: %u", pkg_len);
       if (allocRecvData(recv_pairing_data, pkg_len))
       {
         serverLog(LL_ERROR, "recvData alloc data err");
         // TODO: some fix method?
         return;
       }
+      serverLog(LL_NOTICE, "------- data_len1: %u", recv_pairing_data->data_len);
       // 把当前的数据复制上去
       if (copyData(recv_pairing_data, data, data_length))
       {
         serverLog(LL_ERROR, "copyData err");
         return;
       }
-      printf("--------------data length: %u\n", recv_pairing_data->data_len);
+      serverLog(LL_NOTICE, "------- data_len2: %u", recv_pairing_data->data_len);
       for (int i = 0; i < data_length; ++i)
       {
         printf(" %x", recv_pairing_data->data[i]);
@@ -226,23 +228,29 @@ void recvData(RecvData *recv_pairing_data, uint8_t * data, uint16_t data_length)
     }
     case GOT_PREV_DATA:
       serverLog(LL_NOTICE, "recvData GOT_PREV_DATA-------------------");
+      serverLog(LL_NOTICE, "recvData pkg-------------------");
       /* code */
       if (copyData(recv_pairing_data, data, data_length))
       {
         serverLog(LL_ERROR, "copyData err");
       }
+      serverLog(LL_NOTICE, "------- data_len2: %u", recv_pairing_data->data_len);
       if (recv_pairing_data && isRecvFullPkg(recv_pairing_data))
       {
+        serverLog(LL_NOTICE, "setRecvDataStatus FINISHED_SUCCESS");
         setRecvDataStatus(recv_pairing_data, FINISHED_SUCCESS);
       }
       break;
     case FINISHED_SUCCESS:
       serverLog(LL_NOTICE, "recvData FINISHED_SUCCESS-------------------");
+      serverLog(LL_NOTICE, "------- data_len2: %u", recv_pairing_data->data_len);
       /* code */
       break;
     case FINISHED_ERROR:
+      serverLog(LL_NOTICE, "recvData FINISHED_ERROR-------------------");
       break;
     default:
+       serverLog(LL_NOTICE, "recvData default-------------------");
       break;
   }
 }

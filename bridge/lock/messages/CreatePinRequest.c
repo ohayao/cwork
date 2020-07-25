@@ -10,7 +10,7 @@ IgSerializerError ig_CreatePinRequest_encode(IgCreatePinRequest *obj,uint8_t *re
   
   if(!ig_CreatePinRequest_is_valid(obj)) 
   {
-    printf("!ig_CreatePinRequest_is_valid(obj)");
+    // printf("!ig_CreatePinRequest_is_valid(obj)");
     return IgSerializerErrorInvalidPayload;
   }
   

@@ -106,9 +106,48 @@ static FSM *fsm = NULL;
 
 // 总体和 pairing_fsm.c 的一致
 // 还没写, 根据现在的不同, 等待改写
+
 int handleWriteStep1(void *arg)
 {
 
+	serverLog(LL_NOTICE, "we get client write step1, trans fsm to pairing step1");
+	return 0;
+}
+
+int handleReplyStep2(void *arg)
+{
+	printf("handleReplyStep2 %x ", arg)
+	serverLog(LL_NOTICE, "we are going to reply cliet step2, trans fsm to pairing step2");
+	int ret = 0;
+	struct characteristic *chr = (struct characteristic *)arg;
+	RecvData *recv_pairing_data = chr->recv_pairing_data;
+	serverLog(LL_NOTICE, "handleReplyStep2 %u ", chr->recv_pairing_data->data_len);
+	if (recv_pairing_data == NULL)
+  {
+    serverLog(LL_ERROR, "handleWriteStep1  recv_pairing_data null");
+    return 1;
+  }
+
+	 // test 
+  // printf("=============== handleReplyStep2 ==================\n");
+  // printf("recv data len %u", recv_pairing_data->data_len);
+	// for (int i = 0; i < recv_pairing_data->data_len;  i+=20)
+  // {
+  //   for (int j = 0; j < 20; ++j)
+  //   {
+  //     printf(" %x", recv_pairing_data->data[i+j]);
+  //   }
+  //   printf("\n");
+  // }
+	size_t step1_len = 0;
+  uint8_t *step1_payload_bytes = NULL;
+	if (getRecvPkgLen(recv_pairing_data, &step1_len))
+	{
+		serverLog(LL_ERROR, "getRecvPkgLen error");
+		return 1;
+	}
+	serverLog(LL_NOTICE, "getRecvPkgLen success, size %u", step1_len);
+	return 0;
 }
 
 // 还没写, 根据现在的不同, 等待改写
@@ -129,6 +168,33 @@ int handlePairingComplete(void *arg)
 
 }
 
+void handleStep1Wrong(void *arg)
+{
+
+}
+
+void handleStep2Wrong(void *arg)
+{
+	
+}
+
+void handleStep3Wrong(void *arg)
+{
+	
+}
+
+void handleStep4Wrong(void *arg)
+{
+	
+}
+
+void handleCommitWrong(void *arg)
+{
+	
+}
+
+
+
 int getGlobalFSM()
 {
 	if(getFSM(&fsm))
@@ -136,6 +202,7 @@ int getGlobalFSM()
     serverLog(LL_ERROR, "getFSM err");
     return 1;
   }
+	serverLog(LL_NOTICE, "getFSM success");
 	return 0;
 }
 
@@ -156,12 +223,10 @@ int initPairingFsm()
   }
   serverLog(LL_NOTICE, "getFSMTransTable success");
 
-	// 1 事件, 从 PAIRING_BEGIN -> PAIRING_STEP2
-  // C_WRITE_STEP1, from PAIRING_BEGIN to  PAIRING_STEP2
-  // handleWriteStep1: client 写入一个 step1, 那么就会有把状态从 PAIRING_BEGIN -> PAIRING_STEP2,
-  // 因为接收到了之后, 就会直接返回一个pairing step2, 所以是到pairing step2
+	// 1
+	// 使得 状态机从 Pairing Begin , 变成 PAIRING_STEP1
   if (fillTransItem(&trans_item, 
-    PAIRING_STEP1, PAIRING_BEGIN, handleWriteStep1, PAIRING_STEP2))
+    C_WRITE_STEP1, PAIRING_BEGIN, handleWriteStep1, PAIRING_STEP1))
   {
     serverLog(LL_ERROR, "fillTransItem err");
     return 1;
@@ -174,60 +239,80 @@ int initPairingFsm()
     return 1;
   }
 
-	// 2 事件, 从 PAIRING_STEP2 到 PAIRING_STEP4  
-  // 因为会我们会返回 step3 给客户端
-  // C_WRITE_STEP3, from PAIRING_STEP2 to PAIRING_STEP3
-  // handleWriteStep3: client 写入一个 step3, 那么就会有把状态从 PAIRING_STEP2 -> PAIRING_STEP4,
-  // 因为服务器会发送一个step3, 返回给客户一个step4,然后等待commit
+	// 2
+	// 从 PAIRING_STEP1 -> PAIRING_STEP2
+  // C_WRITE_STEP1, from PAIRING_STEP1 to  PAIRING_STEP2
+  // handleWriteStep1: client 写入一个 step1, 那么就会有把状态从 PAIRING_STEP1 -> PAIRING_STEP2,
+  // 因为接收到了之后, 就会直接返回一个pairing step2, 所以是到pairing step2
+	// 这儿, 暂时不管出错处理
   if (fillTransItem(&trans_item, 
-    C_WRITE_STEP3, PAIRING_STEP2, handleWriteStep3, PAIRING_COMMIT))
+    S_REPLY_STEP2, PAIRING_STEP1, handleReplyStep2, PAIRING_STEP2))
   {
     serverLog(LL_ERROR, "fillTransItem err");
     return 1;
   }
-  serverLog(LL_NOTICE, "fillTransItem event C_WRITE_STEP3");
+  // serverLog(LL_NOTICE, "fillTransItem event C_WRITE_STEP1");
 
   if (fillFSMTransItem(fsm, &trans_item))
   {
     serverLog(LL_ERROR, "fillFSMTransItem err");
     return 1;
   }
-  serverLog(LL_NOTICE, "fillFSMTransItem event C_WRITE_STEP3");
 
-	// 3
-  // S_REPLY_STEP4, from PAIRING_STEP4 to PAIRING_STEP4
-  // handleWriteCommit: 客户接收到 到一个 Commit 消息, 然后会返回一个
-  if (fillTransItem(&trans_item, 
-    C_WRITE_COMMIT, PAIRING_COMMIT, handleWriteCommit, PAIRING_COMPLETE))
-  {
-    serverLog(LL_ERROR, "fillTransItem err");
-    return 1;
-  }
-  // serverLog(LL_NOTICE, "fillTransItem event S_REPLY_STEP4");
+	// // 2 事件, 从 PAIRING_STEP3 到 PAIRING_STEP4  
+  // // 因为会我们会返回 step3 给客户端
+  // // C_WRITE_STEP3, from PAIRING_STEP3 to PAIRING_STEP3
+  // // handleWriteStep3: client 写入一个 step3, 那么就会有把状态从 PAIRING_STEP2 -> PAIRING_STEP4,
+  // // 因为服务器会发送一个step3, 返回给客户一个step4,然后等待commit
+  // if (fillTransItem(&trans_item, 
+  //   C_WRITE_STEP3, PAIRING_STEP3, handleWriteStep3, PAIRING_STEP4))
+  // {
+  //   serverLog(LL_ERROR, "fillTransItem err");
+  //   return 1;
+  // }
+  // serverLog(LL_NOTICE, "fillTransItem event C_WRITE_STEP3");
 
-  if (fillFSMTransItem(fsm, &trans_item))
-  {
-    serverLog(LL_ERROR, "fillFSMTransItem err");
-    return 1;
-  }
-  // serverLog(LL_NOTICE, "fillFSMTransItem event S_REPLY_STEP4");
+  // if (fillFSMTransItem(fsm, &trans_item))
+  // {
+  //   serverLog(LL_ERROR, "fillFSMTransItem err");
+  //   return 1;
+  // }
+  // serverLog(LL_NOTICE, "fillFSMTransItem event C_WRITE_STEP3");
 
-  // 4
-  // S_PAIRING_COMPLETE, from PAIRING_COMPLETE to PAIRING_BEGIN
-  if (fillTransItem(&trans_item, 
-    S_PAIRING_COMPLETE, PAIRING_COMPLETE, handlePairingComplete, PAIRING_BEGIN))
-  {
-    serverLog(LL_ERROR, "fillTransItem err");
-    return 1;
-  }
-  // serverLog(LL_NOTICE, "fillTransItem event C_WRITE_COMMIT");
+	// // 3
+  // // S_REPLY_STEP4, from PAIRING_COMMIT to PAIRING_COMPLETE
+  // // handleWriteCommit: 客户接收到 到一个 Commit 消息, 然后会返回一个
+  // if (fillTransItem(&trans_item, 
+  //   C_WRITE_COMMIT, PAIRING_COMMIT, handleWriteCommit, PAIRING_COMPLETE))
+  // {
+  //   serverLog(LL_ERROR, "fillTransItem err");
+  //   return 1;
+  // }
+  // // serverLog(LL_NOTICE, "fillTransItem event S_REPLY_STEP4");
 
-  if (fillFSMTransItem(fsm, &trans_item))
-  {
-    serverLog(LL_ERROR, "fillFSMTransItem err");
-    return 1;
-  }
-  // serverLog(LL_NOTICE, "fillFSMTransItem event C_WRITE_COMMIT");
+  // if (fillFSMTransItem(fsm, &trans_item))
+  // {
+  //   serverLog(LL_ERROR, "fillFSMTransItem err");
+  //   return 1;
+  // }
+  // // serverLog(LL_NOTICE, "fillFSMTransItem event S_REPLY_STEP4");
+
+  // // 4
+  // // S_PAIRING_COMPLETE, from PAIRING_COMPLETE to PAIRING_BEGIN
+  // if (fillTransItem(&trans_item, 
+  //   S_PAIRING_COMPLETE, PAIRING_COMPLETE, handlePairingComplete, PAIRING_BEGIN))
+  // {
+  //   serverLog(LL_ERROR, "fillTransItem err");
+  //   return 1;
+  // }
+  // // serverLog(LL_NOTICE, "fillTransItem event C_WRITE_COMMIT");
+
+  // if (fillFSMTransItem(fsm, &trans_item))
+  // {
+  //   serverLog(LL_ERROR, "fillFSMTransItem err");
+  //   return 1;
+  // }
+  // // serverLog(LL_NOTICE, "fillFSMTransItem event C_WRITE_COMMIT");
 
 	// 把虚拟机, 弄成 PAIRING_BEGIN, 也就是空闲的意思啦
 	initFSMCurState(fsm, PAIRING_BEGIN);
@@ -404,7 +489,7 @@ static gboolean chr_get_value(const GDBusPropertyTable *property,
 	// 写特征值的时候会调用
 	struct characteristic *chr = user_data;
 
-	printf("Characteristic(%s): Get(\"Value\")\n", chr->uuid);
+	// printf("Characteristic(%s): Get(\"Value\")\n", chr->uuid);
 
 	return chr_read(chr, iter);
 }
@@ -419,7 +504,7 @@ static gboolean chrc_get_notifying(const GDBusPropertyTable *property,
 	value = chrc->notifying ? TRUE : FALSE;
 
 	dbus_message_iter_append_basic(iter, DBUS_TYPE_BOOLEAN, &value);
-	printf("chrc_get_notifying  ------------------ \n");
+	// printf("chrc_get_notifying  ------------------ \n");
 	return TRUE;
 }
 
@@ -634,9 +719,53 @@ static void chr_write(struct characteristic *chr, const uint8_t *value, int len)
 	g_free(chr->value);
 	chr->value = g_memdup(value, len);
 	chr->vlen = len;
-	printf("g_dbus_emit_property_changed\n");
+	printf("-------------g_dbus_emit_property_changed\n");
 	g_dbus_emit_property_changed(connection, chr->path, GATT_CHR_IFACE,
 								"Value");
+}
+
+// 根据 FSM的当前状态, 给出现在应该发送的时间
+// 大概的想法就是, 
+// PAIRING_BEGIN -> C_WRITE_STEP1
+// PAIRING_STEP2 -> C_WRITE_STEP3
+// PAIRING_STEP4 -> C_WRITE_COMMIT
+// 整一个状态机会是这样
+// 1.PAIRING_BEGIN, server 没有事情做的时候, 
+// 2.任何包, 都会产生 C_WRITE_STEP1 事件, 并且设置状态为 PAIRING_STEP1
+// 3. 这时候, 对 PAIRING_STEP1的处理, 可能让转台记转换为 PAIRING_STEP2 , 也可能转换为 BEGIN(因为出错),
+void decideEvent(void *arg)
+{
+	struct characteristic *chr = (struct characteristic *)arg;
+	switch(fsm->cur_state)
+	{
+		case PAIRING_BEGIN:
+		{
+			serverLog(LL_NOTICE, "decideEvent PAIRING_BEGIN");
+			chr->event = C_WRITE_STEP1;
+			break;
+		}
+	}
+}
+
+void handleClientEvent(void *arg)
+{
+	struct characteristic *chr = arg;
+	switch (chr->event)
+	{
+	case C_WRITE_STEP1:
+		// 首先转换状态, 到 step1
+		serverLog(LL_NOTICE, "handleClientEvent cur_state %d", fsm->cur_state);
+		handleEvent(fsm, chr->event, NULL);
+		serverLog(LL_NOTICE, "handleClientEvent cur_state %d", fsm->cur_state);
+		chr->event = S_REPLY_STEP2;
+		// 然后生成 step2
+		handleEvent(fsm, chr->event, chr->recv_pairing_data);
+		/* code */
+		break;
+	
+	default:
+		break;
+	}
 }
 
 // 因为 process_message method->function的调用, 就是调的这个函数, 所以我直接在这里写状态机
@@ -677,8 +806,8 @@ static DBusMessage *chr_write_value(DBusConnection *conn, DBusMessage *msg,
 		printf("len is zero\n");
 		return dbus_message_new_method_return(msg);
 	}
-
-	recvData(chr->recv_pairing_data, value, len);
+	// want't to shut the warming up
+	recvData(chr->recv_pairing_data, (uint8_t *)value, len);
 	// printf("value len %d----------\n", len);
 	// printf("------------------- write value: \n");
 	// for (int i = 0; i < len; ++i)
@@ -691,8 +820,17 @@ static DBusMessage *chr_write_value(DBusConnection *conn, DBusMessage *msg,
 	// 会分开几个包, 
 	// 
 	// 这里就是状态机开始?
-
-	chr_write(chr, value, len);
+	if(isRecvFullPkg(chr->recv_pairing_data))
+	{
+		// 这样就只会返回一个恢复,所以要弄好
+		serverLog(LL_NOTICE, "get the full pkg, data len1 %u", chr->recv_pairing_data->data_len);
+		decideEvent(user_data);
+		serverLog(LL_NOTICE, "get the full pkg, data len2 %u", chr->recv_pairing_data->data_len);
+		handleClientEvent(user_data);
+		serverLog(LL_NOTICE, "get the full pkg, data len3 %u", chr->recv_pairing_data->data_len);
+		chr_write(chr, value, len);
+	}
+	
 
 	return dbus_message_new_method_return(msg);
 }
@@ -869,8 +1007,21 @@ static gboolean register_characteristic(const char *chr_uuid,
 	chr->props = props;
 	chr->service = g_strdup(service_path);
 	chr->path = g_strdup_printf("%s/characteristic%d", service_path, id++);
+	// 初始化自己的数据结构
 	getRecvData(&chr->recv_pairing_data);
-	initRecvData(&chr->recv_pairing_data);
+	initRecvData(chr->recv_pairing_data);
+
+	// 获得 fsm
+	if(getFSM(&fsm))
+  {
+    serverLog(LL_ERROR, "getFSM err");
+    return 1;
+  }
+  serverLog(LL_NOTICE, "getFSM success");
+
+	// 初始化全局的 fsm
+	serverLog(LL_NOTICE, "---------- initPairingFsm success");
+	initPairingFsm();
 	
 	if (!g_dbus_register_interface(connection, chr->path, GATT_CHR_IFACE,
 					chr_methods, NULL, chr_properties,

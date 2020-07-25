@@ -1884,21 +1884,21 @@ static int writeCreatePinRequest(void *arg)
   ig_CreatePinRequest_set_new_pin(
     &create_pin_request, request->new_pin, request->new_pin_size);
   serverLog(LL_NOTICE, "ig_CreatePinRequest_set_new_pin");
-  for (int j = 0; j < create_pin_request.new_pin_size; j++)
-  {
-    printf ("%d ", create_pin_request.new_pin[j]);
-  }
-  printf("\n");
+  // for (int j = 0; j < create_pin_request.new_pin_size; j++)
+  // {
+  //   printf ("%d ", create_pin_request.new_pin[j]);
+  // }
+  // printf("\n");
 
   ig_CreatePinRequest_set_password(
     &create_pin_request, request->password, request->password_size);
 
   serverLog(LL_NOTICE, "ig_CreatePinRequest_set_password");
-  for (int j = 0; j < create_pin_request.password_size; j++)
-  {
-    printf ("%x ", create_pin_request.password[j]);
-  }
-  printf("\n");
+  // for (int j = 0; j < create_pin_request.password_size; j++)
+  // {
+  //   printf ("%x ", create_pin_request.password[j]);
+  // }
+  // printf("\n");
 
   // optionnal
   if (request->has_start_date)

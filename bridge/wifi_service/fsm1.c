@@ -39,6 +39,7 @@ int getFSM(FSM **p_fsm)
         return 1;
     } 
     *p_fsm = malloc(sizeof(FSM));
+    memset(*p_fsm, 0, sizeof(FSM));
     return 0;
 }
 
