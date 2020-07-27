@@ -11,15 +11,27 @@
 
 static char wifi_pairing_str[] = "12345678-0000-1000-8000-00805f9b34fb";
 uuid_t wifi_pairing_uuid = {};
+
 gatt_connection_t* gatt_connection = NULL;
 char *bridge_addr = "DC:A6:32:10:C7:DC";
 bool is_registered = false;
 
 GMainLoop *loop = NULL;
 
+void handleStep2(const uint8_t* data, size_t data_length)
+{
+
+}
+
 static void message_handler(
 	const uuid_t* uuid, const uint8_t* data, size_t data_length, void* user_data) {
   serverLog(LL_NOTICE, "----------- message_handler ---------------");
+  printf("data_length: %u", data_length);
+  for (int i = 0; i < data_length; ++i)
+  {
+    printf(" %x", data[i]);
+  }
+  printf("\n");
 }
 
 int register_pairing_notfication()

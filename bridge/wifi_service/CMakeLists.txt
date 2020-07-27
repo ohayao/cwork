@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.4)
 set(WIFI_DEPENDENCIES
   lock
   ign_lib
+  ble
 )
 
 set(CMAKE_BUILD_TYPE Debug)

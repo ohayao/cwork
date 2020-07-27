@@ -43,6 +43,7 @@
 #include "bridge/wifi_service/pairing.h"
 #include "bridge/wifi_service/fsm1.h"
 #include "bridge/bridge_main/log.h"
+#include "bridge/ble/ble_operation.h"
 
 #define GATT_MGR_IFACE			"org.bluez.GattManager1"
 #define GATT_SERVICE_IFACE		"org.bluez.GattService1"
@@ -56,8 +57,6 @@
 
 /* Random UUID for testing purpose */
 #define READ_WRITE_DESCRIPTOR_UUID	"8260c653-1a54-426b-9e36-e84c238bc669"
-
-
 
 static GMainLoop *main_loop;
 static GSList *services;
@@ -101,6 +100,9 @@ struct descriptor {
 static const char *wifi_info_props[] = { "write-without-response", "notify", NULL };
 static const char *desc_props[] = { "read", "write", NULL };
 
+// functions
+static void chr_write(struct characteristic *chr, const uint8_t *value, int len);
+
 // 状态机相关代码
 static FSM *fsm = NULL;
 
@@ -114,31 +116,19 @@ int handleWriteStep1(void *arg)
 	return 0;
 }
 
+// arg 是 characteristic
 int handleReplyStep2(void *arg)
 {
-	printf("handleReplyStep2 %x ", arg)
 	serverLog(LL_NOTICE, "we are going to reply cliet step2, trans fsm to pairing step2");
 	int ret = 0;
 	struct characteristic *chr = (struct characteristic *)arg;
 	RecvData *recv_pairing_data = chr->recv_pairing_data;
-	serverLog(LL_NOTICE, "handleReplyStep2 %u ", chr->recv_pairing_data->data_len);
 	if (recv_pairing_data == NULL)
   {
     serverLog(LL_ERROR, "handleWriteStep1  recv_pairing_data null");
     return 1;
   }
 
-	 // test 
-  // printf("=============== handleReplyStep2 ==================\n");
-  // printf("recv data len %u", recv_pairing_data->data_len);
-	// for (int i = 0; i < recv_pairing_data->data_len;  i+=20)
-  // {
-  //   for (int j = 0; j < 20; ++j)
-  //   {
-  //     printf(" %x", recv_pairing_data->data[i+j]);
-  //   }
-  //   printf("\n");
-  // }
 	size_t step1_len = 0;
   uint8_t *step1_payload_bytes = NULL;
 	if (getRecvPkgLen(recv_pairing_data, &step1_len))
@@ -147,6 +137,63 @@ int handleReplyStep2(void *arg)
 		return 1;
 	}
 	serverLog(LL_NOTICE, "getRecvPkgLen success, size %u", step1_len);
+
+	step1_payload_bytes = malloc(step1_len);
+  memset(step1_payload_bytes, 0, step1_len);
+
+	if (getPkgFromRecvData(recv_pairing_data, step1_payload_bytes))
+	{
+		serverLog(LL_ERROR, "getPkgFromRecvData error");
+		return 1;
+	}
+	serverLog(LL_NOTICE, "getPkgFromRecvData success");
+
+	uint8_t *step2_bytes = NULL;
+  uint32_t step2_size = ig_pairing_step2_size();
+  uint32_t step2_writen_len = 0;
+
+	if (step2_size == 0)
+	{
+		serverLog(LL_ERROR, "ig_pairing_step2_size error");
+		return 1;
+	}
+
+	step2_bytes = malloc(step2_size);
+  memset(step2_bytes, 0, step2_size);
+
+	if (server_gen_pairing_step2(
+      step1_payload_bytes, step1_len, step2_bytes, step2_size, &step2_writen_len))
+	{
+		serverLog(LL_ERROR, "server_gen_pairing_step2 error");
+		return 1;
+	}
+
+	serverLog(LL_NOTICE, "server_gen_pairing_step2 success");
+
+	if (!ig_PairingStep2_is_valid((IgPairingStep2 *)step2_bytes))
+	{
+		serverLog(LL_ERROR, "step2 not valid error");
+		return 1;
+	}
+
+	uint8_t *payloadBytes = NULL;
+  uint32_t payload_len = 0;
+
+	if (!build_msg_payload(
+      &payloadBytes, &payload_len, step2_bytes, step2_writen_len))
+	{
+		serverLog(LL_ERROR, "failed in build_msg_payload");
+		return 1;
+	}
+	serverLog(LL_NOTICE, "success in build_msg_payload, size: %u", payload_len);
+
+	// 已经验证, 能够成功收到
+	// for (int i = 0; i < payload_len; ++i)
+	// {
+	// 	printf(" %x", payloadBytes[i]);
+	// }
+	// printf("\n");
+	chr_write(chr, payloadBytes, payload_len);
 	return 0;
 }
 
@@ -192,8 +239,6 @@ void handleCommitWrong(void *arg)
 {
 	
 }
-
-
 
 int getGlobalFSM()
 {
@@ -320,8 +365,7 @@ int initPairingFsm()
 }
 
 
-// functions
-static void chr_write(struct characteristic *chr, const uint8_t *value, int len);
+
 
 static gboolean desc_get_uuid(const GDBusPropertyTable *property,
 					DBusMessageIter *iter, void *user_data)
@@ -750,16 +794,26 @@ void decideEvent(void *arg)
 void handleClientEvent(void *arg)
 {
 	struct characteristic *chr = arg;
+	int handle_res = 0;
 	switch (chr->event)
 	{
 	case C_WRITE_STEP1:
 		// 首先转换状态, 到 step1
 		serverLog(LL_NOTICE, "handleClientEvent cur_state %d", fsm->cur_state);
-		handleEvent(fsm, chr->event, NULL);
+		handle_res = handleEvent(fsm, chr->event, NULL);
+		if (handle_res)
+		{
+			serverLog(LL_ERROR, "handle event C_WRITE_STEP1 error");
+		}
 		serverLog(LL_NOTICE, "handleClientEvent cur_state %d", fsm->cur_state);
 		chr->event = S_REPLY_STEP2;
 		// 然后生成 step2
-		handleEvent(fsm, chr->event, chr->recv_pairing_data);
+		// 这儿别传错数据, 都使用chr 进行传递
+		handle_res = handleEvent(fsm, chr->event, chr);
+		if (handle_res)
+		{
+			serverLog(LL_ERROR, "handle event S_REPLY_STEP2 error");
+		}
 		/* code */
 		break;
 	
@@ -823,12 +877,9 @@ static DBusMessage *chr_write_value(DBusConnection *conn, DBusMessage *msg,
 	if(isRecvFullPkg(chr->recv_pairing_data))
 	{
 		// 这样就只会返回一个恢复,所以要弄好
-		serverLog(LL_NOTICE, "get the full pkg, data len1 %u", chr->recv_pairing_data->data_len);
 		decideEvent(user_data);
-		serverLog(LL_NOTICE, "get the full pkg, data len2 %u", chr->recv_pairing_data->data_len);
 		handleClientEvent(user_data);
-		serverLog(LL_NOTICE, "get the full pkg, data len3 %u", chr->recv_pairing_data->data_len);
-		chr_write(chr, value, len);
+		// chr_write(chr, value, len);
 	}
 	
 
