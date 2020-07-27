@@ -20,7 +20,49 @@ GMainLoop *loop = NULL;
 
 void handleStep2(const uint8_t* data, size_t data_length)
 {
+  int ret = 0;
+  size_t payload_len = 0;
+	uint8_t *payloadBytes = NULL;
+  uint8_t *step3Bytes = NULL;
+  size_t step3Bytes_len = 0;
 
+  size_t n_size_byte = 0;
+  if (data[2] == 0xff)
+  {
+    n_size_byte = 3;
+  }
+  else
+  {
+    n_size_byte = 1;
+  }
+
+  step3Bytes_len = 
+      igloohome_ble_lock_crypto_PairingConnection_genPairingStep3Native(
+		        (data_length-n_size_byte), (uint8_t *)(data+n_size_byte), &step3Bytes);
+  if (!step3Bytes_len)
+  {
+    serverLog(LL_NOTICE, "genPairingStep3Native error");
+    return;
+  }
+  serverLog(LL_NOTICE, "genPairingStep3Native Success");
+
+  if (!build_msg_payload(
+		&payloadBytes, &payload_len, step3Bytes, step3Bytes_len))
+	{
+    serverLog(LL_ERROR, "failed in build_msg_payload");
+		return;
+	}
+  serverLog(LL_NOTICE, "build_msg_payload Success");
+
+  ret = write_char_by_uuid_multi_atts(
+		gatt_connection, &wifi_pairing_uuid,payloadBytes, payload_len);
+	if (ret != GATTLIB_SUCCESS) {
+    serverLog(LL_ERROR, 
+                "write_char_by_uuid_multi_atts failed in writing th packags");
+		return;
+	}
+  serverLog(LL_NOTICE, "write_char_by_uuid_multi_atts Success");
+  return;
 }
 
 static void message_handler(
@@ -32,6 +74,7 @@ static void message_handler(
     printf(" %x", data[i]);
   }
   printf("\n");
+  handleStep2(data, data_length);
 }
 
 int register_pairing_notfication()

@@ -188,11 +188,11 @@ int handleReplyStep2(void *arg)
 	serverLog(LL_NOTICE, "success in build_msg_payload, size: %u", payload_len);
 
 	// 已经验证, 能够成功收到
-	// for (int i = 0; i < payload_len; ++i)
-	// {
-	// 	printf(" %x", payloadBytes[i]);
-	// }
-	// printf("\n");
+	for (int i = 0; i < payload_len; ++i)
+	{
+		printf(" %x", payloadBytes[i]);
+	}
+	printf("\n");
 	chr_write(chr, payloadBytes, payload_len);
 	return 0;
 }
@@ -877,6 +877,7 @@ static DBusMessage *chr_write_value(DBusConnection *conn, DBusMessage *msg,
 	if(isRecvFullPkg(chr->recv_pairing_data))
 	{
 		// 这样就只会返回一个恢复,所以要弄好
+		serverLog(LL_NOTICE, "get full pkg");
 		decideEvent(user_data);
 		handleClientEvent(user_data);
 		// chr_write(chr, value, len);
