@@ -2,16 +2,14 @@
 #include "bridge/ble/ble_admin.h"
 #include "bridge/gattlib/gattlib.h"
 #include "bridge/bridge_main/task.h"
-
 #include "bridge/lock/connection/admin_connection.h"
 #include "bridge/ble/ble_operation.h"
-#include "bridge/lock/messages/AdminUnlockRequest.h"
-#include "bridge/lock/messages/AdminUnlockResponse.h"
-
+#include "bridge/lock/messages/UnlockRequest.h"
+#include "bridge/lock/messages/UnlockResponse.h"
 #include "bridge/lock/messages/UnpairRequest.h"
 #include "bridge/lock/messages/UnpairResponse.h"
-#include "bridge/lock/messages/AdminLockRequest.h"
-#include "bridge/lock/messages/AdminLockResponse.h"
+#include "bridge/lock/messages/LockRequest.h"
+#include "bridge/lock/messages/LockResponse.h"
 #include "bridge/lock/messages/GetLogsRequest.h"
 #include "bridge/lock/messages/GetLogsResponse.h"
 #include "bridge/lock/messages/GetLockStatusRequest.h"
@@ -235,12 +233,18 @@ fsm_table_t admin_fsm_table[ADMIN_SM_TABLE_LEN] = {
 
 void message_handler(const uuid_t* uuid, const uint8_t* data, size_t data_length, void* user_data) {
 	serverLog(LL_NOTICE, "message_handler---------------");
+	printf("message_handler---------------\n");
 	task_node_t *task_node = (task_node_t *)user_data;
 	ble_data_t *ble_data = task_node->ble_data;
 	admin_connection_t *admin_connection = (admin_connection_t *)ble_data->ble_connection;
 
-	switch(admin_connection->admin_step)
-	{
+	printf("get gatt notify, step[%d], data_len[%d], data[", admin_connection->admin_step, data_length);
+	for(int i =0 ;i<data_length; i++){
+		printf("%x",data[i]);
+	}
+	printf("]\n");
+
+	switch(admin_connection->admin_step) {
 		case BLE_ADMIN_BEGIN:
 			{
 				serverLog(LL_NOTICE, "admin_connection->admin_step BLE_ADMIN_BEGIN handle_step1_message");
@@ -362,9 +366,8 @@ int register_admin_notfication(void *arg) {
 		goto ADMIN_ERROR_EXIT;
 	}
 
-	serverLog(LL_NOTICE, "register_admin_notfication ready to connection %s",
-			admin_connection->lock->addr);
 	//optimise this short connection to long!
+	printf("in register_guest_notfication ready to connection adapter[%d], lockaddr[%s].\n", ble_data->adapter, admin_connection->lock->addr);
 	admin_connection->gatt_connection = gattlib_connect(
 			ble_data->adapter, admin_connection->lock->addr, GATTLIB_CONNECTION_OPTIONS_LEGACY_DEFAULT);
 	if (NULL == admin_connection->gatt_connection) {
@@ -376,7 +379,7 @@ int register_admin_notfication(void *arg) {
 		serverLog(LL_ERROR, "gattlib_string_to_uuid to admin_uuid fail");
 		goto ADMIN_ERROR_EXIT;
 	}
-	serverLog(LL_NOTICE, "gattlib_string_to_uuid to admin_uuid success." );
+	printf("gattlib_string_to_uuid to admin_uuid[%x] success.", admin_connection->admin_uuid);
 	//*/
 
 	gattlib_register_notification(admin_connection->gatt_connection, message_handler, arg);
@@ -532,16 +535,15 @@ int write_admin_step2(void *arg) {
 	int step2Len = 0;
 	int connectionID = 0;
 
-	ret = igloohome_ble_lock_crypto_AdminConnection_beginConnection(
-			admin_connection->lock->admin_key, admin_connection->lock->admin_key_len);
+	printf("in write_admin_step2, do igloohome_ble_lock_crypto_AdminConnection_beginConnection, key[%x],key_len[%d].\n", admin_connection->lock->key, admin_connection->lock->key_len);
+	ret = igloohome_ble_lock_crypto_AdminConnection_beginConnection(admin_connection->lock->key, admin_connection->lock->key_len);
 	if (ERROR_CONNECTION_ID == ret) {
 		serverLog(LL_ERROR, "igloohome_ble_lock_crypto_AdminConnection_beginConnection error[%d]", ret);
 		goto ADMIN_STEP2_ERROR_EXIT;
 	}
-	serverLog(LL_NOTICE, "igloohome_ble_lock_crypto_AdminConnection_beginConnection success");
 	connectionID = ret;
+	printf("igloohome_ble_lock_crypto_AdminConnection_beginConnection success. connectionID[%d]\n", connectionID);
 	setLockConnectionID(admin_connection->lock, connectionID);
-	serverLog(LL_NOTICE, "set connectionID to Lock");
 
 	step2Len = igloohome_ble_lock_crypto_AdminConnection_genConnStep2Native(
 			connectionID, 
@@ -552,13 +554,14 @@ int write_admin_step2(void *arg) {
 		serverLog(LL_ERROR, "igloohome_ble_lock_crypto_AdminConnection_genConnStep2Native err");
 		goto ADMIN_STEP2_ERROR_EXIT;
 	}
-	serverLog(LL_NOTICE, "igloohome_ble_lock_crypto_AdminConnection_genConnStep2Native success");
+	printf("igloohome_ble_lock_crypto_AdminConnection_genConnStep2Native success, connectionID[%d], ret step2Len[%d], token[%x], token_len[%d].\n", connectionID, step2Len, admin_connection->lock->token, admin_connection->lock->token_len);
 
 	if (!build_msg_payload(&payloadBytes, &payload_len, step2Bytes, step2Len)) {
 		serverLog(LL_ERROR, "failed in build_msg_payload");
 		goto ADMIN_STEP2_ERROR_EXIT;
 	}
-	serverLog(LL_NOTICE, "build_msg_payload success");
+	//serverLog(LL_NOTICE, "build_msg_payload success");
+	printf("build_msg_payload success.\n");
 
 	ret = write_char_by_uuid_multi_atts(
 			admin_connection->gatt_connection, &admin_connection->admin_uuid, 
@@ -567,7 +570,7 @@ int write_admin_step2(void *arg) {
 		serverLog(LL_ERROR, "write_char_by_uuid_multi_atts err[%d]", ret);
 		goto ADMIN_STEP2_ERROR_EXIT;
 	}
-	serverLog(LL_NOTICE, "admin write step2 write_char_by_uuid_multi_atts success in writing packages");
+	printf("write_char_by_uuid_multi_atts ret[%d] succ, payload_len[%d].\n", ret, payload_len);
 
 	admin_connection->admin_step = BLE_ADMIN_STEP2;
 
@@ -729,12 +732,12 @@ static int write_lock_request(void *arg) {
 	uint8_t *encryptPayloadBytes = NULL;
 	size_t encryptPayloadBytes_len;
 
-	IgAdminLockRequest lock_request;
-	ig_AdminLockRequest_init(&lock_request);
-	ig_AdminLockRequest_set_operation_id(&lock_request, requestID);
-	ig_AdminLockRequest_set_password(
+	IgLockRequest lock_request;
+	ig_LockRequest_init(&lock_request);
+	ig_LockRequest_set_operation_id(&lock_request, requestID);
+	ig_LockRequest_set_password(
 			&lock_request, admin_connection->lock->password, admin_connection->lock->password_size);
-	IgSerializerError IgErr = ig_AdminLockRequest_encode(&lock_request, buf, buf_size, &encode_size);
+	IgSerializerError IgErr = ig_LockRequest_encode(&lock_request, buf, buf_size, &encode_size);
 	if (IgErr) {
 		serverLog(LL_ERROR, "ig_UnpairRequest_encode err");
 		goto LOCK_REQUEST_ERROR;
@@ -771,14 +774,14 @@ static int write_lock_request(void *arg) {
 	encryptPayloadBytes = NULL;
 	free(retvalBytes);
 	retvalBytes = NULL;
-	ig_AdminLockRequest_deinit(&lock_request);
+	ig_LockRequest_deinit(&lock_request);
 	admin_connection->admin_step = BLE_ADMIN_LOCK_REQUEST;
 	serverLog(LL_NOTICE, "exit write lock request success");
 	return 0;
 
 LOCK_REQUEST_ERROR:
 	serverLog(LL_ERROR, "LOCK_REQUEST_ERROR");
-	ig_AdminLockRequest_deinit(&lock_request);
+	ig_LockRequest_deinit(&lock_request);
 	if (encryptPayloadBytes) {
 		free(encryptPayloadBytes);
 	}
@@ -899,9 +902,9 @@ static int handle_lock_responce(const uint8_t* data, int data_length,void* user_
 		}
 		serverLog(LL_NOTICE, "AdminConnection_decryptNative responceLen %d", responceLen);
 
-		IgAdminLockResponse admin_lock_responce;
-		ig_AdminLockResponse_init(&admin_lock_responce);
-		IgSerializerError err = ig_AdminLockResponse_decode(
+		IgLockResponse admin_lock_responce;
+		ig_LockResponse_init(&admin_lock_responce);
+		IgSerializerError err = ig_LockResponse_decode(
 				responceBytes, responceLen, &admin_lock_responce, 0
 				);
 		if (err)
@@ -921,7 +924,7 @@ static int handle_lock_responce(const uint8_t* data, int data_length,void* user_
 			admin_connection->ble_result->lock_result= admin_lock_responce.result;
 		}
 		setAdminResultCMDResponse(
-				admin_connection->ble_result, &admin_lock_responce, sizeof(IgAdminLockResponse));
+				admin_connection->ble_result, &admin_lock_responce, sizeof(IgLockResponse));
 
 		serverLog(LL_NOTICE, "handle_step3_message bleSetBleResult to ble data");
 		bleSetBleResult( ble_data, admin_connection->ble_result);
@@ -973,13 +976,13 @@ static int write_unlock_request(void *arg) {
 
 	//op_cmd & pin
 	//unlock
-	IgAdminUnlockRequest unlock_request;
-	ig_AdminUnlockRequest_init(&unlock_request);
-	ig_AdminUnlockRequest_set_operation_id(&unlock_request, requestID);
-	ig_AdminUnlockRequest_set_password(
+	IgUnlockRequest unlock_request;
+	ig_UnlockRequest_init(&unlock_request);
+	ig_UnlockRequest_set_operation_id(&unlock_request, requestID);
+	ig_UnlockRequest_set_password(
 			&unlock_request, admin_connection->lock->password, admin_connection->lock->password_size);
 	//encode without encryption
-	IgSerializerError IgErr = ig_AdminUnlockRequest_encode(&unlock_request, buf, buf_size, &encode_size);
+	IgSerializerError IgErr = ig_UnlockRequest_encode(&unlock_request, buf, buf_size, &encode_size);
 	if (IgErr) {
 		serverLog(LL_ERROR, "ig_UnpairRequest_encode err");
 		goto UNLOCK_REQUEST_ERROR;
@@ -1158,9 +1161,9 @@ static int handle_unlock_responce(const uint8_t* data, int data_length,void* use
 		}
 		serverLog(LL_NOTICE, "AdminConnection_decryptNative responceLen %d", responceLen);
 
-		IgAdminUnlockResponse admin_unlock_responce;
-		ig_AdminUnlockResponse_init(&admin_unlock_responce);
-		IgSerializerError err = ig_AdminUnlockResponse_decode(
+		IgUnlockResponse admin_unlock_responce;
+		ig_UnlockResponse_init(&admin_unlock_responce);
+		IgSerializerError err = ig_UnlockResponse_decode(
 				responceBytes, responceLen, &admin_unlock_responce, 0
 				);
 		if (err)
@@ -1179,7 +1182,7 @@ static int handle_unlock_responce(const uint8_t* data, int data_length,void* use
     }
     // 复制所返回的结果 这儿会有内存申请
     setAdminResultCMDResponse(
-      admin_connection->ble_result, &admin_unlock_responce, sizeof(IgAdminUnlockResponse));
+      admin_connection->ble_result, &admin_unlock_responce, sizeof(IgUnlockResponse));
     
      // 返回参数给调用进程
     serverLog(LL_NOTICE, "handle_step3_message bleSetBleResult to ble data");

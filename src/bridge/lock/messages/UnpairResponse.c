@@ -5,7 +5,6 @@ void ig_UnpairResponse_init(IgUnpairResponse *obj)
 {
   memset(obj, 0, sizeof(IgUnpairResponse));
 }
-
 IgSerializerError ig_UnpairResponse_encode(IgUnpairResponse *obj,uint8_t *retval,uint32_t length,size_t *written_length)
 {
   
@@ -51,8 +50,7 @@ IgSerializerError ig_UnpairResponse_encode(IgUnpairResponse *obj,uint8_t *retval
   
   return IgSerializerNoError;
 }
-IgSerializerError ig_UnpairResponse_decode(
-  uint8_t *buf,size_t buf_size,IgUnpairResponse *retval,size_t index)
+IgSerializerError ig_UnpairResponse_decode(uint8_t *buf,size_t buf_size,IgUnpairResponse *retval,size_t index)
 {
   CborParser parser;
   CborValue it;

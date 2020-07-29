@@ -233,7 +233,7 @@ void saveTaskData(task_node_t* ptn) {
 					{
 						serverLog(LL_NOTICE, "set name %s addr %s to paired", lock->name, lock->addr);
 						setLockPaired(lock);
-						setLockAdminKey(lock, pairing_result->admin_key, pairing_result->admin_key_len);
+						setLockKey(lock, pairing_result->admin_key, pairing_result->admin_key_len);
 						setLockPassword(lock, pairing_result->password, pairing_result->password_size);
 						// addAdminTask(lock, 2);
 						// addAdminUnpairTask(lock);
@@ -287,6 +287,7 @@ int HandleLockCMD (igm_lock_t *lock, int cmd, void* request) {
 
 	task_node_t *tn = (task_node_t *)malloc(sizeof(task_node_t));
 	tn->ble_data = ble_data;
+	memset(tn->lock_id, 0x0, sizeof(tn->lock_id));
 	memcpy(tn->lock_id, lock->name, lock->name_len);
 
 	if (ign_DemoLockCommand_LOCK == cmd) {
@@ -695,7 +696,7 @@ void WaitMQTT(sysinfo_t *si) {
 			serverLog(LL_ERROR, "MQTTClient_receive err[%d], topic[%s].", rc, topic);
 		}
 		if(msg){
-			printf(">>>> MQTTClient_receive msg from server, topic[%s].\n", topic);
+			printf(">>>> MQTTClient_receive msg[%u] from server, topic[%s].\n", msg->payloadlen, topic);
 			if(0 == strcmp(topic, PUB_WEBDEMO)){
 				//web simulator request
 				DoWebMsg(topic,msg->payload);
@@ -711,6 +712,7 @@ void WaitMQTT(sysinfo_t *si) {
 			        serverLog(LL_ERROR, "pb_decode err[%d].", ret);
 					printf("MQTT MSG DECODE ERROR[%d]!\n", ret);
 				}else{
+					printf("after pb decode, type[%d]", (imsg.event_type));
                     //create node,add into list, bred
 					switch(imsg.event_type){
 						case ign_EventType_HEARTBEAT:
@@ -726,9 +728,28 @@ void WaitMQTT(sysinfo_t *si) {
 							break;
 						case ign_EventType_UPDATE_USER_INFO:
 							if(imsg.has_server_data){
+								/*
 								for(int i=0;i<glock_index;i++){
 									printf("%02d bt_id=%s\n",i,glocks[i].bt_id);
+								}*/
+								for(int j=0; j<imsg.server_data.lock_entries_count; j++) {
+									printf("[%d], bt_id[%s], guest_aes_ekey size[%d] [", j, imsg.server_data.lock_entries[j].bt_id, imsg.server_data.lock_entries[j].ekey.guest_aes_key.size);
+									for(int k=0;k<imsg.server_data.lock_entries[j].ekey.guest_aes_key.size; k++) {
+										printf("[%x]", imsg.server_data.lock_entries[j].ekey.guest_aes_key.bytes[k]);
+									}
+									printf("]");
+									printf(", guest_token size[%d] [", imsg.server_data.lock_entries[j].ekey.guest_token.size);
+									for(int k=0;k<imsg.server_data.lock_entries[j].ekey.guest_token.size; k++) {
+										printf("[%x]", imsg.server_data.lock_entries[j].ekey.guest_token.bytes[k]);
+									}
+									printf("]");
+									printf(", password size[%d] [", imsg.server_data.lock_entries[j].ekey.password.size);
+									for(int k=0;k<imsg.server_data.lock_entries[j].ekey.password.size; k++) {
+										printf("[%x]", imsg.server_data.lock_entries[j].ekey.password.bytes[k]);
+									}
+									printf("]\n");
 								}
+								printf("\n");
 							}
 
 							ign_MsgInfo tmsg={};
@@ -739,14 +760,18 @@ void WaitMQTT(sysinfo_t *si) {
 							pbed->profile = Create_IgnBridgeProfile(&g_sysif);
 							tmsg.has_server_data = true;
 							ign_ServerEventData *psd = &tmsg.server_data;
-							psd->lock_entries_count = 5;
+							psd->lock_entries_count = imsg.server_data.lock_entries_count;
+							for(int i=0; i<imsg.server_data.lock_entries_count; i++){
+								psd->lock_entries[i] = imsg.server_data.lock_entries[i];
+							}
+							/*	
 							int tl=0;
 							printf("recv User Info, lock_count[%u].\n", imsg.server_data.lock_entries_count);
 							for(int i=0; i<imsg.server_data.lock_entries_count; i++){
 								if(strlen(imsg.server_data.lock_entries[i].bt_id)>0){
 									tl++;
 									strcpy(psd->lock_entries[i].bt_id,imsg.server_data.lock_entries[i].bt_id);
-									strcpy(psd->lock_entries[i].ekey.bytes,imsg.server_data.lock_entries[i].ekey.bytes);
+									strcpy(psd->lock_entries[i].ekey.bytes,imsg.server_data.lock_entries[i].ekey.guest_aes_key.bytes);
 									if(0 == psd->lock_entries[i].ekey.size) {
 										serverLog(LL_ERROR, "get lock[%s] ekey is empty err!", psd->lock_entries[i].bt_id);
 									}
@@ -758,7 +783,7 @@ void WaitMQTT(sysinfo_t *si) {
 								}
 							}
 							psd->lock_entries_count=tl;
-
+*/
                             SendMQTTMsg(&tmsg, SUB_WEBDEMO);
 							goto gomqttfree;
 							break;
@@ -772,9 +797,19 @@ void WaitMQTT(sysinfo_t *si) {
 							}
 							printf("]\nlock_entries_count[%u]:", imsg.server_data.lock_entries_count);
 							for(int j=0; j<imsg.server_data.lock_entries_count; j++) {
-								printf("[%d], bt_id[%s], ekey[", j, imsg.server_data.lock_entries[j].bt_id);
-								for(int k=0;k<imsg.server_data.lock_entries[j].ekey.size; k++) {
-									printf("%x", imsg.server_data.lock_entries[j].ekey.bytes[k]);
+								printf("[%d], bt_id[%s], guest_aes_ekey size[%d] [", j, imsg.server_data.lock_entries[j].bt_id, imsg.server_data.lock_entries[j].ekey.guest_aes_key.size);
+								for(int k=0;k<imsg.server_data.lock_entries[j].ekey.guest_aes_key.size; k++) {
+									printf("%x", imsg.server_data.lock_entries[j].ekey.guest_aes_key.bytes[k]);
+								}
+								printf("]");
+								printf(", guest_token size[%d] [", imsg.server_data.lock_entries[j].ekey.guest_token.size);
+								for(int k=0;k<imsg.server_data.lock_entries[j].ekey.guest_token.size; k++) {
+									printf("%x", imsg.server_data.lock_entries[j].ekey.guest_token.bytes[k]);
+								}
+								printf("]");
+								printf(", password size[%d] [", imsg.server_data.lock_entries[j].ekey.password.size);
+								for(int k=0;k<imsg.server_data.lock_entries[j].ekey.password.size; k++) {
+									printf("%x", imsg.server_data.lock_entries[j].ekey.password.bytes[k]);
 								}
 								printf("]");
 							}
@@ -805,7 +840,7 @@ void WaitMQTT(sysinfo_t *si) {
 							uint8_t tmp_buff[100];
 							memset(tmp_buff, 0, sizeof(tmp_buff));
 							int admin_len = hexStrToByte(admin_key, tmp_buff, strlen(admin_key));
-							setLockAdminKey(lock, tmp_buff, admin_len);
+							setLockKey(lock, tmp_buff, admin_len);
 							memset(tmp_buff, 0, sizeof(tmp_buff));
 							int password_size = hexStrToByte(passwd, tmp_buff, strlen(passwd));
 							setLockPassword(lock, tmp_buff, password_size);
@@ -861,7 +896,7 @@ void WaitMQTT(sysinfo_t *si) {
 							goto gomqttfree;
 							break;
 						default:
-							printf("RECV MQTT [%u] msg.\n", imsg.event_type);
+							printf("RECV MQTT err type[%u].\n", imsg.event_type);
 							goto gomqttfree;
 							break;
 					}

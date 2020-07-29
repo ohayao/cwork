@@ -5,7 +5,6 @@ void ig_PairingStep3_init(IgPairingStep3 *obj)
 {
   memset(obj, 0, sizeof(IgPairingStep3));
 }
-
 IgSerializerError ig_PairingStep3_encode(IgPairingStep3 *obj,uint8_t *retval,uint32_t length,size_t *written_length)
 {
   
@@ -89,7 +88,6 @@ IgSerializerError ig_PairingStep3_encode(IgPairingStep3 *obj,uint8_t *retval,uin
 }
 IgSerializerError ig_PairingStep3_decode(uint8_t *buf,size_t buf_size,IgPairingStep3 *retval,size_t index)
 {
-  // printf("ig_PairingStep3_decode\n");
   CborParser parser;
   CborValue it;
   CborValue content;
@@ -122,23 +120,18 @@ IgSerializerError ig_PairingStep3_decode(uint8_t *buf,size_t buf_size,IgPairingS
   while (!cbor_value_at_end(&content)) {
   
     CborType tag_id_type = cbor_value_get_type(&content);
-    // printf("cbor_value_get_type\n");
     if(tag_id_type != CborIntegerType) return IgSerializerErrorInvalidTypeTagId;
   
     cbor_value_get_int64(&content, &tag_id);
     err = cbor_value_advance_fixed(&content);
-    // printf("cbor_value_advance_fixed\n");
     if(err) return (IgSerializerError) err;
   
     if(!err){
       //handle value
       CborType value_type = cbor_value_get_type(&content);
-      // printf("value_type %x\n", value_type);
       switch (tag_id) {
         case 0:
-          // printf("case 0\n");
           if(value_type == CborIntegerType){
-            // printf("case 0 end\n");
             int64_t val;
             cbor_value_get_int64(&content, &val);
             //msgId value
@@ -146,12 +139,9 @@ IgSerializerError ig_PairingStep3_decode(uint8_t *buf,size_t buf_size,IgPairingS
             err = cbor_value_advance_fixed(&content);
             break;
           }
-          break;
-        
+  
         case 11:
-            // printf("case 11\n");
             if(value_type == CborByteStringType){
-                // printf("case 11 end\n");
                 size_t size;
                 err = cbor_value_get_string_length(&content, &size);
                 if(err) return (IgSerializerError) err;
@@ -163,13 +153,10 @@ IgSerializerError ig_PairingStep3_decode(uint8_t *buf,size_t buf_size,IgPairingS
                 ig_PairingStep3_set_nonce_nocopy(retval, data_arr, size);
                 break;
             }
-            break;
         
         
         case 13:
-            // printf("case 13\n");
             if(value_type == CborByteStringType){
-                // printf("case 13 end\n");
                 size_t size;
                 err = cbor_value_get_string_length(&content, &size);
                 if(err) return (IgSerializerError) err;
@@ -177,39 +164,29 @@ IgSerializerError ig_PairingStep3_decode(uint8_t *buf,size_t buf_size,IgPairingS
                 uint8_t *data_arr = malloc(size);
                 err = cbor_value_copy_byte_string(&content, data_arr, &size, &content);
                 if(err) return (IgSerializerError) err;
-                // for (int i = 0; i < size; i++)
-                // {
-                //   printf("%x ", data_arr[i]);
-                // }
-                // printf("\n");
+        
                 ig_PairingStep3_set_master_pin_nocopy(retval, data_arr, size);
                 break;
             }
-            break;
-             
+        
+        
         case 14:
-            // printf("case 14\n");
             if(value_type == CborByteStringType){
-                // printf("case 14 end\n");
                 size_t size;
                 err = cbor_value_get_string_length(&content, &size);
-                // printf("case 14 cbor_value_get_string_length %d\n", size);
                 if(err) return (IgSerializerError) err;
         
                 uint8_t *data_arr = malloc(size);
                 err = cbor_value_copy_byte_string(&content, data_arr, &size, &content);
-                // printf("case 14 cbor_value_copy_byte_string\n");
                 if(err) return (IgSerializerError) err;
-                // printf("case 14 ig_PairingStep3_set_pin_key_nocopy\n");
+        
                 ig_PairingStep3_set_pin_key_nocopy(retval, data_arr, size);
                 break;
             }
-            break;
+        
         
         case 15:
-            // printf("case 15\n");
             if(value_type == CborIntegerType){
-                // printf("case 15 end\n");
                 int64_t val;
                 cbor_value_get_int64(&content, &val);
                 ig_PairingStep3_set_gmt_offset(retval, (int32_t) val);
@@ -217,12 +194,10 @@ IgSerializerError ig_PairingStep3_decode(uint8_t *buf,size_t buf_size,IgPairingS
                 if(err) return (IgSerializerError) err;
                 break;
             }
-            break;
+        
         
         case 16:
-            // printf("case 16\n");
             if(value_type == CborByteStringType){
-                // printf("case 16 end\n");
                 size_t size;
                 err = cbor_value_get_string_length(&content, &size);
                 if(err) return (IgSerializerError) err;
@@ -234,12 +209,10 @@ IgSerializerError ig_PairingStep3_decode(uint8_t *buf,size_t buf_size,IgPairingS
                 ig_PairingStep3_set_dst_times_nocopy(retval, data_arr, size);
                 break;
             }
-            break;
+        
         
         case 17:
-            // printf("case 17\n");
             if(value_type == CborByteStringType){
-                // printf("case 17 end\n");
                 size_t size;
                 err = cbor_value_get_string_length(&content, &size);
                 if(err) return (IgSerializerError) err;
@@ -247,13 +220,11 @@ IgSerializerError ig_PairingStep3_decode(uint8_t *buf,size_t buf_size,IgPairingS
                 uint8_t *data_arr = malloc(size);
                 err = cbor_value_copy_byte_string(&content, data_arr, &size, &content);
                 if(err) return (IgSerializerError) err;
-                // printf("case 17: ig_PairingStep3_set_password_nocopy\n");
+        
                 ig_PairingStep3_set_password_nocopy(retval, data_arr, size);
                 break;
             }
-            break;
           default:
-            // printf("default\n");
             return IgSerializerErrorUnknownTagId;
         }
   
@@ -263,7 +234,6 @@ IgSerializerError ig_PairingStep3_decode(uint8_t *buf,size_t buf_size,IgPairingS
   
   return (IgSerializerError) err;
 }
-
 uint32_t ig_PairingStep3_get_max_payload_in_bytes(IgPairingStep3 *obj)
 {
   return 54 + obj->nonce_size + obj->master_pin_size + obj->pin_key_size + obj->dst_times_size + obj->password_size; //13 + 41;

@@ -227,11 +227,9 @@ int handle_step4_message(const uint8_t* data, int data_length,void* user_data)
   serverLog(LL_NOTICE, "handle_step4_message");
   task_node_t *task_node = (task_node_t *)user_data;
   ble_data_t *ble_data = task_node->ble_data;
-  pairing_connection_t *pairing_connection = 
-                              (pairing_connection_t *)ble_data->ble_connection;
+  pairing_connection_t *pairing_connection = (pairing_connection_t *)ble_data->ble_connection;
   save_message_data(data, data_length, user_data);
-  if (pairing_connection->step_max_size == pairing_connection->step_cur_size)
-  {
+  if (pairing_connection->step_max_size == pairing_connection->step_cur_size) {
     int ret;
     serverLog(LL_NOTICE, "handle_step4_message RECV step2 data finished");
     pairing_connection->pairing_step = BLE_PAIRING_STEP4;

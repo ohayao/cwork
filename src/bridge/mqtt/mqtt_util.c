@@ -1,25 +1,24 @@
 #include <bridge/mqtt/mqtt_util.h>
 
-MQTTClient MQTT_initClients(
-  char *host,char *clientID,int keepAliveInterval,int clearnSession,char *caPath,char *trustStore,char *privateKey,char *keyStore){
-    MQTTClient client;
-    MQTTClient_create(&client,host,clientID,MQTTCLIENT_PERSISTENCE_NONE,NULL);
+MQTTClient MQTT_initClients(char *host,char *clientID,int keepAliveInterval,int clearnSession,char *caPath,char *trustStore,char *privateKey,char *keyStore){
+	MQTTClient client;
+	MQTTClient_create(&client,host,clientID,MQTTCLIENT_PERSISTENCE_NONE,NULL);
 
-    MQTTClient_connectOptions opts=configConnect(keepAliveInterval,clearnSession);
-    MQTTClient_SSLOptions ssl=configSSL(caPath,trustStore,privateKey,keyStore);
-    bindSSLToConnect(&opts,&ssl);
+	MQTTClient_connectOptions opts=configConnect(keepAliveInterval,clearnSession);
+	MQTTClient_SSLOptions ssl=configSSL(caPath,trustStore,privateKey,keyStore);
+	bindSSLToConnect(&opts,&ssl);
 
-    int rc = MQTTClient_connect(client, &opts);
-    if(MQTTCLIENT_SUCCESS != rc){
-        printf("Connect server error with code[%d]!!!!!!\n",rc);
-        return NULL;
-    }
-    printf("Connect server Success ^_^ -- ^_^\n");
-    return client;
+	int rc = MQTTClient_connect(client, &opts);
+	if(MQTTCLIENT_SUCCESS != rc){
+		printf("Connect server error with code[%d]!!!!!!\n",rc);
+		return NULL;
+	}
+	printf("Connect server Success ^_^ -- ^_^\n");
+	return client;
 }
 
 int MQTT_sendMessage(MQTTClient client,char *topic,int qos,void * message,int messageLength){
-    //    MQTTClient_message msg=MQTTClient_message_initializer;
+	//    MQTTClient_message msg=MQTTClient_message_initializer;
     //    msg.qos=qos;
     //    msg.payload=message;
     //    msg.payloadlen=messageLength;

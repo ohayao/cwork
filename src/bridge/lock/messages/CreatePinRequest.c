@@ -8,11 +8,7 @@ void ig_CreatePinRequest_init(IgCreatePinRequest *obj)
 IgSerializerError ig_CreatePinRequest_encode(IgCreatePinRequest *obj,uint8_t *retval,uint32_t length,size_t *written_length)
 {
   
-  if(!ig_CreatePinRequest_is_valid(obj)) 
-  {
-    printf("!ig_CreatePinRequest_is_valid(obj)");
-    return IgSerializerErrorInvalidPayload;
-  }
+  if(!ig_CreatePinRequest_is_valid(obj)) return IgSerializerErrorInvalidPayload;
   
   CborEncoder encoder;
   CborEncoder map;
@@ -35,15 +31,21 @@ IgSerializerError ig_CreatePinRequest_encode(IgCreatePinRequest *obj,uint8_t *re
   err = cbor_encode_uint(&map, 43);
   if(err) return (IgSerializerError) err;
   
-  err = cbor_encode_uint(&map, 11);
-  if(err) return (IgSerializerError) err;
-  err = cbor_encode_byte_string(&map, obj->password, obj->password_size);
-  if(err) return (IgSerializerError) err;
   
-  err = cbor_encode_uint(&map, 12);
-  if(err) return (IgSerializerError) err;
-  err = cbor_encode_byte_string(&map, obj->new_pin, obj->new_pin_size);
-  if(err) return (IgSerializerError) err;
+      err = cbor_encode_uint(&map, 11);
+      if(err) return (IgSerializerError) err;
+      err = cbor_encode_byte_string(&map, obj->password, obj->password_size);
+      if(err) return (IgSerializerError) err;
+  
+  
+  
+  
+      err = cbor_encode_uint(&map, 12);
+      if(err) return (IgSerializerError) err;
+      err = cbor_encode_byte_string(&map, obj->new_pin, obj->new_pin_size);
+      if(err) return (IgSerializerError) err;
+  
+  
   
   if(obj->has_start_date){
       err = cbor_encode_uint(&map, 13);
@@ -52,12 +54,14 @@ IgSerializerError ig_CreatePinRequest_encode(IgCreatePinRequest *obj,uint8_t *re
       if(err) return (IgSerializerError) err;
   }
   
+  
   if(obj->has_end_date){
       err = cbor_encode_uint(&map, 14);
       if(err) return (IgSerializerError) err;
       err = cbor_encode_uint(&map, obj->end_date);
       if(err) return (IgSerializerError) err;
   }
+  
   
   if(obj->has_pin_type){
       err = cbor_encode_uint(&map, 15);
@@ -66,14 +70,17 @@ IgSerializerError ig_CreatePinRequest_encode(IgCreatePinRequest *obj,uint8_t *re
       if(err) return (IgSerializerError) err;
   }
   
+  
   if(obj->has_operation_id){
       err = cbor_encode_uint(&map, 100);
       if(err) return (IgSerializerError) err;
       err = cbor_encode_uint(&map, obj->operation_id);
       if(err) return (IgSerializerError) err;
   }
+  
   err = cbor_encoder_close_container(&encoder, &map);
   if(err) return (IgSerializerError) err;
+  
   *written_length = cbor_encoder_get_buffer_size(&map, retval);
   
   return IgSerializerNoError;
@@ -229,10 +236,15 @@ void ig_CreatePinRequest_deinit(IgCreatePinRequest *obj)
       obj->password = NULL;
   }
   
+  
   if(obj->has_new_pin){
       free(obj->new_pin);
       obj->new_pin = NULL;
   }
+  
+  
+  
+  
 }
 size_t ig_CreatePinRequest_get_password_size(IgCreatePinRequest *obj)
 {

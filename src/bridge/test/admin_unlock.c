@@ -25,7 +25,7 @@
 #include <bridge/bridge_main/lock_list.h>
 #include <bridge/ble/ble_admin.h>
 #include <bridge/ble/ble_pairing.h>
-#include "bridge/lock/messages/AdminUnlockResponse.h"
+#include "bridge/lock/messages/UnlockResponse.h"
 
 void saveTaskData(task_node_t *ptn)
 {
@@ -47,7 +47,7 @@ void saveTaskData(task_node_t *ptn)
 						serverLog(LL_ERROR, "unlock success");
 					}
 					serverLog(LL_NOTICE, "admin_unlock response");
-					IgAdminUnlockResponse *unlock_response = admin_unlock_result->cmd_response;
+					IgUnlockResponse *unlock_response = admin_unlock_result->cmd_response;
 					if (unlock_response->has_operation_id) {
 						serverLog(LL_NOTICE, "admin_unlock operation id[%d].", unlock_response->operation_id);
 					}
@@ -135,8 +135,8 @@ int main(int argc, char *argv[]) {
 	uint8_t tmp_buff[100];
 	memset(tmp_buff, 0, sizeof(tmp_buff));
 	int admin_len = hexStrToByte(argv[2], tmp_buff, strlen(argv[2]));
-	setLockAdminKey(lock, tmp_buff, admin_len);
-    serverLog(LL_NOTICE, "setLockAdminKey success");
+	setLockKey(lock, tmp_buff, admin_len);
+    serverLog(LL_NOTICE, "setLockKey success");
 
     memset(tmp_buff, 0, sizeof(tmp_buff));
     int password_size = hexStrToByte(argv[3], tmp_buff, strlen(argv[3]));

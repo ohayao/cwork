@@ -18,6 +18,9 @@ PB_BIND(ign_BridgeProfile, ign_BridgeProfile, 2)
 PB_BIND(ign_LockLog, ign_LockLog, 2)
 
 
+PB_BIND(ign_LocksTestUpdate, ign_LocksTestUpdate, AUTO)
+
+
 PB_BIND(ign_DemoUpdateLockBattery, ign_DemoUpdateLockBattery, AUTO)
 
 
@@ -30,10 +33,13 @@ PB_BIND(ign_DemoUpdateLockActivities, ign_DemoUpdateLockActivities, 2)
 PB_BIND(ign_LockJob, ign_LockJob, 2)
 
 
-PB_BIND(ign_LockEntry, ign_LockEntry, AUTO)
+PB_BIND(ign_Ekey, ign_Ekey, 2)
 
 
-PB_BIND(ign_ServerEventData, ign_ServerEventData, 2)
+PB_BIND(ign_LockEntry, ign_LockEntry, 2)
+
+
+PB_BIND(ign_ServerEventData, ign_ServerEventData, 4)
 
 
 PB_BIND(ign_DemoLockJob, ign_DemoLockJob, AUTO)

@@ -547,7 +547,7 @@ int main(int argc, char *argv[]) {
     uint8_t tmp_buff[100];
     memset(tmp_buff, 0, sizeof(tmp_buff));
     int admin_len = hexStrToByte(argv[2], tmp_buff, strlen(argv[2]));
-    setLockAdminKey(&lock, tmp_buff, admin_len);
+    setLockKey(&lock, tmp_buff, admin_len);
     serverLog(LL_NOTICE, "setLockAdminKey");
     memset(tmp_buff, 0, sizeof(tmp_buff));
     int password_size = hexStrToByte(argv[3], tmp_buff, strlen(argv[3]));

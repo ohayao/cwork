@@ -24,7 +24,7 @@
 #include "bridge/bridge_main/lock_list.h"
 #include "bridge/ble/ble_admin.h"
 #include "bridge/ble/ble_pairing.h"
-#include "bridge/lock/messages/AdminLockResponse.h"
+#include "bridge/lock/messages/LockResponse.h"
 
 void saveTaskData(task_node_t *ptn)
 {
@@ -48,7 +48,7 @@ void saveTaskData(task_node_t *ptn)
             else
             {
                 serverLog(LL_ERROR, "lock success");
-                IgAdminLockResponse *lock_response = admin_unlock_result->cmd_response;
+                IgLockResponse *lock_response = admin_unlock_result->cmd_response;
             }
             
             break;
@@ -109,7 +109,7 @@ int testLock(igm_lock_t *lock) {
 
     saveTaskData(tn);
     ble_admin_result_t *admin_unlock_result = (ble_admin_result_t *)ble_data->ble_result;
-    ig_AdminLockResponse_deinit(admin_unlock_result->cmd_response);
+    ig_LockResponse_deinit(admin_unlock_result->cmd_response);
     // 这儿是释放结果, 因为已经用完
     releaseAdminResult(&admin_unlock_result);
     bleReleaseBleResult(ble_data);
@@ -140,8 +140,8 @@ int main(int argc, char *argv[]) {
     uint8_t tmp_buff[100];
     memset(tmp_buff, 0, sizeof(tmp_buff));
     int admin_len = hexStrToByte(argv[2], tmp_buff, strlen(argv[2]));
-    setLockAdminKey(lock, tmp_buff, admin_len);
-    serverLog(LL_NOTICE, "setLockAdminKey success");
+    setLockKey(lock, tmp_buff, admin_len);
+    serverLog(LL_NOTICE, "setLockKey success");
 
     memset(tmp_buff, 0, sizeof(tmp_buff));
     int password_size = hexStrToByte(argv[3], tmp_buff, strlen(argv[3]));

@@ -16,6 +16,7 @@ IgSerializerError ig_UnpairRequest_encode(IgUnpairRequest *obj,uint8_t *retval,u
   
   //msg_id property + required properties
   size_t fields_size = 1 + 1;
+  if(obj->has_force) fields_size++;
   if(obj->has_operation_id) fields_size++;
   
   cbor_encoder_init(&encoder, retval, length, 0);
@@ -34,6 +35,14 @@ IgSerializerError ig_UnpairRequest_encode(IgUnpairRequest *obj,uint8_t *retval,u
       err = cbor_encode_byte_string(&map, obj->password, obj->password_size);
       if(err) return (IgSerializerError) err;
   
+  
+  
+  if(obj->has_force){
+      err = cbor_encode_uint(&map, 12);
+      if(err) return (IgSerializerError) err;
+      err = cbor_encode_boolean(&map, obj->force);
+      if(err) return (IgSerializerError) err;
+  }
   
   
   if(obj->has_operation_id){
@@ -119,6 +128,17 @@ IgSerializerError ig_UnpairRequest_decode(uint8_t *buf,size_t buf_size,IgUnpairR
             }
         
         
+        case 12:
+            if(value_type == CborBooleanType){
+                bool val;
+                cbor_value_get_boolean(&content, &val);
+                ig_UnpairRequest_set_force(retval, val);
+                err = cbor_value_advance_fixed(&content);
+                if(err) return (IgSerializerError) err;
+                break;
+            }
+        
+        
         case 100:
             if(value_type == CborIntegerType){
                 uint64_t val;
@@ -140,7 +160,7 @@ IgSerializerError ig_UnpairRequest_decode(uint8_t *buf,size_t buf_size,IgUnpairR
 }
 uint32_t ig_UnpairRequest_get_max_payload_in_bytes(IgUnpairRequest *obj)
 {
-  return 26 + obj->password_size; //13 + 13;
+  return 28 + obj->password_size; //13 + 15;
 }
 bool ig_UnpairRequest_is_valid(IgUnpairRequest *obj)
 {
@@ -152,6 +172,7 @@ void ig_UnpairRequest_deinit(IgUnpairRequest *obj)
       free(obj->password);
       obj->password = NULL;
   }
+  
   
 }
 size_t ig_UnpairRequest_get_password_size(IgUnpairRequest *obj)
@@ -182,6 +203,11 @@ void ig_UnpairRequest_set_password(IgUnpairRequest *obj,uint8_t* password,size_t
   memcpy(obj->password, password, size);
   obj->password_size = size;
   obj->has_password = size > 0;
+}
+void ig_UnpairRequest_set_force(IgUnpairRequest *obj,bool force)
+{
+  obj->force = force;
+  obj->has_force = true;
 }
 void ig_UnpairRequest_set_operation_id(IgUnpairRequest *obj,uint32_t operation_id)
 {

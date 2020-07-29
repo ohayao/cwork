@@ -16,6 +16,9 @@ typedef struct IgUnpairRequest {
   //required
   uint8_t* password;
   size_t password_size;
+  bool has_force;
+  //optional
+  bool force;
   bool has_operation_id;
   //optional
   uint32_t operation_id;
@@ -33,6 +36,8 @@ void ig_UnpairRequest_deinit(IgUnpairRequest *obj);
 size_t ig_UnpairRequest_get_password_size(IgUnpairRequest *obj);
 void ig_UnpairRequest_set_password_nocopy(IgUnpairRequest *obj,uint8_t* password,size_t size);
 void ig_UnpairRequest_set_password(IgUnpairRequest *obj,uint8_t* password,size_t size);
+
+void ig_UnpairRequest_set_force(IgUnpairRequest *obj,bool force);
 
 void ig_UnpairRequest_set_operation_id(IgUnpairRequest *obj,uint32_t operation_id);
 

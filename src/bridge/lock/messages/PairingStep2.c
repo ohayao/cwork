@@ -52,7 +52,6 @@ IgSerializerError ig_PairingStep2_encode(IgPairingStep2 *obj,uint8_t *retval,uin
 }
 IgSerializerError ig_PairingStep2_decode(uint8_t *buf,size_t buf_size,IgPairingStep2 *retval,size_t index)
 {
-  printf("ig_PairingStep2_decode\n");
   CborParser parser;
   CborValue it;
   CborValue content;

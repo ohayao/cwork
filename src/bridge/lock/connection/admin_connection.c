@@ -29,6 +29,7 @@ int igloohome_ble_lock_crypto_AdminConnection_genConnStep2Native(int connectionI
 	uint8_t step1Bytes[step1Len];
 	memcpy(step1Bytes, jConnectionStep1, step1Len);
 
+	printf("do ig_AdminConnectionStep1_decode step1Len[%d]\n", step1Len);
 	IgAdminConnectionStep1 step1;
 	ig_AdminConnectionStep1_init(&step1);
 	IgSerializerError step1_err = ig_AdminConnectionStep1_decode( step1Bytes, (size_t)step1Len, &step1, 0);
@@ -38,6 +39,7 @@ int igloohome_ble_lock_crypto_AdminConnection_genConnStep2Native(int connectionI
 		return 0;
 	}
 
+	//??
 	memcpy(connection->txNonce, step1.nonce, step1.nonce_size);
 
 	IgAdminConnectionStep2 step2;

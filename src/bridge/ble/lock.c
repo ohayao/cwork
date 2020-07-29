@@ -22,9 +22,9 @@ int initLock(igm_lock_t *lock) {
 // int paired;
 // int admin_connection;
 // int guest_connection;
-// int has_admin_key;
-// uint8_t *admin_key;
-// size_t admin_key_len;
+// int has_key;
+// uint8_t *key;
+// size_t key_len;
 // int has_password;
 // uint8_t *password;
 // size_t password_size;
@@ -42,13 +42,13 @@ int copyLock(igm_lock_t *to, igm_lock_t *from) {
 	to->admin_connection = from->admin_connection;
 	to->guest_connection = from->guest_connection;
 	to->connectionID = from->connectionID;
-	if (from->has_admin_key && from->admin_key && from->admin_key_len) {
-		releaseLockAminKey(to);
-		to->has_admin_key = from->has_admin_key;
-		to->admin_key_len = from->admin_key_len;
-		//to->admin_key = calloc(from->admin_key_len, 1);
-		//memcpy(to->admin_key, from->admin_key, from->admin_key_len);
-		to->admin_key = from->admin_key;
+	if (from->has_key && from->key && from->key_len) {
+		releaseLockKey(to);
+		to->has_key = from->has_key;
+		to->key_len = from->key_len;
+		//to->key = calloc(from->key_len, 1);
+		//memcpy(to->key, from->key, from->key_len);
+		to->key = from->key;
 	}
 
 	if (from->has_password && from->password && from->password_size) {
@@ -65,6 +65,13 @@ int copyLock(igm_lock_t *to, igm_lock_t *from) {
 		to->lock_cmd_size = from->lock_cmd_size;
 		to->lock_cmd = from->lock_cmd;
 	}
+	if (from->has_token && from->token && from->token_len) {
+		releaseLockToken(to);
+		to->has_token = from->has_token;
+		to->token_len = from->token_len;
+		to->token = from->token;
+	}
+
 	return 0;
 }
 
@@ -84,9 +91,9 @@ int setLockAddr(igm_lock_t *lock, const char *addr_, int addr_len_) {
 
 
 // -------------------------------------
-// int has_admin_key;
-// uint8_t *admin_key;
-// size_t admin_key_len;
+// int has_key;
+// uint8_t *key;
+// size_t key_len;
 // int has_password;
 // uint8_t *password;
 // size_t password_size;
@@ -106,10 +113,10 @@ void printLock (igm_lock_t *lock) {
 		}
 		printf("]\n");
 	}
-	if (lock->has_admin_key) {
-		printf("admin_key size %zu admin_key:[ ", lock->admin_key_len);
-		for (int j = 0; j < lock->admin_key_len; j++) {
-			printf("%x", lock->admin_key[j]);
+	if (lock->has_key) {
+		printf("key size %zu key:[ ", lock->key_len);
+		for (int j = 0; j < lock->key_len; j++) {
+			printf("%x", lock->key[j]);
 		}
 		printf("]\n");
 	}
@@ -139,13 +146,13 @@ int setLockConnectionID(igm_lock_t *lock, int ID) {
 	lock->connectionID = ID;
 }
 
-int releaseLockAminKey(igm_lock_t *lock) {
-	serverLog(LL_NOTICE, "releaseLockAminKey");
-	if (lock && lock->has_admin_key && lock->admin_key && lock->admin_key_len) {
-		lock->has_admin_key = 0;
-		lock->admin_key_len = 0;
-		free(lock->admin_key);
-		lock->admin_key = NULL;
+int releaseLockKey(igm_lock_t *lock) {
+	serverLog(LL_NOTICE, "releaseLockKey");
+	if (lock && lock->has_key && lock->key && lock->key_len) {
+		lock->has_key = 0;
+		lock->key_len = 0;
+		free(lock->key);
+		lock->key = NULL;
 	}
 	return 0;
 }
@@ -172,12 +179,33 @@ int releaseLockCmd(igm_lock_t *lock) {
 	return 0;
 }
 
-int setLockAdminKey(igm_lock_t *lock, uint8_t *admin_key, int admin_key_len) {
-	releaseLockAminKey(lock);
-	lock->has_admin_key = 1;
-	lock->admin_key_len = admin_key_len;
-	lock->admin_key = calloc(admin_key_len, 1);
-	memcpy(lock->admin_key, admin_key, admin_key_len);
+int releaseLockToken(igm_lock_t *lock) {
+	serverLog(LL_NOTICE, "releaseLockToken");
+	if (lock && lock->has_token && lock->token_len && lock->token) {
+		lock->has_token = 0;
+		lock->token_len = 0;
+		free(lock->token );
+		lock->token = NULL;
+	}
+	return 0;
+}
+
+
+int setLockToken(igm_lock_t *lock, uint8_t *token, int token_len) {
+	releaseLockToken(lock);
+	lock->has_token = 1;
+	lock->token_len = token_len;
+	lock->token = calloc(token_len, 1);
+	memcpy(lock->token, token, token_len);
+	return 0;
+}
+
+int setLockKey(igm_lock_t *lock, uint8_t *key, int key_len) {
+	releaseLockKey(lock);
+	lock->has_key = 1;
+	lock->key_len = key_len;
+	lock->key = calloc(key_len, 1);
+	memcpy(lock->key, key, key_len);
 	return 0;
 }
 
@@ -192,7 +220,7 @@ int setLockPassword(igm_lock_t *lock, uint8_t *password, int password_size) {
 }
 
 int setLockCmd(igm_lock_t *lock, uint8_t *lock_cmd, unsigned int lock_cmd_size) {
-	releaseLockCmd(lock);
+	//releaseLockCmd(lock);
 	serverLog(LL_NOTICE, "releaseLockCmd");
 	lock->has_lock_cmd = 1;
 	lock->lock_cmd_size = lock_cmd_size;
@@ -201,10 +229,10 @@ int setLockCmd(igm_lock_t *lock, uint8_t *lock_cmd, unsigned int lock_cmd_size) 
 	return 0;
 }
 
-int getLockAdminKey(igm_lock_t *lock, uint8_t *admin_key, int *p_admin_key_len) {
-	if (lock->has_admin_key) {
-		*p_admin_key_len = lock->admin_key_len;
-		memcpy(admin_key, lock->admin_key, lock->admin_key_len);
+int getLockKey(igm_lock_t *lock, uint8_t *key, int *p_key_len) {
+	if (lock->has_key) {
+		*p_key_len = lock->key_len;
+		memcpy(key, lock->key, lock->key_len);
 	}
 	return 0;
 }
@@ -225,7 +253,7 @@ int setLockAdminConnection(igm_lock_t *lock, int admin_connection) {
 void releaseLock(igm_lock_t ** pp_lock) {
 	if (!pp_lock) return;
 	if (!(*pp_lock)) return;
-	releaseLockAminKey(*pp_lock);
+	releaseLockKey(*pp_lock);
 	releaseLockPassword(*pp_lock);
 	releaseLockCmd(*pp_lock);
 	free(*pp_lock);
