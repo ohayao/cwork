@@ -20,6 +20,8 @@ bool is_registered = false;
 GMainLoop *loop = NULL;
 
 PAIRING_STATUS pairing_status;
+// pairing 所需要的, 就是利用所得来得 server_nonce, server_private_key, server_public_key 来给服务器传数据
+// 也可以利用 client_nonce, client_private_key, client_public_key 来给 client 反馈.
 
 void handleStep4(const uint8_t* data, size_t data_length)
 {

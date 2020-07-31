@@ -44,11 +44,13 @@
 #include "bridge/wifi_service/fsm1.h"
 #include "bridge/bridge_main/log.h"
 #include "bridge/ble/ble_operation.h"
+#include "bridge/wifi_service/ad.h"
 
 #define GATT_MGR_IFACE			"org.bluez.GattManager1"
 #define GATT_SERVICE_IFACE		"org.bluez.GattService1"
 #define GATT_CHR_IFACE			"org.bluez.GattCharacteristic1"
 #define GATT_DESCRIPTOR_IFACE		"org.bluez.GattDescriptor1"
+#define LE_AD_MGR_IFACE 			"org.bluez.LEAdvertisingManager1"
 
 /* Immediate Alert Service UUID */
 // wifi service
@@ -90,6 +92,17 @@ struct descriptor {
 	const char **props;
 };
 
+struct adapter {
+	GDBusProxy *proxy;
+	GDBusProxy *ad_proxy;
+	GList *devices;
+};
+
+static struct adapter *default_ctrl;
+static GDBusProxy *default_dev;
+static GDBusProxy *default_attr;
+static GList *ctrl_list;
+
 // 状态机结构体
 // struct connection
 /*
@@ -102,6 +115,19 @@ static const char *desc_props[] = { "read", "write", NULL };
 
 // functions
 static void chr_write(struct characteristic *chr, const uint8_t *value, int len);
+
+// adapter 相关代码
+static struct adapter *adapter_new(GDBusProxy *proxy)
+{
+	struct adapter *adapter = g_malloc0(sizeof(struct adapter));
+
+	ctrl_list = g_list_append(ctrl_list, adapter);
+
+	if (!default_ctrl)
+		default_ctrl = adapter;
+
+	return adapter;
+}
 
 // 状态机相关代码
 static FSM *fsm = NULL;
@@ -316,8 +342,10 @@ int handleWriteCommit(void *arg)
 
 // 对 commit 的处理
 int handlePairingComplete(void *arg)
-{
+{	
+	serverLog(LL_NOTICE, " -------------------------- handlePairingComplete");
 
+	return 0;
 }
 
 void handleStep1Wrong(void *arg)
@@ -453,7 +481,7 @@ int initPairingFsm()
   // S_REPLY_STEP4, from PAIRING_COMMIT to PAIRING_COMPLETE
   // handleWriteCommit: 客户接收到 到一个 Commit 消息, 然后会返回一个
   if (fillTransItem(&trans_item, 
-    C_WRITE_COMMIT, PAIRING_STEP4, handleWriteCommit, PAIRING_COMMIT))
+    C_WRITE_COMMIT, PAIRING_STEP4, handleWriteCommit, PAIRING_COMPLETE))
   {
     serverLog(LL_ERROR, "fillTransItem err");
     return 1;
@@ -471,23 +499,6 @@ int initPairingFsm()
   // S_REPLY_STEP4, from PAIRING_COMMIT to PAIRING_COMPLETE
   // handleWriteCommit: 客户接收到 到一个 Commit 消息, 然后会返回一个
   if (fillTransItem(&trans_item, 
-    C_WRITE_COMMIT, PAIRING_STEP4, handleWriteCommit, PAIRING_COMMIT))
-  {
-    serverLog(LL_ERROR, "fillTransItem err");
-    return 1;
-  }
-  // serverLog(LL_NOTICE, "fillTransItem event S_REPLY_STEP4");
-
-  if (fillFSMTransItem(fsm, &trans_item))
-  {
-    serverLog(LL_ERROR, "fillFSMTransItem err");
-    return 1;
-  }
-  // serverLog(LL_NOTICE, "fillFSMTransItem event S_REPLY_STEP4");
-
-  // 7
-  // S_PAIRING_COMPLETE, from PAIRING_COMPLETE to PAIRING_BEGIN
-  if (fillTransItem(&trans_item, 
     S_PAIRING_COMPLETE, PAIRING_COMPLETE, handlePairingComplete, PAIRING_BEGIN))
   {
     serverLog(LL_ERROR, "fillTransItem err");
@@ -500,11 +511,11 @@ int initPairingFsm()
     serverLog(LL_ERROR, "fillFSMTransItem err");
     return 1;
   }
-  // // serverLog(LL_NOTICE, "fillFSMTransItem event C_WRITE_COMMIT");
+  // serverLog(LL_NOTICE, "fillFSMTransItem event S_REPLY_STEP4");
+
 
 	// 把虚拟机, 弄成 PAIRING_BEGIN, 也就是空闲的意思啦
 	initFSMCurState(fsm, PAIRING_BEGIN);
-
 }
 
 
@@ -940,7 +951,7 @@ void decideEvent(void *arg)
 		case PAIRING_STEP4:
 		{
 			serverLog(LL_NOTICE, "decideEvent PAIRING_STEP4");
-			C_WRITE_COMMIT;
+			chr->event = C_WRITE_COMMIT;
 			break;
 		}
 		default:
@@ -1000,11 +1011,15 @@ void handleClientEvent(void *arg)
 		handle_res = handleEvent(fsm, chr->event, NULL);
 		if (handle_res)
 		{
-			serverLog(LL_ERROR, "handle event C_WRITE_STEP1 error");
+			serverLog(LL_ERROR, "handle event C_WRITE_COMMIT error");
 		}
-		serverLog(LL_NOTICE, "handleClientEvent C_WRITE_STEP3 cur_state %d", fsm->cur_state);
+		serverLog(LL_NOTICE, "handleClientEvent C_WRITE_COMMIT cur_state %d", fsm->cur_state);
 		chr->event = S_PAIRING_COMPLETE;
-		
+		handle_res = handleEvent(fsm, chr->event, NULL);
+		if (handle_res)
+		{
+			serverLog(LL_ERROR, "handle event C_WRITE_COMMIT error");
+		}
 		break;
 	default:
 		serverLog(LL_ERROR, "default error event");
@@ -1399,10 +1414,12 @@ static void proxy_added_cb(GDBusProxy *proxy, void *user_data)
 	const char *iface;
 
 	iface = g_dbus_proxy_get_interface(proxy);
-
+	printf("-------------------- iface %s\n ", iface);
 	if (g_strcmp0(iface, GATT_MGR_IFACE))
 		return;
 
+	// if (g_strcmp0(iface, LE_AD_MGR_IFACE))
+	// 	return;
 	register_app(proxy);
 }
 
@@ -1475,6 +1492,53 @@ static guint setup_signalfd(void)
 	return source;
 }
 
+static const char *ad_arguments[] = {
+	"on",
+	"off",
+	"peripheral",
+	"broadcast",
+	NULL
+};
+
+// arg_table 解析参数的表
+// value: 是否为真
+// msg: 
+static gboolean parse_argument(char *argv[], const char **arg_table, dbus_bool_t *value,
+					const char **option)
+{
+	const char **opt;
+	for (opt = arg_table; opt && *opt; opt++) {
+		serverLog(LL_NOTICE, "argv: %s", argv[1]);
+		if (strcmp(argv[0], *opt) == 0) {
+			*value = TRUE;
+			*option = *opt;
+			return TRUE;
+		}
+	}
+	return FALSE;
+}
+
+// ---------------
+
+
+void cmd_advertise()
+{
+	serverLog(LL_NOTICE, "------------------- cmd_advertise");
+	dbus_bool_t enable;
+	const char *type;
+	char *argv[2];
+	argv[0] = "on";
+	argv[1] = NULL;
+
+	if (!parse_argument(argv, ad_arguments, &enable, &type))
+		return;
+	serverLog(LL_NOTICE, " cmd_advertise enable: %d type: %s", enable, type);
+
+	if (enable == TRUE)
+		ad_register(connection, default_ctrl->ad_proxy, type);
+	return;
+}
+
 int main(int argc, char *argv[])
 {
 	GDBusClient *client;
@@ -1484,9 +1548,10 @@ int main(int argc, char *argv[])
 	if (signal == 0)
 		return -errno;
 
-	// 其实只是对 dbus 消息的设置
-	// 还每有看到对 dbus 的订阅
+	// // 其实只是对 dbus 消息的设置
+	// // 还每有看到对 dbus 的订阅
 	connection = g_dbus_setup_bus(DBUS_BUS_SYSTEM, NULL, NULL);
+
 
 	main_loop = g_main_loop_new(NULL, FALSE);
 
@@ -1499,7 +1564,7 @@ int main(int argc, char *argv[])
 
 	create_services();
 
-	client = g_dbus_client_new(connection, "org.bluez", "/");
+	client = g_dbus_client_new(connection, "org.bluez", "/org/bluez");
 
 	g_dbus_client_set_proxy_handlers(client, proxy_added_cb, NULL, NULL,
 									NULL);
