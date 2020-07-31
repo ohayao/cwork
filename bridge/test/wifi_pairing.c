@@ -7,6 +7,7 @@
 #include "bridge/lock/connection/pairing_connection.h"
 #include "bridge/gattlib/gattlib.h"
 #include "bridge/ble/ble_operation.h"
+#include "bridge/wifi_service/pairing.h"
 #include <glib.h>
 
 static char wifi_pairing_str[] = "12345678-0000-1000-8000-00805f9b34fb";
@@ -18,8 +19,114 @@ bool is_registered = false;
 
 GMainLoop *loop = NULL;
 
+PAIRING_STATUS pairing_status;
+
+void handleStep4(const uint8_t* data, size_t data_length)
+{
+  serverLog(LL_NOTICE, "---------------- handleStep4: ");
+  int ret = 0;
+  
+
+  uint8_t *step4Bytes = NULL;
+	size_t step4_size = 0;
+  IgPairingStep4 *step4;
+
+  size_t n_size_byte = 0;
+  if (data[2] == 0xff)
+  {
+    n_size_byte = 3;
+  }
+  else
+  {
+    n_size_byte = 1;
+  }
+
+  step4_size = igloohome_ble_lock_crypto_PairingConnection_recPairingStep4Native(
+		(data_length-n_size_byte), (uint8_t *)(data+n_size_byte), &(step4Bytes)
+	);
+
+  if (!step4_size)
+	{
+    serverLog(LL_ERROR, "igloohome_ble_lock_crypto_PairingConnection_recPairingStep4Native error");
+    return;
+  }
+
+  step4 = (IgPairingStep4 *)step4Bytes;
+
+  serverLog(LL_NOTICE, "debug show step4 password: ");
+
+  if (step4->has_success && step4->success)
+	{
+    serverLog(LL_NOTICE, "set Pairing Result the Password");
+    if (step4->has_password)
+    {
+        printf("step4.has_password: ");
+        for (int j = 0; j < step4->password_size;j++)
+        {
+            printf("%02x ", (step4->password)[j]);
+        }
+        printf("\n");
+    }
+	}
+
+  size_t commitBytes_len = 0;
+	uint8_t *commitBytes = NULL;
+  time_t current_time = time(NULL);
+
+  commitBytes_len = igloohome_ble_lock_crypto_PairingConnection_genPairingCommitNative(
+    current_time, &commitBytes);
+  if (!commitBytes_len)
+	{
+    serverLog(LL_ERROR, "genPairingCommitNative failed!");
+		return;
+	}
+  serverLog(LL_NOTICE, "genPairingCommitNative success");
+
+
+  size_t payload_len = 0;
+	uint8_t *payloadBytes = NULL;
+
+  if (!build_msg_payload(
+		&payloadBytes, &payload_len, commitBytes, commitBytes_len))
+	{
+    serverLog(LL_ERROR, "build_msg_payload failed!");
+		return;
+	}
+  serverLog(LL_NOTICE, "build_msg_payload success!");
+
+  ret = write_char_by_uuid_multi_atts(
+		gatt_connection, &wifi_pairing_uuid, 
+    payloadBytes, payload_len);
+	if (ret != GATTLIB_SUCCESS) {
+    serverLog(LL_ERROR, "write_char_by_uuid_multi_atts failed!");
+		return;
+	}
+  serverLog(LL_NOTICE, "write_char_by_uuid_multi_atts success!");
+
+  if (step4Bytes)
+  {
+    free(step4Bytes);
+    step4Bytes = NULL;
+  }
+
+  if (commitBytes)
+  {
+    free(commitBytes);
+    commitBytes = NULL;
+  }
+
+  if (payloadBytes)
+  {
+    free(payloadBytes);
+    payloadBytes = NULL;
+  }
+  pairing_status = PAIRING_COMMIT;
+  return;
+}
+
 void handleStep2(const uint8_t* data, size_t data_length)
 {
+  serverLog(LL_NOTICE, "---------------- handleStep4: ");
   int ret = 0;
   size_t payload_len = 0;
 	uint8_t *payloadBytes = NULL;
@@ -62,6 +169,8 @@ void handleStep2(const uint8_t* data, size_t data_length)
 		return;
 	}
   serverLog(LL_NOTICE, "write_char_by_uuid_multi_atts Success");
+
+  pairing_status = PAIRING_STEP3;
   return;
 }
 
@@ -74,7 +183,21 @@ static void message_handler(
     printf(" %x", data[i]);
   }
   printf("\n");
-  handleStep2(data, data_length);
+  switch (pairing_status)
+  {
+  case PAIRING_STEP1:
+    handleStep2(data, data_length);
+    break;
+  case PAIRING_STEP3:
+    handleStep4(data, data_length);
+    break;
+  case PAIRING_COMMIT:
+    break;
+  default:
+    serverLog(LL_ERROR, "error pairing_status");
+    break;
+  }
+  
 }
 
 int register_pairing_notfication()
@@ -197,6 +320,7 @@ int write_pairing_step1()
     free(payloadBytes);
     payloadBytes =  NULL;
   }
+  pairing_status = PAIRING_STEP1;
   return 0;
 }
 

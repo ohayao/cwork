@@ -119,7 +119,7 @@ int handleWriteStep1(void *arg)
 // arg 是 characteristic
 int handleReplyStep2(void *arg)
 {
-	serverLog(LL_NOTICE, "we are going to reply cliet step2, trans fsm to pairing step2");
+	serverLog(LL_NOTICE, "----------------------- handleReplyStep2 we are going to reply cliet step2, trans fsm to pairing step2");
 	int ret = 0;
 	struct characteristic *chr = (struct characteristic *)arg;
 	RecvData *recv_pairing_data = chr->recv_pairing_data;
@@ -194,22 +194,127 @@ int handleReplyStep2(void *arg)
 	}
 	printf("\n");
 	chr_write(chr, payloadBytes, payload_len);
+
+	if (step1_payload_bytes) 
+	{
+		free(step1_payload_bytes);
+		step1_payload_bytes = NULL;
+	}
+
+	if (step2_bytes)
+	{
+		free(step2_bytes);
+		step2_bytes = NULL;
+	}
+
+
+	if (payloadBytes)
+	{
+		free(payloadBytes);
+		payloadBytes = NULL;
+	}
+
+	serverLog(LL_NOTICE, "handleReplyStep2 resetRecvData");
+	resetRecvData(recv_pairing_data);
 	return 0;
 }
 
 // 还没写, 根据现在的不同, 等待改写
 int handleWriteStep3(void *arg)
 {
+	serverLog(LL_NOTICE, "we get client write step3, trans fsm to pairing step3");
+	return 0;
+}
 
+int handleReplyStep4(void *arg)
+{
+	serverLog(LL_NOTICE, "----------------------- handleReplyStep4  we are going to reply cliet step4, trans fsm to pairing step4");
+	int ret = 0;
+	struct characteristic *chr = (struct characteristic *)arg;
+	RecvData *recv_pairing_data = chr->recv_pairing_data;
+
+	if (recv_pairing_data == NULL)
+  {
+    serverLog(LL_ERROR, "handleWriteStep1  recv_pairing_data null");
+    return 1;
+  }
+
+	size_t step3_len = 0;
+  uint8_t *step3_payload_bytes = NULL;
+
+	if (getRecvPkgLen(recv_pairing_data, &step3_len))
+	{
+		serverLog(LL_ERROR, "getRecvPkgLen error");
+		return 1;
+	}
+
+	step3_payload_bytes = malloc(step3_len);
+	memset(step3_payload_bytes, 0, step3_len);
+
+	if (getPkgFromRecvData(recv_pairing_data, step3_payload_bytes))
+	{
+		serverLog(LL_ERROR, "getPkgFromRecvData error");
+		return 1;
+	}
+	serverLog(LL_NOTICE, "getPkgFromRecvData success");
+
+
+	uint32_t encrypt_step4_bytes_len = ig_pairing_step4_size();
+  uint8_t encrypt_step4_bytes[encrypt_step4_bytes_len];
+  uint32_t encrypt_step4_writen_len = 0;
+
+	ig_pairing_step4(
+      step3_payload_bytes, step3_len, 
+      encrypt_step4_bytes, encrypt_step4_bytes_len, &encrypt_step4_writen_len);
+	if (encrypt_step4_writen_len == UINT32_MAX)
+	{
+		serverLog(LL_ERROR, "ig_pairing_step4 error");
+		return 1;
+	}
+
+	uint32_t payload_len = 0;
+  uint8_t *payloadBytes = NULL;
+
+	if (!build_msg_payload(
+      &payloadBytes, &payload_len, 
+      encrypt_step4_bytes, encrypt_step4_writen_len))
+	{
+		serverLog(LL_ERROR, "failed in build_msg_payload");
+		return 1;
+	}
+
+	// 用于验证,是否我发送的, 对面客户已经收到这个信息
+	for (int i = 0; i < payload_len; ++i)
+	{
+		printf(" %x", payloadBytes[i]);
+	}
+	printf("\n");
+	chr_write(chr, payloadBytes, payload_len);
+
+	if (step3_payload_bytes)
+	{
+		free(step3_payload_bytes);
+		step3_payload_bytes = NULL;
+	}
+
+	if (payloadBytes)
+	{
+		free(payloadBytes);
+		payloadBytes = NULL;
+	}
+	serverLog(LL_NOTICE, "handleReplyStep4 resetRecvData");
+	resetRecvData(recv_pairing_data);
+	return 0;
 }
 
 // 还没写, 根据现在的不同, 等待改写
 int handleWriteCommit(void *arg)
 {
-
+	serverLog(LL_NOTICE, "we get client write commit, trans fsm to pairing complete");
+	return 0;
 }
 
-// 还没写, 根据现在的不同, 等待改写
+// 对 commit 的处理
 int handlePairingComplete(void *arg)
 {
 
@@ -304,59 +409,97 @@ int initPairingFsm()
     return 1;
   }
 
-	// // 2 事件, 从 PAIRING_STEP3 到 PAIRING_STEP4  
-  // // 因为会我们会返回 step3 给客户端
-  // // C_WRITE_STEP3, from PAIRING_STEP3 to PAIRING_STEP3
-  // // handleWriteStep3: client 写入一个 step3, 那么就会有把状态从 PAIRING_STEP2 -> PAIRING_STEP4,
-  // // 因为服务器会发送一个step3, 返回给客户一个step4,然后等待commit
-  // if (fillTransItem(&trans_item, 
-  //   C_WRITE_STEP3, PAIRING_STEP3, handleWriteStep3, PAIRING_STEP4))
-  // {
-  //   serverLog(LL_ERROR, "fillTransItem err");
-  //   return 1;
-  // }
-  // serverLog(LL_NOTICE, "fillTransItem event C_WRITE_STEP3");
+	// 3 事件, 从 PAIRING_STEP3 到 PAIRING_STEP4  
+  // 因为会我们会返回 step3 给客户端
+  // C_WRITE_STEP3, from PAIRING_STEP3 to PAIRING_STEP3
+  // handleWriteStep3: client 写入一个 step3, 那么就会有把状态从 PAIRING_STEP2 -> PAIRING_STEP4,
+  // 因为服务器会发送一个step3, 返回给客户一个step4,然后等待commit
+  if (fillTransItem(&trans_item, 
+    C_WRITE_STEP3, PAIRING_STEP2, handleWriteStep3, PAIRING_STEP3))
+  {
+    serverLog(LL_ERROR, "fillTransItem err");
+    return 1;
+  }
+  serverLog(LL_NOTICE, "fillTransItem event C_WRITE_STEP3");
 
-  // if (fillFSMTransItem(fsm, &trans_item))
-  // {
-  //   serverLog(LL_ERROR, "fillFSMTransItem err");
-  //   return 1;
-  // }
-  // serverLog(LL_NOTICE, "fillFSMTransItem event C_WRITE_STEP3");
+  if (fillFSMTransItem(fsm, &trans_item))
+  {
+    serverLog(LL_ERROR, "fillFSMTransItem err");
+    return 1;
+  }
+  serverLog(LL_NOTICE, "fillFSMTransItem event C_WRITE_STEP3");
 
-	// // 3
-  // // S_REPLY_STEP4, from PAIRING_COMMIT to PAIRING_COMPLETE
-  // // handleWriteCommit: 客户接收到 到一个 Commit 消息, 然后会返回一个
-  // if (fillTransItem(&trans_item, 
-  //   C_WRITE_COMMIT, PAIRING_COMMIT, handleWriteCommit, PAIRING_COMPLETE))
-  // {
-  //   serverLog(LL_ERROR, "fillTransItem err");
-  //   return 1;
-  // }
-  // // serverLog(LL_NOTICE, "fillTransItem event S_REPLY_STEP4");
+	// 4 事件, 从 PAIRING_STEP3 到 PAIRING_STEP4  
+  // 因为会我们会返回 step3 给客户端
+  // C_WRITE_STEP3, from PAIRING_STEP3 to PAIRING_STEP3
+  // handleWriteStep3: client 写入一个 step3, 那么就会有把状态从 PAIRING_STEP2 -> PAIRING_STEP4,
+  // 因为服务器会发送一个step3, 返回给客户一个step4,然后等待commit
+  if (fillTransItem(&trans_item, 
+    S_REPLY_STEP4, PAIRING_STEP3, handleReplyStep4, PAIRING_STEP4))
+  {
+    serverLog(LL_ERROR, "fillTransItem err");
+    return 1;
+  }
+  serverLog(LL_NOTICE, "fillTransItem event C_WRITE_STEP3");
 
-  // if (fillFSMTransItem(fsm, &trans_item))
-  // {
-  //   serverLog(LL_ERROR, "fillFSMTransItem err");
-  //   return 1;
-  // }
-  // // serverLog(LL_NOTICE, "fillFSMTransItem event S_REPLY_STEP4");
+  if (fillFSMTransItem(fsm, &trans_item))
+  {
+    serverLog(LL_ERROR, "fillFSMTransItem err");
+    return 1;
+  }
+  serverLog(LL_NOTICE, "fillFSMTransItem event C_WRITE_STEP3");
 
-  // // 4
-  // // S_PAIRING_COMPLETE, from PAIRING_COMPLETE to PAIRING_BEGIN
-  // if (fillTransItem(&trans_item, 
-  //   S_PAIRING_COMPLETE, PAIRING_COMPLETE, handlePairingComplete, PAIRING_BEGIN))
-  // {
-  //   serverLog(LL_ERROR, "fillTransItem err");
-  //   return 1;
-  // }
-  // // serverLog(LL_NOTICE, "fillTransItem event C_WRITE_COMMIT");
+	// 5
+  // S_REPLY_STEP4, from PAIRING_COMMIT to PAIRING_COMPLETE
+  // handleWriteCommit: 客户接收到 到一个 Commit 消息, 然后会返回一个
+  if (fillTransItem(&trans_item, 
+    C_WRITE_COMMIT, PAIRING_STEP4, handleWriteCommit, PAIRING_COMMIT))
+  {
+    serverLog(LL_ERROR, "fillTransItem err");
+    return 1;
+  }
+  // serverLog(LL_NOTICE, "fillTransItem event S_REPLY_STEP4");
 
-  // if (fillFSMTransItem(fsm, &trans_item))
-  // {
-  //   serverLog(LL_ERROR, "fillFSMTransItem err");
-  //   return 1;
-  // }
+  if (fillFSMTransItem(fsm, &trans_item))
+  {
+    serverLog(LL_ERROR, "fillFSMTransItem err");
+    return 1;
+  }
+  // serverLog(LL_NOTICE, "fillFSMTransItem event S_REPLY_STEP4");
+
+	// 6
+  // S_REPLY_STEP4, from PAIRING_COMMIT to PAIRING_COMPLETE
+  // handleWriteCommit: 客户接收到 到一个 Commit 消息, 然后会返回一个
+  if (fillTransItem(&trans_item, 
+    C_WRITE_COMMIT, PAIRING_STEP4, handleWriteCommit, PAIRING_COMMIT))
+  {
+    serverLog(LL_ERROR, "fillTransItem err");
+    return 1;
+  }
+  // serverLog(LL_NOTICE, "fillTransItem event S_REPLY_STEP4");
+
+  if (fillFSMTransItem(fsm, &trans_item))
+  {
+    serverLog(LL_ERROR, "fillFSMTransItem err");
+    return 1;
+  }
+  // serverLog(LL_NOTICE, "fillFSMTransItem event S_REPLY_STEP4");
+
+  // 7
+  // S_PAIRING_COMPLETE, from PAIRING_COMPLETE to PAIRING_BEGIN
+  if (fillTransItem(&trans_item, 
+    S_PAIRING_COMPLETE, PAIRING_COMPLETE, handlePairingComplete, PAIRING_BEGIN))
+  {
+    serverLog(LL_ERROR, "fillTransItem err");
+    return 1;
+  }
+  // serverLog(LL_NOTICE, "fillTransItem event C_WRITE_COMMIT");
+
+  if (fillFSMTransItem(fsm, &trans_item))
+  {
+    serverLog(LL_ERROR, "fillFSMTransItem err");
+    return 1;
+  }
   // // serverLog(LL_NOTICE, "fillFSMTransItem event C_WRITE_COMMIT");
 
 	// 把虚拟机, 弄成 PAIRING_BEGIN, 也就是空闲的意思啦
@@ -788,6 +931,23 @@ void decideEvent(void *arg)
 			chr->event = C_WRITE_STEP1;
 			break;
 		}
+		case PAIRING_STEP2:
+		{
+			serverLog(LL_NOTICE, "decideEvent PAIRING_STEP2");
+			chr->event = C_WRITE_STEP3;
+			break;
+		}
+		case PAIRING_STEP4:
+		{
+			serverLog(LL_NOTICE, "decideEvent PAIRING_STEP4");
+			C_WRITE_COMMIT;
+			break;
+		}
+		default:
+		{
+			serverLog(LL_ERROR, "decideEvent default error");
+			break;
+		}
 	}
 }
 
@@ -799,13 +959,13 @@ void handleClientEvent(void *arg)
 	{
 	case C_WRITE_STEP1:
 		// 首先转换状态, 到 step1
-		serverLog(LL_NOTICE, "handleClientEvent cur_state %d", fsm->cur_state);
+		serverLog(LL_NOTICE, "handleClientEvent C_WRITE_STEP1 cur_state %d", fsm->cur_state);
 		handle_res = handleEvent(fsm, chr->event, NULL);
 		if (handle_res)
 		{
 			serverLog(LL_ERROR, "handle event C_WRITE_STEP1 error");
 		}
-		serverLog(LL_NOTICE, "handleClientEvent cur_state %d", fsm->cur_state);
+		serverLog(LL_NOTICE, "handleClientEvent C_WRITE_STEP1 cur_state %d", fsm->cur_state);
 		chr->event = S_REPLY_STEP2;
 		// 然后生成 step2
 		// 这儿别传错数据, 都使用chr 进行传递
@@ -814,10 +974,40 @@ void handleClientEvent(void *arg)
 		{
 			serverLog(LL_ERROR, "handle event S_REPLY_STEP2 error");
 		}
+		serverLog(LL_NOTICE, "handleClientEvent C_WRITE_STEP1 cur_state %d", fsm->cur_state);
 		/* code */
 		break;
-	
+	case C_WRITE_STEP3:
+		serverLog(LL_NOTICE, "handleClientEvent C_WRITE_STEP3 cur_state %d", fsm->cur_state);
+		// 首先转换到 step3
+		handle_res = handleEvent(fsm, chr->event, NULL);
+		if (handle_res)
+		{
+			serverLog(LL_ERROR, "handle event C_WRITE_STEP1 error");
+		}
+		serverLog(LL_NOTICE, "handleClientEvent C_WRITE_STEP3 cur_state %d", fsm->cur_state);
+		chr->event = S_REPLY_STEP4;
+		handle_res = handleEvent(fsm, chr->event, chr);
+		if (handle_res)
+		{
+			serverLog(LL_ERROR, "handle event S_REPLY_STEP2 error");
+		}
+		serverLog(LL_NOTICE, "handleClientEvent C_WRITE_STEP3 cur_state %d", fsm->cur_state);
+		break;
+	case C_WRITE_COMMIT:
+		serverLog(LL_NOTICE, "handleClientEvent C_WRITE_COMMIT cur_state %d", fsm->cur_state);
+		// 首先转换状态到 C_WRITE_COMMIT
+		handle_res = handleEvent(fsm, chr->event, NULL);
+		if (handle_res)
+		{
+			serverLog(LL_ERROR, "handle event C_WRITE_STEP1 error");
+		}
+		serverLog(LL_NOTICE, "handleClientEvent C_WRITE_STEP3 cur_state %d", fsm->cur_state);
+		chr->event = S_PAIRING_COMPLETE;
+		
+		break;
 	default:
+		serverLog(LL_ERROR, "default error event");
 		break;
 	}
 }
@@ -877,7 +1067,7 @@ static DBusMessage *chr_write_value(DBusConnection *conn, DBusMessage *msg,
 	if(isRecvFullPkg(chr->recv_pairing_data))
 	{
 		// 这样就只会返回一个恢复,所以要弄好
-		serverLog(LL_NOTICE, "get full pkg");
+		serverLog(LL_NOTICE, "-------- get full pkg");
 		decideEvent(user_data);
 		handleClientEvent(user_data);
 		// chr_write(chr, value, len);
