@@ -51,6 +51,7 @@
 #define GATT_CHR_IFACE			"org.bluez.GattCharacteristic1"
 #define GATT_DESCRIPTOR_IFACE		"org.bluez.GattDescriptor1"
 #define LE_AD_MGR_IFACE 			"org.bluez.LEAdvertisingManager1"
+#define ADPTER_IFACE					"org.bluez.Adapter1"
 
 /* Immediate Alert Service UUID */
 // wifi service
@@ -91,17 +92,8 @@ struct descriptor {
 	int vlen;
 	const char **props;
 };
-
-struct adapter {
-	GDBusProxy *proxy;
-	GDBusProxy *ad_proxy;
-	GList *devices;
-};
-
-static struct adapter *default_ctrl;
-static GDBusProxy *default_dev;
-static GDBusProxy *default_attr;
-static GList *ctrl_list;
+static GDBusProxy *adapter_proxy;
+static GDBusProxy *ad_proxy;
 
 // 状态机结构体
 // struct connection
@@ -115,19 +107,7 @@ static const char *desc_props[] = { "read", "write", NULL };
 
 // functions
 static void chr_write(struct characteristic *chr, const uint8_t *value, int len);
-
-// adapter 相关代码
-static struct adapter *adapter_new(GDBusProxy *proxy)
-{
-	struct adapter *adapter = g_malloc0(sizeof(struct adapter));
-
-	ctrl_list = g_list_append(ctrl_list, adapter);
-
-	if (!default_ctrl)
-		default_ctrl = adapter;
-
-	return adapter;
-}
+void cmd_advertise();
 
 // 状态机相关代码
 static FSM *fsm = NULL;
@@ -1411,15 +1391,29 @@ static void register_app(GDBusProxy *proxy)
 
 static void proxy_added_cb(GDBusProxy *proxy, void *user_data)
 {
+	
 	const char *iface;
 
 	iface = g_dbus_proxy_get_interface(proxy);
 	printf("-------------------- iface %s\n ", iface);
+
+	if (!g_strcmp0(iface, LE_AD_MGR_IFACE))
+	{
+		printf("2 -------------------- iface %s\n ", iface);
+		ad_proxy = proxy;
+		cmd_advertise();
+	}
+	else if (!g_strcmp0(iface, ADPTER_IFACE))
+	{
+		adapter_proxy = proxy;
+	}	
+
 	if (g_strcmp0(iface, GATT_MGR_IFACE))
 		return;
 
-	// if (g_strcmp0(iface, LE_AD_MGR_IFACE))
-	// 	return;
+	
+	
+	
 	register_app(proxy);
 }
 
@@ -1535,8 +1529,14 @@ void cmd_advertise()
 	serverLog(LL_NOTICE, " cmd_advertise enable: %d type: %s", enable, type);
 
 	if (enable == TRUE)
-		ad_register(connection, default_ctrl->ad_proxy, type);
+		ad_register(connection, ad_proxy, type);
 	return;
+}
+
+// discoverble
+static void cmd_discoverable()
+{
+
 }
 
 int main(int argc, char *argv[])
@@ -1568,7 +1568,7 @@ int main(int argc, char *argv[])
 
 	g_dbus_client_set_proxy_handlers(client, proxy_added_cb, NULL, NULL,
 									NULL);
-
+	
 	g_main_loop_run(main_loop);
 
 	g_dbus_client_unref(client);
