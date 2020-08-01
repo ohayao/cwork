@@ -108,6 +108,7 @@ static const char *desc_props[] = { "read", "write", NULL };
 // functions
 static void chr_write(struct characteristic *chr, const uint8_t *value, int len);
 void cmd_advertise();
+void cmd_discoverable();
 
 // 状态机相关代码
 static FSM *fsm = NULL;
@@ -1406,6 +1407,8 @@ static void proxy_added_cb(GDBusProxy *proxy, void *user_data)
 	else if (!g_strcmp0(iface, ADPTER_IFACE))
 	{
 		adapter_proxy = proxy;
+		// 仅仅是开启几秒
+		cmd_discoverable();
 	}	
 
 	if (g_strcmp0(iface, GATT_MGR_IFACE))
@@ -1520,9 +1523,8 @@ void cmd_advertise()
 	serverLog(LL_NOTICE, "------------------- cmd_advertise");
 	dbus_bool_t enable;
 	const char *type;
-	char *argv[2];
-	argv[0] = "on";
-	argv[1] = NULL;
+	char *argv[1];
+	argv[0] = "broadcast";
 
 	if (!parse_argument(argv, ad_arguments, &enable, &type))
 		return;
@@ -1533,10 +1535,32 @@ void cmd_advertise()
 	return;
 }
 
-// discoverble
-static void cmd_discoverable()
+static void generic_callback(const DBusError *error, void *user_data)
 {
+	char *str = user_data;
 
+	if (dbus_error_is_set(error))
+		serverLog(LL_NOTICE, "Failed to set %s: %s\n", str, error->name);
+	else
+		serverLog(LL_NOTICE, "Changing %s succeeded\n", str);
+}
+
+// discoverble
+void cmd_discoverable()
+{
+	dbus_bool_t discoverable = true;
+	char *str = NULL;
+
+	// 很有可能内存泄漏
+	str = g_strdup_printf("discoverable %s",
+				discoverable == TRUE ? "on" : "off");
+
+	if (g_dbus_proxy_set_property_basic(adapter_proxy, "Discoverable",
+					DBUS_TYPE_BOOLEAN, &discoverable,
+					generic_callback, str, g_free) == TRUE)
+		return;
+	
+	g_free(str);
 }
 
 int main(int argc, char *argv[])

@@ -358,3 +358,23 @@ void ad_register(DBusConnection *conn, GDBusProxy *manager, const char *type)
 		return;
 	}
 }
+
+void ad_advertise_uuids(DBusConnection *conn, int argc, char *argv[])
+{
+	g_strfreev(ad.uuids);
+	ad.uuids = NULL;
+	ad.uuids_len = 0;
+
+	if (argc < 2 || !strlen(argv[1]))
+		return;
+
+	ad.uuids = g_strdupv(&argv[1]);
+	if (!ad.uuids) {
+		serverLog(LL_ERROR, "Failed to parse input\n");
+		return;
+	}
+
+	ad.uuids_len = g_strv_length(ad.uuids);
+
+	g_dbus_emit_property_changed(conn, AD_PATH, AD_IFACE, "ServiceUUIDs");
+}
