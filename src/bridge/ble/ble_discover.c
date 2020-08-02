@@ -99,7 +99,7 @@ void ble_discovered_device(void *adapter, const char* addr, const char* name, vo
 void continueDiscoveredDevice(
         void *adapter, const char* addr, const char* name, void *user_data);
 
-int contnueDiscoverLock() {
+int continueDiscoverLock() {
     char *addr_name = NULL;
     void *adapter = NULL;
     int ret;

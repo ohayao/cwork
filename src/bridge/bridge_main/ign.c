@@ -25,6 +25,7 @@
 //#include "bridge/https_client/https.h"
 
 static sysinfo_t g_sysif;
+static ble_addr_t g_ble_addr;
 static char TOPIC_SUB[32];
 static char TOPIC_PUB[32];
 
@@ -519,30 +520,41 @@ int Init_MQTT(MQTTClient* p_mqtt){
 }
 
 int Init_Ble(sysinfo_t* si) {
-	char device_address[] = "EC:09:02:7F:4B:09";
-	char admin_key[] = "96eb72d2852d41df94dac37eb3241caa";
-	char passwd[] = "63c5bd7dd34fe863";
+	si->lockinfo = (LockInfo_t*) malloc(sizeof(LockInfo_t)*MAX_LOCK_COUNT);
+	memset(si->lockinfo, 0, sizeof(LockInfo_t)*MAX_LOCK_COUNT);
+	si->lock_total = 0;
 
+    char *addr_name = NULL;
+    int ret = gattlib_adapter_open(addr_name, &si->ble_adapter);
+    if (ret) {
+        serverLog(LL_ERROR, "discoverLock ERROR: Failed to open adapter.\n");
+		Close(si);
+        return -1;
+    }
+
+/*
 	LockInfo_t *li = (LockInfo_t*) malloc(sizeof(LockInfo_t));
 	if (NULL==li) {
 		return -1;
 	}
+*/
+/*
+	char lock_id[] = "IGM3037f4b09";
+	char device_address[] = "EC:09:02:7F:4B:09";
+	char admin_key[] = "96eb72d2852d41df94dac37eb3241caa";
+	char passwd[] = "63c5bd7dd34fe863";
 
-	memset(li, 0, sizeof(LockInfo_t));
-	memcpy(li->lock_addr, device_address, strlen(device_address));
-	memcpy(li->lock_ekey, admin_key, strlen(admin_key));
-	memcpy(li->lock_passwd, passwd, strlen(passwd));
+	LockInfo_t li;
+	memset(&li, 0, sizeof(LockInfo_t));
+	memcpy(&li.lock_id, lock_id, strlen(lock_id));
+	memcpy(&li.lock_addr, device_address, strlen(device_address));
+	memcpy(&li.lock_ekey, admin_key, strlen(admin_key));
+	memcpy(&li.lock_passwd, passwd, strlen(passwd));
 
-    char *addr_name = NULL;
-    void *adapter = NULL;
-    int ret;
-    ret = gattlib_adapter_open(addr_name, &adapter);
-    if (ret) {
-        serverLog(LL_ERROR, "discoverLock ERROR: Failed to open adapter.\n");
-        // TODO: our own error;
-        return ret;
-    }
+	AddLockinfo(si, &li);
+	PrintLockinfo(si);
 
+*/
 	//@@@ need async connect!!!
 	/*
 	int ret = create_gatt_connection(li->lock_addr, &(li->gatt_connection), &(li->gatt_adapter));
@@ -567,23 +579,111 @@ int Init_Ble(sysinfo_t* si) {
     }
 	*/
 
-	si->lockinfo = (LockInfo_t**) malloc(sizeof(LockInfo_t*)*5);
-	si->lockinfo[0] = li;
-	si->lock_total = 1;
 	return 0;
 }
 
-int ScanBLE() {
-    //do scan BLE ,bred
+char* GetAddrBle(sysinfo_t* si, char* lock_id) {
+	//get factor
+	//create addr_part
+	//search addr_part
+	//return
+	for(int i=0; i<si->ble_list_n; i++){
+		if(!strcmp(lock_id, si->ble_list[i].name)) {
+			return si->ble_list[i].addr;
+		}
+	}
+	return NULL;
+}
 
-    //if have the BLE addr, do init for demo
-    int ret = Init_Ble(&g_sysif);
-	if(ret) {
-        serverLog(LL_ERROR, "Init_Ble err[%d].", ret);
+int AddLockinfo(sysinfo_t* si, LockInfo_t* li) {
+	if(si->lock_total < MAX_LOCK_COUNT-1) {
+		LockInfo_t* p = si->lockinfo + (si->lock_total);
+		memcpy(p, li, sizeof(LockInfo_t)); 
+		//get addr
+		char* lock_addr = GetAddrBle(si, li->lock_id);
+		if(NULL != lock_addr) {
+			p->lock_addr_size = strlen(lock_addr);
+			if(32 > p->lock_addr_size){
+				memcpy(p->lock_addr, lock_addr, p->lock_addr_size);
+			}
+		}
+		si->lock_total++;
+		return 0;
+	}
+	return -1;
+}
+
+void PrintLockinfo(sysinfo_t* si) {
+	for(int i =0; i<si->lock_total; i++){
+		LockInfo_t* pi = si->lockinfo + i;
+		printf("[%d], id[%s],id_size[%d],key[%X],key_size[%d],passwd[%x],passwd_size[%d],token[%x],token_size[%d],addr[%s]\n",
+			i, pi->lock_id, pi->lock_id_size, pi->lock_ekey, pi->lock_ekey_size, pi->lock_passwd, pi->lock_passwd_size, pi->lock_token, pi->lock_token_size, pi->lock_addr);
+	}
+}
+
+LockInfo_t* SearchLockInfo(sysinfo_t* si, char* lock_id){
+	for(int i =0; i<si->lock_total; i++){
+		LockInfo_t* pi = si->lockinfo + i;
+		if(!strcmp(pi->lock_id, lock_id)) {
+			return pi;
+		}
+	}
+	return NULL;
+}
+
+void ble_discovered_cb(void *adapter, const char* addr, const char* name, void* si) {
+	ble_addr_t* bl = ((sysinfo_t*)si)->ble_list;
+	unsigned char ble_total = ((sysinfo_t*)si)->ble_list_n; 
+    if (name) {
+        printf("Discovered %s - '%s'\n", addr, name);
+		((sysinfo_t*)si)->ble_list = realloc(bl, sizeof(ble_addr_t)*(ble_total+1));
+		ble_addr_t* nbl = ((sysinfo_t*)si)->ble_list + ble_total;
+		memset(nbl, 0x0, sizeof(ble_addr_t));
+		memcpy(nbl->name, name, strlen(name));
+		memcpy(nbl->addr, addr, strlen(addr));
+		((sysinfo_t*)si)->ble_list_n++;
+    } else {
+        printf("Discovered %s\n", addr);
+    }
+	
+	//g_ble_addr.insert(name, addr);
+}
+
+int ScanBLE(sysinfo_t* si) {
+	if (NULL == si || NULL == si->ble_adapter) {
+		serverLog(LL_ERROR, "in ScanBLE, si is NULL err. ");
 		return -1;
 	}
-
+	si->ble_list_n = 0;
+    //do scan BLE
+    int ret = gattlib_adapter_scan_enable(si->ble_adapter, ble_discovered_cb, BLE_SCAN_TIMEOUT, si);
+    if (ret) {
+        fprintf(stderr, "ERROR: Failed to scan.\n");
+		Close(si);
+		return -1;
+    }
+	printf("ble_addr_n[%d]\n", si->ble_list_n);
+	for(int i =0; i<si->ble_list_n; i++) {
+		printf("[%d],name[%s],addr[%s]\n", i, si->ble_list[i].name, si->ble_list[i].addr);
+	}
+/*
+	printf("g_ble_addr.size[%d]\n",g_ble_addr.size());
+	for(map<string, string>::iterator it = g_ble_addr.begin(); g_ble_addr.end()!= it; it++) {
+		prtinf("name[%s],addr[%s]\n", it->first.c_str(), it->second.c_str());
+	}
+*/
+    gattlib_adapter_scan_disable(si->ble_adapter);
+    //if have the BLE addr, do init for demo
     return 0;
+}
+
+void Close(sysinfo_t* si) {
+	if(si->ble_adapter) {
+		gattlib_adapter_close(si->ble_adapter);
+	}
+	if(si->ble_list) {
+		free(si->ble_list);
+	}
 }
 
 int WifiConnection(){
@@ -599,6 +699,18 @@ int Init(void* tn) {
         serverLog(LL_ERROR, "Init GetMacAddr err[%d].", ret);
         return -1;
     }
+
+    ret = Init_Ble(&g_sysif);
+	if(ret) {
+        serverLog(LL_ERROR, "Init_Ble err[%d].", ret);
+		return -2;
+	}
+
+    ret = ScanBLE(&g_sysif);
+	if(ret) {
+        serverLog(LL_ERROR, "ScanBle err[%d].", ret);
+		return -3;
+	}
 
 /*
     ret = download_ca();
@@ -642,13 +754,6 @@ int Init(void* tn) {
     }
     serverLog(LL_NOTICE, "Subscribe [%s] success!!!", PUB_WEBDEMO);
 
-    //scan BLE, bred
-    ret = ScanBLE();
-	if(ret) {
-        serverLog(LL_ERROR, "ScanBle err[%d].", ret);
-		return -4;
-	}
-
     return 0;
 }
 
@@ -677,14 +782,236 @@ int DoWebMsg(char *topic,void *payload){
         UnLock(lockID);
     }*/
     printf("vvvvvvvvvvvvvvv web msgvvvvvvvvvvvvvvv\n");
-    cJSON_Delete(root);
+	cJSON_Delete(root);
 
-    return 0;
+	return 0;
+	}
+
+int DealCMD(sysinfo_t *si, ign_MsgInfo imsg) {
+	printf("after pb decode, type[%d]:\n", (imsg.event_type));
+	//create node,add into list, bred
+	switch(imsg.event_type){
+		case ign_EventType_HEARTBEAT:
+			{
+				printf("RECV MQTT HB msg\n");
+				return 0;
+			}
+		case ign_EventType_GET_USER_INFO:
+			{
+				printf("RECV msgid[%d],signal[%d].\n", imsg.msg_id, imsg.bridge_data.profile.wifi_signal);
+				printf("RECV profile_bt_id[%s],bridege_name[%s].\n",
+						imsg.bridge_data.profile.bt_id.bytes, imsg.bridge_data.profile.name.bytes);
+				return 0;
+			}
+		case ign_EventType_UPDATE_USER_INFO: 
+			{
+				if(imsg.has_server_data){
+					/*
+					   for(int i=0;i<glock_index;i++){
+					   printf("%02d bt_id=%s\n",i,glocks[i].bt_id);
+					   }*/
+					for(int j=0; j<imsg.server_data.lock_entries_count; j++) {
+						LockInfo_t li;
+						memset(&li, 0, sizeof(LockInfo_t));
+						li.lock_id_size = strlen(imsg.server_data.lock_entries[j].bt_id);
+						li.lock_ekey_size = imsg.server_data.lock_entries[j].ekey.guest_aes_key.size;
+						li.lock_token_size = imsg.server_data.lock_entries[j].ekey.guest_token.size;
+						li.lock_passwd_size = imsg.server_data.lock_entries[j].ekey.password.size;
+						memcpy(li.lock_ekey, imsg.server_data.lock_entries[j].ekey.guest_aes_key.bytes, sizeof(li.lock_ekey));
+						memcpy(li.lock_token, imsg.server_data.lock_entries[j].ekey.guest_token.bytes, sizeof(li.lock_token));
+						memcpy(li.lock_passwd, imsg.server_data.lock_entries[j].ekey.password.bytes, sizeof(li.lock_passwd));
+						memcpy(li.lock_id, imsg.server_data.lock_entries[j].bt_id, sizeof(li.lock_id));
+						int ret = AddLockinfo(si, &li);
+						if (ret) {
+							printf("AddLockinfo err, lock_total[%d]\n", si->lock_total);
+						}
+						/*
+						   printf("[%d], bt_id[%s], guest_aes_ekey size[%d] [", j, imsg.server_data.lock_entries[j].bt_id, imsg.server_data.lock_entries[j].ekey.guest_aes_key.size);
+						   for(int k=0;k<imsg.server_data.lock_entries[j].ekey.guest_aes_key.size; k++) {
+						   printf("[%x]", imsg.server_data.lock_entries[j].ekey.guest_aes_key.bytes[k]);
+						   }
+						   printf("]");
+						   printf(", guest_token size[%d] [", imsg.server_data.lock_entries[j].ekey.guest_token.size);
+						   for(int k=0;k<imsg.server_data.lock_entries[j].ekey.guest_token.size; k++) {
+						   printf("[%x]", imsg.server_data.lock_entries[j].ekey.guest_token.bytes[k]);
+						   }
+						   printf("]");
+						   printf(", password size[%d] [", imsg.server_data.lock_entries[j].ekey.password.size);
+						   for(int k=0;k<imsg.server_data.lock_entries[j].ekey.password.size; k++) {
+						   printf("[%x]", imsg.server_data.lock_entries[j].ekey.password.bytes[k]);
+						   }
+						   printf("]\n");
+						 */
+					}
+				}
+
+				//fake lock data
+				char lock_id[] = "IGP105cc2684";
+				char device_address[] = "ED:67:F0:CC:26:84";
+				char guest_key[] = "7df6d0dc000873150e94deb03ccd18cb";
+				char passwd[] = "06F3E8FC48D256CA";
+				char token[] = "5294087c99c653ca277d5d42074572c83a853ba7c14c0a8fe72f74473777504aeb999ec892f30ab961e2d18354d02708bd6a15bcf73a6103e491dca642873b0367478e08f3a5";
+
+				uint8_t tmp_buff[256] = {0};
+				memset(tmp_buff, 0, sizeof(tmp_buff));
+
+				LockInfo_t li;
+				memset(&li, 0, sizeof(LockInfo_t));
+				memcpy(&li.lock_id, lock_id, strlen(lock_id));
+				li.lock_id_size = strlen(lock_id);
+				memcpy(&li.lock_addr, device_address, strlen(device_address));
+				li.lock_addr_size = sizeof(device_address);
+
+				memset(tmp_buff, 0, sizeof(tmp_buff));
+				int ekey_len = hexStrToByte(guest_key, tmp_buff, strlen(guest_key));
+				memcpy(&li.lock_ekey, guest_key, ekey_len);
+				li.lock_ekey_size = ekey_len;
+
+				memset(tmp_buff, 0, sizeof(tmp_buff));
+				int passwd_len = hexStrToByte(passwd, tmp_buff, strlen(passwd));
+				memcpy(&li.lock_passwd, tmp_buff, passwd_len);
+				li.lock_passwd_size = passwd_len;
+
+				memset(tmp_buff, 0, sizeof(tmp_buff));
+				int token_len = hexStrToByte(token, tmp_buff, strlen(token));
+				memcpy(&li.lock_token, tmp_buff, token_len);
+				li.lock_token_size = token_len;
+
+				int ret = AddLockinfo(si, &li);
+				if (ret) {
+					printf("AddLockinfo err, lock_total[%d]\n", si->lock_total);
+				}
+
+				PrintLockinfo(si);
+
+				//for web client
+				ign_MsgInfo tmsg = {};
+				tmsg.event_type = ign_EventType_UPDATE_USER_INFO;
+				tmsg.has_bridge_data = true;
+				ign_BridgeEventData *pbed = &tmsg.bridge_data;
+				pbed->has_profile = true;
+				pbed->profile = Create_IgnBridgeProfile(&g_sysif);
+				tmsg.has_server_data = true;
+				ign_ServerEventData *psd = &tmsg.server_data;
+				psd->lock_entries_count = imsg.server_data.lock_entries_count;
+				for(int i=0; i<imsg.server_data.lock_entries_count; i++){
+					psd->lock_entries[i] = imsg.server_data.lock_entries[i];
+				}
+				if(5 > psd->lock_entries_count){
+					memcpy(psd->lock_entries[psd->lock_entries_count].bt_id, li.lock_id, li.lock_id_size); 
+					psd->lock_entries[psd->lock_entries_count].has_ekey = 1;
+					psd->lock_entries[psd->lock_entries_count].ekey.guest_aes_key.size = li.lock_ekey_size;
+					memcpy(psd->lock_entries[psd->lock_entries_count].ekey.guest_aes_key.bytes, li.lock_ekey, li.lock_ekey_size);
+					psd->lock_entries[psd->lock_entries_count].ekey.guest_token.size = li.lock_token_size;
+					memcpy(psd->lock_entries[psd->lock_entries_count].ekey.guest_token.bytes, li.lock_token, li.lock_token_size);
+					psd->lock_entries[psd->lock_entries_count].ekey.password.size = li.lock_passwd_size;
+					memcpy(psd->lock_entries[psd->lock_entries_count].ekey.password.bytes, li.lock_passwd, li.lock_passwd_size); 
+					psd->lock_entries[psd->lock_entries_count].ekey.keyId = psd->lock_entries_count;
+					psd->lock_entries_count++;
+				}
+
+				SendMQTTMsg(&tmsg, SUB_WEBDEMO);
+				return 0;
+			}
+		case ign_EventType_NEW_JOB_NOTIFY:
+			{
+				//@@@test
+				/*
+				   printf("RECV[NEW_JOB_NOTIFY]:bt_id[%s],lock_cmd_size[%d],lock_cmd[",
+				   imsg.server_data.job.bt_id,
+				   (int)imsg.server_data.job.lock_cmd.size);
+				   for(int i=0;i<imsg.server_data.job.lock_cmd.size;i++){
+				   printf("%x", imsg.server_data.job.lock_cmd.bytes[i]);
+				   }
+				   printf("]\nlock_entries_count[%u]:", imsg.server_data.lock_entries_count);
+				   for(int j=0; j<imsg.server_data.lock_entries_count; j++) {
+				   printf("[%d], bt_id[%s], guest_aes_ekey size[%d] [", j, imsg.server_data.lock_entries[j].bt_id, imsg.server_data.lock_entries[j].ekey.guest_aes_key.size);
+				   for(int k=0;k<imsg.server_data.lock_entries[j].ekey.guest_aes_key.size; k++) {
+				   printf("%x", imsg.server_data.lock_entries[j].ekey.guest_aes_key.bytes[k]);
+				   }
+				   printf("]");
+				   printf(", guest_token size[%d] [", imsg.server_data.lock_entries[j].ekey.guest_token.size);
+				   for(int k=0;k<imsg.server_data.lock_entries[j].ekey.guest_token.size; k++) {
+				   printf("%x", imsg.server_data.lock_entries[j].ekey.guest_token.bytes[k]);
+				   }
+				   printf("]");
+				   printf(", password size[%d] [", imsg.server_data.lock_entries[j].ekey.password.size);
+				   for(int k=0;k<imsg.server_data.lock_entries[j].ekey.password.size; k++) {
+				   printf("%x", imsg.server_data.lock_entries[j].ekey.password.bytes[k]);
+				   }
+				   printf("]");
+				   }
+				   printf("\n");
+				 */
+				LockInfo_t* pli = SearchLockInfo(si, imsg.server_data.demo_job.bt_id);
+				if (NULL == pli) {
+					printf("SearchLockInfo err. lock_id[%s]\n", imsg.server_data.demo_job.bt_id);
+				}
+
+				printf("@@@ demo_job.bt_id[%s], op_cmd[%d], pin[", 
+						imsg.server_data.demo_job.bt_id, imsg.server_data.demo_job.op_cmd);
+				for(int n=0;n<imsg.server_data.demo_job.pin.size; n++) {
+					printf("%x", imsg.server_data.demo_job.pin.bytes[n]);
+				}
+				printf("]\n");
+				//handle lock_cmd
+				//char device_address[] = "EC:09:02:7F:4B:09";
+				//char admin_key[] = "96eb72d2852d41df94dac37eb3241caa";
+				//char passwd[] = "63c5bd7dd34fe863";
+
+				igm_lock_t* lock = NULL;
+				getLock(&lock);
+				initLock(lock);
+				setLockName(lock, pli->lock_id, strlen(pli->lock_id));//imsg.server_data.demo_job.bt_id, strlen(imsg.server_data.demo_job.bt_id));
+				setLockAddr(lock, pli->lock_addr, strlen(pli->lock_addr));//device_address, strlen(device_address));
+				setLockKey(lock, pli->lock_ekey, pli->lock_ekey_size);
+				setLockPassword(lock, pli->lock_passwd, pli->lock_passwd_size);
+				setLockToken(lock, pli->lock_token, pli->lock_token_size);
+				//setLockCmd(&lock, imsg.server_data.job.lock_cmd.bytes, imsg.server_data.job.lock_cmd.size);
+				void* request = NULL;
+				if (ign_DemoLockCommand_CREATE_PIN == imsg.server_data.demo_job.op_cmd) {
+					IgCreatePinRequest create_pin_request;
+					ig_CreatePinRequest_init(&create_pin_request);
+					ig_CreatePinRequest_set_password(&create_pin_request, pli->lock_passwd, pli->lock_passwd_size);
+					ig_CreatePinRequest_set_new_pin(&create_pin_request, imsg.server_data.demo_job.pin.bytes, imsg.server_data.demo_job.pin.size);
+					printf( "set new_pin[%s]\n", create_pin_request.new_pin);
+					ig_CreatePinRequest_set_start_date(&create_pin_request, time(0));
+					ig_CreatePinRequest_set_end_date(&create_pin_request, time(0)+10000);
+					ig_CreatePinRequest_set_pin_type(&create_pin_request, 2);
+					ig_CreatePinRequest_set_operation_id(&create_pin_request, 1);
+					request = &create_pin_request;
+					//int res = testCreatePin(lock, &create_pin_request);
+					//releaseLock(&lock);
+				}
+				else if (ign_DemoLockCommand_DELETE_PIN == imsg.server_data.demo_job.op_cmd) {
+					IgDeletePinRequest delete_pin_request;
+					ig_DeletePinRequest_init(&delete_pin_request);
+					ig_DeletePinRequest_set_password(&delete_pin_request, pli->lock_passwd, pli->lock_passwd_size);
+
+					ig_DeletePinRequest_set_old_pin(&delete_pin_request, imsg.server_data.demo_job.pin.bytes, imsg.server_data.demo_job.pin.size);
+					printf( "set old_pin[%s]\n", delete_pin_request.old_pin);
+					ig_DeletePinRequest_set_operation_id(&delete_pin_request, 2);
+					request = &delete_pin_request;
+					//int res = testDeletePin(lock, &delete_pin_request);
+				}
+				int ret = HandleLockCMD (lock, imsg.server_data.demo_job.op_cmd, request);
+				if(ret) {
+					printf( "HandleLockCMD ret[%d].\n", ret);
+				}
+				return 0;
+			}
+		default:
+			{
+				printf("RECV MQTT err type[%u].\n", imsg.event_type);
+				return -1;
+			}
+	}
+	return -1;
 }
 
 void WaitMQTT(sysinfo_t *si) {
 	printf("do Waiting MQTT...\n");
-    int ret = 0;
+	int ret = 0;
 	while(1){
 		//if (NULL == si->mqtt_c)
 		char *topic = NULL;
@@ -712,221 +1039,36 @@ void WaitMQTT(sysinfo_t *si) {
 			        serverLog(LL_ERROR, "pb_decode err[%d].", ret);
 					printf("MQTT MSG DECODE ERROR[%d]!\n", ret);
 				}else{
-					printf("after pb decode, type[%d]", (imsg.event_type));
-                    //create node,add into list, bred
-					switch(imsg.event_type){
-						case ign_EventType_HEARTBEAT:
-							printf("RECV MQTT HB msg\n");
-							goto gomqttfree;
-							break;
-						case ign_EventType_GET_USER_INFO:
-							printf("RECV MQTT GETUSERINFO msg LENi[%d].\n", msg->payloadlen);
-							printf("RECV msgid[%d],signal[%d].\n", imsg.msg_id, imsg.bridge_data.profile.wifi_signal);
-							printf("RECV profile_bt_id[%s],bridege_name[%s].\n",
-								imsg.bridge_data.profile.bt_id.bytes, imsg.bridge_data.profile.name.bytes);
-							goto gomqttfree;
-							break;
-						case ign_EventType_UPDATE_USER_INFO:
-							if(imsg.has_server_data){
-								/*
-								for(int i=0;i<glock_index;i++){
-									printf("%02d bt_id=%s\n",i,glocks[i].bt_id);
-								}*/
-								for(int j=0; j<imsg.server_data.lock_entries_count; j++) {
-									printf("[%d], bt_id[%s], guest_aes_ekey size[%d] [", j, imsg.server_data.lock_entries[j].bt_id, imsg.server_data.lock_entries[j].ekey.guest_aes_key.size);
-									for(int k=0;k<imsg.server_data.lock_entries[j].ekey.guest_aes_key.size; k++) {
-										printf("[%x]", imsg.server_data.lock_entries[j].ekey.guest_aes_key.bytes[k]);
-									}
-									printf("]");
-									printf(", guest_token size[%d] [", imsg.server_data.lock_entries[j].ekey.guest_token.size);
-									for(int k=0;k<imsg.server_data.lock_entries[j].ekey.guest_token.size; k++) {
-										printf("[%x]", imsg.server_data.lock_entries[j].ekey.guest_token.bytes[k]);
-									}
-									printf("]");
-									printf(", password size[%d] [", imsg.server_data.lock_entries[j].ekey.password.size);
-									for(int k=0;k<imsg.server_data.lock_entries[j].ekey.password.size; k++) {
-										printf("[%x]", imsg.server_data.lock_entries[j].ekey.password.bytes[k]);
-									}
-									printf("]\n");
-								}
-								printf("\n");
-							}
-
-							ign_MsgInfo tmsg={};
-							tmsg.event_type=ign_EventType_UPDATE_USER_INFO;
-							tmsg.has_bridge_data=true;
-							ign_BridgeEventData *pbed = &tmsg.bridge_data;
-							pbed->has_profile = true;
-							pbed->profile = Create_IgnBridgeProfile(&g_sysif);
-							tmsg.has_server_data = true;
-							ign_ServerEventData *psd = &tmsg.server_data;
-							psd->lock_entries_count = imsg.server_data.lock_entries_count;
-							for(int i=0; i<imsg.server_data.lock_entries_count; i++){
-								psd->lock_entries[i] = imsg.server_data.lock_entries[i];
-							}
-							/*	
-							int tl=0;
-							printf("recv User Info, lock_count[%u].\n", imsg.server_data.lock_entries_count);
-							for(int i=0; i<imsg.server_data.lock_entries_count; i++){
-								if(strlen(imsg.server_data.lock_entries[i].bt_id)>0){
-									tl++;
-									strcpy(psd->lock_entries[i].bt_id,imsg.server_data.lock_entries[i].bt_id);
-									strcpy(psd->lock_entries[i].ekey.bytes,imsg.server_data.lock_entries[i].ekey.guest_aes_key.bytes);
-									if(0 == psd->lock_entries[i].ekey.size) {
-										serverLog(LL_ERROR, "get lock[%s] ekey is empty err!", psd->lock_entries[i].bt_id);
-									}
-									printf("[%d], bt_id[%s], ekey[", i, imsg.server_data.lock_entries[i].bt_id);
-									for(int k=0;k<imsg.server_data.lock_entries[i].ekey.size; k++) {
-										printf("%x", imsg.server_data.lock_entries[i].ekey.bytes[k]);
-									}
-									printf("]\n");
-								}
-							}
-							psd->lock_entries_count=tl;
-*/
-                            SendMQTTMsg(&tmsg, SUB_WEBDEMO);
-							goto gomqttfree;
-							break;
-						case ign_EventType_NEW_JOB_NOTIFY:
-							//@@@test
-							printf("RECV[NEW_JOB_NOTIFY]:bt_id[%s],lock_cmd_size[%d],lock_cmd[",
-								imsg.server_data.job.bt_id,
-								(int)imsg.server_data.job.lock_cmd.size);
-							for(int i=0;i<imsg.server_data.job.lock_cmd.size;i++){
-								printf("%x", imsg.server_data.job.lock_cmd.bytes[i]);
-							}
-							printf("]\nlock_entries_count[%u]:", imsg.server_data.lock_entries_count);
-							for(int j=0; j<imsg.server_data.lock_entries_count; j++) {
-								printf("[%d], bt_id[%s], guest_aes_ekey size[%d] [", j, imsg.server_data.lock_entries[j].bt_id, imsg.server_data.lock_entries[j].ekey.guest_aes_key.size);
-								for(int k=0;k<imsg.server_data.lock_entries[j].ekey.guest_aes_key.size; k++) {
-									printf("%x", imsg.server_data.lock_entries[j].ekey.guest_aes_key.bytes[k]);
-								}
-								printf("]");
-								printf(", guest_token size[%d] [", imsg.server_data.lock_entries[j].ekey.guest_token.size);
-								for(int k=0;k<imsg.server_data.lock_entries[j].ekey.guest_token.size; k++) {
-									printf("%x", imsg.server_data.lock_entries[j].ekey.guest_token.bytes[k]);
-								}
-								printf("]");
-								printf(", password size[%d] [", imsg.server_data.lock_entries[j].ekey.password.size);
-								for(int k=0;k<imsg.server_data.lock_entries[j].ekey.password.size; k++) {
-									printf("%x", imsg.server_data.lock_entries[j].ekey.password.bytes[k]);
-								}
-								printf("]");
-							}
-							printf("\n");
-
-
-							printf("@@@demo_job.bt_id[%s], op_cmd[%d], pin[", 
-								imsg.server_data.demo_job.bt_id, imsg.server_data.demo_job.op_cmd);
-							for(int n=0;n<imsg.server_data.demo_job.pin.size; n++) {
-								printf("%x", imsg.server_data.demo_job.pin.bytes[n]);
-							}
-							printf("]\n");
-							//handle lock_cmd
-
-							igm_lock_t* lock = NULL;
-							getLock(&lock);
-							initLock(lock);
-							//char device_address[] = "E1:93:2A:A3:16:E7";
-							//char admin_key[] = "8d29d572299deda54de78c16fcce1451"; 
-							//char passwd[] = "35f1cfb6f8bee257";
-
-							char device_address[] = "EC:09:02:7F:4B:09";
-							char admin_key[] = "96eb72d2852d41df94dac37eb3241caa";
-							char passwd[] = "63c5bd7dd34fe863";
-
-							setLockName(lock, imsg.server_data.demo_job.bt_id, strlen(imsg.server_data.demo_job.bt_id));
-							setLockAddr(lock, device_address, strlen(device_address));
-							uint8_t tmp_buff[100];
-							memset(tmp_buff, 0, sizeof(tmp_buff));
-							int admin_len = hexStrToByte(admin_key, tmp_buff, strlen(admin_key));
-							setLockKey(lock, tmp_buff, admin_len);
-							memset(tmp_buff, 0, sizeof(tmp_buff));
-							int password_size = hexStrToByte(passwd, tmp_buff, strlen(passwd));
-							setLockPassword(lock, tmp_buff, password_size);
-							//setLockCmd(&lock, imsg.server_data.job.lock_cmd.bytes, imsg.server_data.job.lock_cmd.size);
-							void* request = NULL;
-							if (ign_DemoLockCommand_CREATE_PIN == imsg.server_data.demo_job.op_cmd) {
-								IgCreatePinRequest create_pin_request;
-								ig_CreatePinRequest_init(&create_pin_request);
-								ig_CreatePinRequest_set_password(&create_pin_request, tmp_buff, password_size);
-								ig_CreatePinRequest_set_new_pin(&create_pin_request, imsg.server_data.demo_job.pin.bytes, imsg.server_data.demo_job.pin.size);
-								printf( "set new_pin[%s]\n", create_pin_request.new_pin);
-								ig_CreatePinRequest_set_start_date(&create_pin_request, time(0));
-								ig_CreatePinRequest_set_end_date(&create_pin_request, time(0)+10000);
-								ig_CreatePinRequest_set_pin_type(&create_pin_request, 2);
-								ig_CreatePinRequest_set_operation_id(&create_pin_request, 1);
-								request = &create_pin_request;
-								//int res = testCreatePin(lock, &create_pin_request);
-								//releaseLock(&lock);
-							}
-							else if (ign_DemoLockCommand_DELETE_PIN == imsg.server_data.demo_job.op_cmd) {
-								IgDeletePinRequest delete_pin_request;
-								ig_DeletePinRequest_init(&delete_pin_request);
-								ig_DeletePinRequest_set_password(&delete_pin_request, tmp_buff, password_size);
-
-								ig_DeletePinRequest_set_old_pin(&delete_pin_request, imsg.server_data.demo_job.pin.bytes, imsg.server_data.demo_job.pin.size);
-								printf( "set old_pin[%s]\n", delete_pin_request.old_pin);
-								ig_DeletePinRequest_set_operation_id(&delete_pin_request, 2);
-								request = &delete_pin_request;
-								//int res = testDeletePin(lock, &delete_pin_request);
-							}
-/*
-							else if (ign_DemoLockCommand_LOCK == imsg.server_data.demo_job.op_cmd) {
-								printf("@@@do lock.\n");
-								testLock(lock);
-							}
-							else if (ign_DemoLockCommand_UNLOCK == imsg.server_data.demo_job.op_cmd) {
-								printf("@@@do unlock.\n");
-								// addDiscoverTask(1);
-								addAdminDoLockTask(lock);
-							} else if (ign_DemoLockCommand_GET_LOCK_STATUS == imsg.server_data.demo_job.op_cmd) {
-								testGetLockStatus(lock);
-								printf("@@@get status.\n");
-								//Sync_Status();
-							} else if (ign_DemoLockCommand_GET_BATTERY == imsg.server_data.demo_job.op_cmd) {
-								printf("@@@get battery.\n");
-								testGetLockBattery(lock);
-							}
-*/
-							int ret = HandleLockCMD (lock, imsg.server_data.demo_job.op_cmd, request);
-							if(ret) {
-								printf( "HandleLockCMD ret[%d].\n", ret);
-							}
-							goto gomqttfree;
-							break;
-						default:
-							printf("RECV MQTT err type[%u].\n", imsg.event_type);
-							goto gomqttfree;
-							break;
+					int ret = DealCMD(si, imsg);
+					if (ret) {
+						serverLog(LL_ERROR, "DealCMD err[%d].", ret);
 					}
-
-					/*
-					//search task queue by msg_id
-					unsigned int current_state = 1;
-					task_node_t *ptn = NULL;
-					ptn = FindTaskByMsgID(imsg.msg_id, &waiting_task_head);
-
-					if (NULL!=ptn) {//move task_node into doing_list task queue
-					printf("find task_node.msg_id[%u], current_state[%d].\n", ptn->msg_id, ptn->cur_state);
-
-					//MoveTask();
-					pthread_mutex_lock(g_sysif.mutex);
-					MoveTask(&ptn->list, &doing_task_head);
-					pthread_mutex_unlock(g_sysif.mutex);
-					}
-					else {//if not exist, add into task queue
-					printf("find ptn==NULL.\n");
-					pthread_mutex_lock(g_sysif.mutex);
-					InsertTask(&doing_task_head, imsg.msg_id, current_state, NULL, NULL);
-					pthread_mutex_unlock(g_sysif.mutex);
-					}
-					 */
-gomqttfree:            
-					MQTTClient_freeMessage(&msg);
-					MQTTClient_free(topic);
 				}
 			} 
+			MQTTClient_freeMessage(&msg);
+			MQTTClient_free(topic);
+
+			/*
+			//search task queue by msg_id
+			unsigned int current_state = 1;
+			task_node_t *ptn = NULL;
+			ptn = FindTaskByMsgID(imsg.msg_id, &waiting_task_head);
+
+			if (NULL!=ptn) {//move task_node into doing_list task queue
+			printf("find task_node.msg_id[%u], current_state[%d].\n", ptn->msg_id, ptn->cur_state);
+
+			//MoveTask();
+			pthread_mutex_lock(g_sysif.mutex);
+			MoveTask(&ptn->list, &doing_task_head);
+			pthread_mutex_unlock(g_sysif.mutex);
+			}
+			else {//if not exist, add into task queue
+			printf("find ptn==NULL.\n");
+			pthread_mutex_lock(g_sysif.mutex);
+			InsertTask(&doing_task_head, imsg.msg_id, current_state, NULL, NULL);
+			pthread_mutex_unlock(g_sysif.mutex);
+			}
+			 */
 		} else {
 			HeartBeat();
 		}
@@ -994,21 +1136,18 @@ void addDiscoverTask(int msg_id)
     return;
 }
 
-igm_lock_t *checkLockIsDiscovered(igm_lock_t *lock)
+igm_lock_t* checkLockIsDiscovered(igm_lock_t *lock)
 {
     int n_try_scan = 3;
     igm_lock_t *lock_nearby;
-    while (n_try_scan--)
-    {
+    while (n_try_scan--) {
         lock_nearby = findLockByName(lock->name);
-        if (!lock_nearby)
-        {
+        if (!lock_nearby) {
             serverLog(LL_NOTICE, "Pairing lock, not discover by the bridge, bridge scan first");
-            contnueDiscoverLock();
+            continueDiscoverLock();
         }
     }
-    if (!lock_nearby)
-    {
+    if (!lock_nearby) {
         serverLog(LL_NOTICE, "Pairing lock, not discover by the bridge");
         return NULL;
     }
