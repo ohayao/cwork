@@ -21,12 +21,12 @@
 #include <net/if.h> //for struct ifreq
 
 #include "bridge/gattlib/gattlib.h"
-#include "bridge/ble/ble_admin.h"
+//#include "bridge/ble/ble_admin.h"
 
 // #include "MQTTClient.h"
 
-#define MAX_LOCK_COUNT 5
-#define BLE_SCAN_TIMEOUT   8
+#define MAX_LOCK_COUNT		5
+#define BLE_SCAN_TIMEOUT	6
 
 atomic_int g_msg_id;
 
@@ -105,7 +105,7 @@ int hexStrToByte(const char* source, uint8_t* dest, int sourceLen) {
     }
     return sourceLen /2 ;
 }
-
+/*
 int create_gatt_connection(const char* addr, gatt_connection_t** gatt_connection, void** gatt_adapter) {
 	//blue connection
 	int ret = gattlib_adapter_open(addr, gatt_adapter);
@@ -127,6 +127,7 @@ int create_gatt_connection(const char* addr, gatt_connection_t** gatt_connection
 	serverLog(LL_NOTICE, "Succeeded to connect to the bluetooth device." );
 	return 0;
 }
+*/
 
 char* get_file_content(char *path){
     char* buf;

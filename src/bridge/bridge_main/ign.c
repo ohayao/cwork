@@ -9,10 +9,9 @@
 #include <bridge/bridge_main/wait_ble.h>
 #include <bridge/ble/ble_discover.h>
 #include <bridge/ble/lock.h>
-#include <bridge/ble/ble_pairing.h>
 #include <bridge/bridge_main/lock_list.h>
-#include <bridge/ble/ble_admin.h>
-#include <bridge/ble/ble_pairing.h>
+#include <bridge/ble/ble_guest.h>
+//#include <bridge/ble/ble_pairing.h>
 #include <bridge/mqtt/mqtt_constant.h>
 #include <bridge/mqtt/mqtt_util.h>
 #include <bridge/mqtt/cJSON.h>
@@ -105,7 +104,7 @@ int Sync_Battery(char* lock_id, int battery_l){
     ign_BridgeEventData *pbed= &battery.bridge_data;
     strncpy(pbed->demo_lockId, lock_id, sizeof(pbed->demo_lockId));
     pbed->has_profile=true;
-	pbed->profile=Create_IgnBridgeProfile(&g_sysif);
+	pbed->profile = Create_IgnBridgeProfile(&g_sysif);
 
     pbed->has_demo_update_lock_battery = true;
     pbed->demo_update_lock_battery.battery = battery_l;
@@ -165,20 +164,20 @@ void saveTaskData(task_node_t* ptn) {
 			case TASK_BLE_ADMIN_GETLOCKSTATUS:
 				{
 					printf( "handle ble get lock status data.\n");
-					ble_admin_result_t *admin_result = (ble_admin_result_t *)ble_data->ble_result;
-					if(admin_result->getlockstatus_result) {
-						printf("get status error[%d].\n", admin_result->getlockstatus_result);
+					ble_guest_result_t *guest_result = (ble_guest_result_t *)ble_data->ble_result;
+					if(guest_result->getlockstatus_result) {
+						printf("get status error[%d].\n", guest_result->getlockstatus_result);
 					} else {
 						printf("@@@get status success. lock_status[%d]\n", ble_data->lock_status);
 						Sync_Status(ptn->lock_id, ble_data->lock_status);
 					}
 					break;
 				}
-			case TASK_BLE_ADMIN_GET_BATTERY_LEVEL:
+			case TASK_BLE_GUEST_GET_BATTERY_LEVEL:
 				{
 					printf( "handle battery data.\n");
-					ble_admin_result_t *admin_unlock_result = (ble_admin_result_t *)ble_data->ble_result;
-					int ret = admin_unlock_result->get_battery_level_result;
+					ble_guest_result_t *guest_unlock_result = (ble_guest_result_t *)ble_data->ble_result;
+					int ret = guest_unlock_result->get_battery_level_result;
 					if (ret) {
 						printf("get battery error[%d].\n", ret);
 					} else {
@@ -188,22 +187,21 @@ void saveTaskData(task_node_t* ptn) {
 
 					break;
 				}
-			case TASK_BLE_ADMIN_GETLOGS:
+			case TASK_BLE_GUEST_GETLOGS:
 				{
-					printf( "get ble response data of TASK_BLE_ADMIN_GETLOGS\n");
-					ble_admin_result_t *admin_get_logs_result = (ble_admin_result_t *)ble_data->ble_result;
-					int ret = admin_get_logs_result->getlogs_result;
+					printf( "get ble response data of TASK_BLE_GUEST_GETLOGS\n");
+					ble_guest_result_t *guest_get_logs_result = (ble_guest_result_t *)ble_data->ble_result;
+					int ret = guest_get_logs_result->getlogs_result;
 					if (ret) {
 						printf( "get lock logs error\n");
 					} else {
-						IgGetLogsResponse *get_logs_response = admin_get_logs_result->cmd_response;
+						IgGetLogsResponse *get_logs_response = guest_get_logs_result->cmd_response;
 						printf( "get lock logs success size [%lu], data[%s]\n", get_logs_response->data_size, get_logs_response->data);
 						// send get_logs_response.data;
 						Sync_Activities(ptn->lock_id, get_logs_response->data, get_logs_response->data_size);
 					}   
 					break;
 				}
-
 			case TASK_BLE_DISCOVER:
 				{
 					serverLog(LL_NOTICE, "saving ble TASK_BLE_DISCOVER data");
@@ -223,45 +221,20 @@ void saveTaskData(task_node_t* ptn) {
 					}
 					break;
 				}
-			case TASK_BLE_PAIRING:
+			case TASK_BLE_GUEST_CONNECTION:
 				{
-					serverLog(LL_NOTICE, "saving ble TASK_BLE_PAIRING data");
-					ble_pairing_result_t *pairing_result = (ble_pairing_result_t *)ble_data->ble_result;
-					igm_lock_t *lock = findLockByAddr(pairing_result->addr);
-					// åªææ¾å°è¿æé, å¹¶ä¸å¹éæå, æä¿å­ç§°ä¸ºPaired
-					// æ·»å ä»»å¡, çº¯å±æµè¯éè¦
-					if (lock && pairing_result->pairing_successed)
-					{
-						serverLog(LL_NOTICE, "set name %s addr %s to paired", lock->name, lock->addr);
-						setLockPaired(lock);
-						setLockKey(lock, pairing_result->admin_key, pairing_result->admin_key_len);
-						setLockPassword(lock, pairing_result->password, pairing_result->password_size);
-						// addAdminTask(lock, 2);
-						// addAdminUnpairTask(lock);
-						// addAdminLockTask(lock);
-					}
+					serverLog(LL_NOTICE, "saving ble TASK_BLE_GUEST_CONNECTION data");
+				}
+			case TASK_BLE_GUEST_UNLOCK:
+				{
+					serverLog(LL_NOTICE, "saving ble TASK_BLE_GUEST_UNLOCK data");
+					ble_guest_result_t *guest_lock_result = (ble_guest_result_t *)ble_data->ble_result;
 					break;
 				}
-			case TASK_BLE_ADMIN_CONNECTION:
+			case TASK_BLE_GUEST_LOCK:
 				{
-					serverLog(LL_NOTICE, "saving ble TASK_BLE_ADMIN_CONNECTION data");
-				}
-			case TASK_BLE_ADMIN_UNPAIR:
-				{
-					serverLog(LL_NOTICE, "saving ble TASK_BLE_ADMIN_UNPAIR data");
-					ble_admin_result_t *admin_unpair_result = (ble_admin_result_t *)ble_data->ble_result;
-					break;
-				}
-			case TASK_BLE_ADMIN_UNLOCK:
-				{
-					serverLog(LL_NOTICE, "saving ble TASK_BLE_ADMIN_UNLOCK data");
-					ble_admin_result_t *admin_lock_result = (ble_admin_result_t *)ble_data->ble_result;
-					break;
-				}
-			case TASK_BLE_ADMIN_LOCK:
-				{
-					serverLog(LL_NOTICE, "saving ble TASK_BLE_ADMIN_LOCK data");
-					ble_admin_result_t *admin_lock_result = (ble_admin_result_t *)ble_data->ble_result;
+					serverLog(LL_NOTICE, "saving ble TASK_BLE_GUEST_LOCK data");
+					ble_guest_result_t *guest_lock_result = (ble_guest_result_t *)ble_data->ble_result;
 					break;
 				}
 			default:
@@ -270,65 +243,65 @@ void saveTaskData(task_node_t* ptn) {
 	}
 }
 
-int HandleLockCMD (igm_lock_t *lock, int cmd, void* request) {
+int HandleLockCMD (sysinfo_t* si, igm_lock_t* lock, int cmd, void* request) {
     serverLog(LL_NOTICE, "in HandleLockCMD.");
-    ble_admin_param_t *admin_param = (ble_admin_param_t *)malloc(sizeof(ble_admin_param_t));
-    bleInitAdminParam(admin_param);
-    bleSetAdminParam(admin_param, lock);
+    ble_guest_param_t *guest_param = (ble_guest_param_t *)malloc(sizeof(ble_guest_param_t));
+    bleInitGuestParam(guest_param);
+    bleSetGuestParam(guest_param, lock);
 
 	if (ign_DemoLockCommand_CREATE_PIN == cmd && NULL != request) {
-		bleSetAdminRequest(admin_param, request, sizeof(IgCreatePinRequest));
+		bleSetGuestRequest(guest_param, request, sizeof(IgCreatePinRequest));
 	} else if (ign_DemoLockCommand_DELETE_PIN == cmd && NULL != request) {
-		bleSetAdminRequest(admin_param, request, sizeof(IgDeletePinRequest));
+		bleSetGuestRequest(guest_param, request, sizeof(IgDeletePinRequest));
 	}
 
     ble_data_t *ble_data = malloc(sizeof(ble_data_t));
     bleInitData(ble_data);
-    bleSetBleParam(ble_data, admin_param, sizeof(ble_admin_param_t));
+    bleSetBleParam(ble_data, guest_param, sizeof(ble_guest_param_t));
 
 	task_node_t *tn = (task_node_t *)malloc(sizeof(task_node_t));
+	tn->sysif = si;
 	tn->ble_data = ble_data;
 	memset(tn->lock_id, 0x0, sizeof(tn->lock_id));
 	memcpy(tn->lock_id, lock->name, lock->name_len);
 
 	if (ign_DemoLockCommand_LOCK == cmd) {
-		tn->sm_table_len = getAdminLockFsmTableLen();
-		tn->task_sm_table = getAdminLockFsmTable();
-		tn->task_type = TASK_BLE_ADMIN_LOCK;
+		tn->sm_table_len = getGuestLockFsmTableLen();
+		tn->task_sm_table = getGuestLockFsmTable();
+		tn->task_type = TASK_BLE_GUEST_LOCK;
 	} else if (ign_DemoLockCommand_UNLOCK == cmd) {
-		tn->sm_table_len = getAdminUnlockFsmTableLen();
-		tn->task_sm_table = getAdminUnlockFsmTable();
-		tn->task_type = TASK_BLE_ADMIN_UNLOCK;
+		tn->sm_table_len = getGuestUnlockFsmTableLen();
+		tn->task_sm_table = getGuestUnlockFsmTable();
+		tn->task_type = TASK_BLE_GUEST_UNLOCK;
 	} else if (ign_DemoLockCommand_GET_LOCK_STATUS == cmd) {
-		tn->sm_table_len = getAdminGetLockStatusFsmTableLen();
-		tn->task_sm_table = getAdminGetLockStatusFsmTable();
-	    tn->task_type = TASK_BLE_ADMIN_GETLOCKSTATUS;
+		tn->sm_table_len = getGuestGetLockStatusFsmTableLen();
+		tn->task_sm_table = getGuestGetLockStatusFsmTable();
+	    tn->task_type = TASK_BLE_GUEST_GETLOCKSTATUS;
 	} else if (ign_DemoLockCommand_GET_BATTERY == cmd) {
-		tn->sm_table_len = getAdminGetBatteryLevelFsmTableLen();
-		tn->task_sm_table = getAdminGetBatteryLevelFsmTable();
-		tn->task_type = TASK_BLE_ADMIN_GET_BATTERY_LEVEL;
+		tn->sm_table_len = getGuestGetBatteryLevelFsmTableLen();
+		tn->task_sm_table = getGuestGetBatteryLevelFsmTable();
+		tn->task_type = TASK_BLE_GUEST_GET_BATTERY_LEVEL;
 	} else if (ign_DemoLockCommand_GET_LOGS == cmd) {
-		tn->sm_table_len = getAdminGetLogsFsmTableLen();
-		tn->task_sm_table = getAdminGetLogsFsmTable();
-	    tn->task_type = TASK_BLE_ADMIN_GETLOGS;
+		tn->sm_table_len = getGuestGetLogsFsmTableLen();
+		tn->task_sm_table = getGuestGetLogsFsmTable();
+	    tn->task_type = TASK_BLE_GUEST_GETLOGS;
 	} else if (ign_DemoLockCommand_CREATE_PIN == cmd) {
-		tn->sm_table_len = getAdminCreatePinRequestFsmTableLen();
-		tn->task_sm_table = getAdminCreatePinRequestFsmTable();
-	    tn->task_type = TASK_BLE_ADMIN_CREATE_PIN_REQUEST;
+		tn->sm_table_len = getGuestCreatePinRequestFsmTableLen();
+		tn->task_sm_table = getGuestCreatePinRequestFsmTable();
+	    tn->task_type = TASK_BLE_GUEST_CREATE_PIN_REQUEST;
 	} else if (ign_DemoLockCommand_DELETE_PIN == cmd) {
-		tn->sm_table_len = getAdminDeletePinRequestFsmTableLen();
-		tn->task_sm_table = getAdminDeletePinRequestFsmTable();
-	    tn->task_type = TASK_BLE_ADMIN_CREATE_PIN_REQUEST;
+		tn->sm_table_len = getGuestDeletePinRequestFsmTableLen();
+		tn->task_sm_table = getGuestDeletePinRequestFsmTable();
+	    tn->task_type = TASK_BLE_GUEST_CREATE_PIN_REQUEST;
 	} 
 
-	int current_state = BLE_ADMIN_BEGIN;
+	int current_state = BLE_GUEST_BEGIN;
     for (int j = 0; j < tn->sm_table_len; j++) {
         if (current_state == tn->task_sm_table[j].cur_state) {
 			int event_result = tn->task_sm_table[j].eventActFun(tn);
             if (event_result) {
-                serverLog(LL_ERROR, "[%d] step error", j);
+                serverLog(LL_ERROR, "ign sm err, step[%d] event_result[%d].", j, event_result);
                 return -1;
-                break;
             } else {
 				current_state = tn->task_sm_table[j].next_state;
             }
@@ -336,16 +309,17 @@ int HandleLockCMD (igm_lock_t *lock, int cmd, void* request) {
     }
 
     saveTaskData(tn);
-    ble_admin_result_t *admin_unlock_result = (ble_admin_result_t *)ble_data->ble_result;
-    //ig_AdminLockResponse_deinit(admin_unlock_result->cmd_response);
-    releaseAdminResult(&admin_unlock_result);
+    ble_guest_result_t *guest_unlock_result = (ble_guest_result_t *)ble_data->ble_result;
+    //ig_AdminLockResponse_deinit(guest_unlock_result->cmd_response);
+    releaseGuestResult(&guest_unlock_result);
     bleReleaseBleResult(ble_data);
     free(ble_data); ble_data = NULL;
     free(tn); tn = NULL;
-    free(admin_param); admin_param = NULL;
+    free(guest_param); guest_param = NULL;
     serverLog(LL_NOTICE, "HandleLockCMD end-------");
     return 0;
 }
+
 
 /*
 int download_ca(){
@@ -442,19 +416,19 @@ int FSMHandle(task_node_t* tn) {
 }
 
 ign_BridgeProfile Create_IgnBridgeProfile(sysinfo_t* ps){
-    ign_BridgeProfile bp={};
-    bp.os_info=ign_OSType_LINUX;
+    ign_BridgeProfile bp = {};
+    bp.os_info = ign_OSType_LINUX;
     char temp[100];
     memset(temp,0,sizeof(temp));
-    bp.bt_id.size=snprintf(temp, sizeof(temp), "%s", ps->mac);
-    bp.mac_addr.size=bp.bt_id.size;
-    memcpy(bp.bt_id.bytes,temp,strlen(temp));
-    memcpy(bp.mac_addr.bytes,temp,strlen(temp));
+    bp.bt_id.size = snprintf(temp, sizeof(temp), "%s", ps->mac);
+    bp.mac_addr.size = bp.bt_id.size;
+    memcpy(bp.bt_id.bytes, temp, strlen(temp));
+    memcpy(bp.mac_addr.bytes, temp, strlen(temp));
 
-    memset(temp,0,sizeof(temp));
-    strcpy(temp,"local_ip");
-    bp.local_ip.size=strlen(temp);
-    memcpy(bp.local_ip.bytes,temp,strlen(temp));
+    memset(temp, 0, sizeof(temp));
+    strcpy(temp, "local_ip");
+    bp.local_ip.size = strlen(temp);
+    memcpy(bp.local_ip.bytes, temp, strlen(temp));
 
     memset(temp,0,sizeof(temp));
     strcpy(temp,"public_ip");
@@ -468,15 +442,15 @@ ign_BridgeProfile Create_IgnBridgeProfile(sysinfo_t* ps){
 
     memset(temp,0,sizeof(temp));
     strcpy(temp,"wifi_ssid");
-    bp.wifi_ssid.size=strlen(temp);
+    bp.wifi_ssid.size = strlen(temp);
     memcpy(bp.wifi_ssid.bytes,temp,strlen(temp));
-    bp.wifi_signal=2;
-    bp.inited_time=get_ustime();
+    bp.wifi_signal = 2;
+    bp.inited_time = get_ustime();
 
     memset(temp,0,sizeof(temp));
     strcpy(temp,"bridge_name");
-    bp.name.size=strlen(temp);
-    memcpy(bp.name.bytes,temp,strlen(temp));
+    bp.name.size = strlen(temp);
+    memcpy(bp.name.bytes, temp, strlen(temp));
     return bp;
 }
 
@@ -493,18 +467,18 @@ bool get_server_event_data(pb_istream_t *stream,const pb_field_t *field,void **a
     return false;
 }
 
-int GetUserInfo(void* si) {
+int GetUserInfo() {
 	//send request to server to get userinfo
 	printf("send request to server to get userinfo!\n");
 
-	ign_MsgInfo msg={};
-	msg.event_type=ign_EventType_GET_USER_INFO;
-	msg.time=get_ustime();
-	msg.msg_id=GetMsgID();//get_ustime();
+	ign_MsgInfo msg = {};
+	msg.event_type = ign_EventType_GET_USER_INFO;
+	msg.time = get_ustime();
+	msg.msg_id = GetMsgID();//get_ustime();
 
-	msg.has_bridge_data=true;
-	msg.bridge_data.has_profile=true;
-	msg.bridge_data.profile=Create_IgnBridgeProfile(&g_sysif);
+	msg.has_bridge_data = true;
+	msg.bridge_data.has_profile = true;
+	msg.bridge_data.profile = Create_IgnBridgeProfile(&g_sysif);
     SendMQTTMsg(&msg, TOPIC_PUB);
 	return 0;
 }
@@ -521,11 +495,11 @@ int Init_MQTT(MQTTClient* p_mqtt){
 
 int Init_Ble(sysinfo_t* si) {
 	si->lockinfo = (LockInfo_t*) malloc(sizeof(LockInfo_t)*MAX_LOCK_COUNT);
-	memset(si->lockinfo, 0, sizeof(LockInfo_t)*MAX_LOCK_COUNT);
-	si->lock_total = 0;
+	InitLockinfo(si);
+	//memset(si->lockinfo, 0, sizeof(LockInfo_t)*MAX_LOCK_COUNT);
+	//si->lock_total = 0;
 
-    char *addr_name = NULL;
-    int ret = gattlib_adapter_open(addr_name, &si->ble_adapter);
+    int ret = gattlib_adapter_open(NULL, &si->ble_adapter);
     if (ret) {
         serverLog(LL_ERROR, "discoverLock ERROR: Failed to open adapter.\n");
 		Close(si);
@@ -583,16 +557,17 @@ int Init_Ble(sysinfo_t* si) {
 }
 
 char* GetAddrBle(sysinfo_t* si, char* lock_id) {
-	//get factor
-	//create addr_part
-	//search addr_part
-	//return
 	for(int i=0; i<si->ble_list_n; i++){
 		if(!strcmp(lock_id, si->ble_list[i].name)) {
 			return si->ble_list[i].addr;
 		}
 	}
 	return NULL;
+}
+
+void InitLockinfo(sysinfo_t* si) {
+	si->lock_total = 0;
+	memset(si->lockinfo, 0x0, sizeof(LockInfo_t)*MAX_LOCK_COUNT);
 }
 
 int AddLockinfo(sysinfo_t* si, LockInfo_t* li) {
@@ -606,6 +581,9 @@ int AddLockinfo(sysinfo_t* si, LockInfo_t* li) {
 			if(32 > p->lock_addr_size){
 				memcpy(p->lock_addr, lock_addr, p->lock_addr_size);
 			}
+		}else{
+			printf("GetAddrBle get NULL.\n");
+			p->lock_addr_size = 0;
 		}
 		si->lock_total++;
 		return 0;
@@ -626,6 +604,8 @@ LockInfo_t* SearchLockInfo(sysinfo_t* si, char* lock_id){
 		LockInfo_t* pi = si->lockinfo + i;
 		if(!strcmp(pi->lock_id, lock_id)) {
 			return pi;
+		}else{
+			//printf("\tpi->lock_id[%s] != lock_id[%s]\n", pi->lock_id, lock_id);
 		}
 	}
 	return NULL;
@@ -754,6 +734,9 @@ int Init(void* tn) {
     }
     serverLog(LL_NOTICE, "Subscribe [%s] success!!!", PUB_WEBDEMO);
 
+	//
+    GetUserInfo();
+
     return 0;
 }
 
@@ -773,7 +756,7 @@ int DoWebMsg(char *topic,void *payload){
 	//handle request CMD
     if(0 == strcmp("getUserInfo",cmd->valuestring)){
 		printf("will do getUserInfo.\n");
-        GetUserInfo(bridgeId->valuestring);
+        GetUserInfo();//bridgeId->valuestring);
 	}
     /*
     }else if(0 == strcmp("unlock",cmd->valuestring)){
@@ -785,7 +768,7 @@ int DoWebMsg(char *topic,void *payload){
 	cJSON_Delete(root);
 
 	return 0;
-	}
+}
 
 int DealCMD(sysinfo_t *si, ign_MsgInfo imsg) {
 	printf("after pb decode, type[%d]:\n", (imsg.event_type));
@@ -796,15 +779,9 @@ int DealCMD(sysinfo_t *si, ign_MsgInfo imsg) {
 				printf("RECV MQTT HB msg\n");
 				return 0;
 			}
-		case ign_EventType_GET_USER_INFO:
-			{
-				printf("RECV msgid[%d],signal[%d].\n", imsg.msg_id, imsg.bridge_data.profile.wifi_signal);
-				printf("RECV profile_bt_id[%s],bridege_name[%s].\n",
-						imsg.bridge_data.profile.bt_id.bytes, imsg.bridge_data.profile.name.bytes);
-				return 0;
-			}
 		case ign_EventType_UPDATE_USER_INFO: 
 			{
+				InitLockinfo(si);
 				if(imsg.has_server_data){
 					/*
 					   for(int i=0;i<glock_index;i++){
@@ -825,23 +802,22 @@ int DealCMD(sysinfo_t *si, ign_MsgInfo imsg) {
 						if (ret) {
 							printf("AddLockinfo err, lock_total[%d]\n", si->lock_total);
 						}
-						/*
-						   printf("[%d], bt_id[%s], guest_aes_ekey size[%d] [", j, imsg.server_data.lock_entries[j].bt_id, imsg.server_data.lock_entries[j].ekey.guest_aes_key.size);
-						   for(int k=0;k<imsg.server_data.lock_entries[j].ekey.guest_aes_key.size; k++) {
-						   printf("[%x]", imsg.server_data.lock_entries[j].ekey.guest_aes_key.bytes[k]);
-						   }
-						   printf("]");
-						   printf(", guest_token size[%d] [", imsg.server_data.lock_entries[j].ekey.guest_token.size);
-						   for(int k=0;k<imsg.server_data.lock_entries[j].ekey.guest_token.size; k++) {
-						   printf("[%x]", imsg.server_data.lock_entries[j].ekey.guest_token.bytes[k]);
-						   }
-						   printf("]");
-						   printf(", password size[%d] [", imsg.server_data.lock_entries[j].ekey.password.size);
-						   for(int k=0;k<imsg.server_data.lock_entries[j].ekey.password.size; k++) {
-						   printf("[%x]", imsg.server_data.lock_entries[j].ekey.password.bytes[k]);
-						   }
-						   printf("]\n");
-						 */
+
+						printf("[%d], bt_id[%s], guest_aes_ekey size[%d] [", j, imsg.server_data.lock_entries[j].bt_id, imsg.server_data.lock_entries[j].ekey.guest_aes_key.size);
+						for(int k=0;k<imsg.server_data.lock_entries[j].ekey.guest_aes_key.size; k++) {
+							printf("%02x", imsg.server_data.lock_entries[j].ekey.guest_aes_key.bytes[k]);
+						}
+						printf("]\n");
+						printf("guest_token size[%d] [", imsg.server_data.lock_entries[j].ekey.guest_token.size);
+						for(int k=0;k<imsg.server_data.lock_entries[j].ekey.guest_token.size; k++) {
+							printf("%02x", imsg.server_data.lock_entries[j].ekey.guest_token.bytes[k]);
+						}
+						printf("]\n");
+						printf("password size[%d] [", imsg.server_data.lock_entries[j].ekey.password.size);
+						for(int k=0;k<imsg.server_data.lock_entries[j].ekey.password.size; k++) {
+							printf("%02x", imsg.server_data.lock_entries[j].ekey.password.bytes[k]);
+						}
+						printf("]\n");
 					}
 				}
 
@@ -945,7 +921,8 @@ int DealCMD(sysinfo_t *si, ign_MsgInfo imsg) {
 				 */
 				LockInfo_t* pli = SearchLockInfo(si, imsg.server_data.demo_job.bt_id);
 				if (NULL == pli) {
-					printf("SearchLockInfo err. lock_id[%s]\n", imsg.server_data.demo_job.bt_id);
+					printf("SearchLockInfo err. lock_id[%s], si->lock_total[%d].\n", imsg.server_data.demo_job.bt_id, si->lock_total);
+					return -1;
 				}
 
 				printf("@@@ demo_job.bt_id[%s], op_cmd[%d], pin[", 
@@ -994,7 +971,7 @@ int DealCMD(sysinfo_t *si, ign_MsgInfo imsg) {
 					request = &delete_pin_request;
 					//int res = testDeletePin(lock, &delete_pin_request);
 				}
-				int ret = HandleLockCMD (lock, imsg.server_data.demo_job.op_cmd, request);
+				int ret = HandleLockCMD(si, lock, imsg.server_data.demo_job.op_cmd, request);
 				if(ret) {
 					printf( "HandleLockCMD ret[%d].\n", ret);
 				}
@@ -1557,5 +1534,84 @@ fsm_table_t g_sm_table[] = {
     {  CMD_UPDATE_LOCKSTATUS,   UpdateLockState,    DONE},
     {  CMD_UNLOCK,              UnLock,             CMD_UPDATE_LOCKSTATUS},
 };
+
+//admin
+int HandleLockCMD (igm_lock_t *lock, int cmd, void* request) {
+    serverLog(LL_NOTICE, "in HandleLockCMD.");
+    ble_admin_param_t *admin_param = (ble_admin_param_t *)malloc(sizeof(ble_admin_param_t));
+    bleInitAdminParam(admin_param);
+    bleSetAdminParam(admin_param, lock);
+
+	if (ign_DemoLockCommand_CREATE_PIN == cmd && NULL != request) {
+		bleSetAdminRequest(admin_param, request, sizeof(IgCreatePinRequest));
+	} else if (ign_DemoLockCommand_DELETE_PIN == cmd && NULL != request) {
+		bleSetAdminRequest(admin_param, request, sizeof(IgDeletePinRequest));
+	}
+
+    ble_data_t *ble_data = malloc(sizeof(ble_data_t));
+    bleInitData(ble_data);
+    bleSetBleParam(ble_data, admin_param, sizeof(ble_admin_param_t));
+
+	task_node_t *tn = (task_node_t *)malloc(sizeof(task_node_t));
+	tn->ble_data = ble_data;
+	memset(tn->lock_id, 0x0, sizeof(tn->lock_id));
+	memcpy(tn->lock_id, lock->name, lock->name_len);
+
+	if (ign_DemoLockCommand_LOCK == cmd) {
+		tn->sm_table_len = getAdminLockFsmTableLen();
+		tn->task_sm_table = getAdminLockFsmTable();
+		tn->task_type = TASK_BLE_ADMIN_LOCK;
+	} else if (ign_DemoLockCommand_UNLOCK == cmd) {
+		tn->sm_table_len = getAdminUnlockFsmTableLen();
+		tn->task_sm_table = getAdminUnlockFsmTable();
+		tn->task_type = TASK_BLE_ADMIN_UNLOCK;
+	} else if (ign_DemoLockCommand_GET_LOCK_STATUS == cmd) {
+		tn->sm_table_len = getAdminGetLockStatusFsmTableLen();
+		tn->task_sm_table = getAdminGetLockStatusFsmTable();
+	    tn->task_type = TASK_BLE_ADMIN_GETLOCKSTATUS;
+	} else if (ign_DemoLockCommand_GET_BATTERY == cmd) {
+		tn->sm_table_len = getAdminGetBatteryLevelFsmTableLen();
+		tn->task_sm_table = getAdminGetBatteryLevelFsmTable();
+		tn->task_type = TASK_BLE_ADMIN_GET_BATTERY_LEVEL;
+	} else if (ign_DemoLockCommand_GET_LOGS == cmd) {
+		tn->sm_table_len = getAdminGetLogsFsmTableLen();
+		tn->task_sm_table = getAdminGetLogsFsmTable();
+	    tn->task_type = TASK_BLE_ADMIN_GETLOGS;
+	} else if (ign_DemoLockCommand_CREATE_PIN == cmd) {
+		tn->sm_table_len = getAdminCreatePinRequestFsmTableLen();
+		tn->task_sm_table = getAdminCreatePinRequestFsmTable();
+	    tn->task_type = TASK_BLE_ADMIN_CREATE_PIN_REQUEST;
+	} else if (ign_DemoLockCommand_DELETE_PIN == cmd) {
+		tn->sm_table_len = getAdminDeletePinRequestFsmTableLen();
+		tn->task_sm_table = getAdminDeletePinRequestFsmTable();
+	    tn->task_type = TASK_BLE_ADMIN_CREATE_PIN_REQUEST;
+	} 
+
+	int current_state = BLE_ADMIN_BEGIN;
+    for (int j = 0; j < tn->sm_table_len; j++) {
+        if (current_state == tn->task_sm_table[j].cur_state) {
+			int event_result = tn->task_sm_table[j].eventActFun(tn);
+            if (event_result) {
+                serverLog(LL_ERROR, "[%d] step error", j);
+                return -1;
+                break;
+            } else {
+				current_state = tn->task_sm_table[j].next_state;
+            }
+		}
+    }
+
+    saveTaskData(tn);
+    ble_admin_result_t *admin_unlock_result = (ble_admin_result_t *)ble_data->ble_result;
+    //ig_AdminLockResponse_deinit(admin_unlock_result->cmd_response);
+    releaseAdminResult(&admin_unlock_result);
+    bleReleaseBleResult(ble_data);
+    free(ble_data); ble_data = NULL;
+    free(tn); tn = NULL;
+    free(admin_param); admin_param = NULL;
+    serverLog(LL_NOTICE, "HandleLockCMD end-------");
+    return 0;
+}
+
 
 */

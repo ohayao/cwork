@@ -25,6 +25,7 @@
 #include "bridge/ble/ble_guest.h"
 #include "bridge/lock/messages/LockResponse.h"
 
+static sysinfo_t g_sysif;
 void saveTaskData(task_node_t *ptn) {
     if (!ptn) return;
 
@@ -76,6 +77,7 @@ int testLock(igm_lock_t *lock) {
 
     task_node_t *tn = (task_node_t *)malloc(sizeof(task_node_t));
     tn->ble_data = ble_data;
+	tn->sysif = &g_sysif;
 
     tn->sm_table_len = fsm_max_n;
     tn->task_sm_table = unlock_fsm;
@@ -160,7 +162,7 @@ int main(int argc, char *argv[]) {
 
     serverLog(LL_NOTICE, "lock cmd test go");
     int res = testLock(lock);
-    releaseLock(&lock);
+   // releaseLock(&lock);
     return 0;
 }
 

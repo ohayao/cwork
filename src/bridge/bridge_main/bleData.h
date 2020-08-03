@@ -4,8 +4,8 @@
 // 所有的数据, 在这里都有一份
 // 所以使用者需要自己释放
 typedef struct BleData {
-	char *adapter_name; // 蓝牙接口的名字
-	void *adapter;
+	//char *adapter_name; // 蓝牙接口的名字
+	//void *adapter;
 	void *ble_param;  // 设置什么参数
 	int  ble_param_len;    
 	void *ble_result;   // 返回给你什么结果

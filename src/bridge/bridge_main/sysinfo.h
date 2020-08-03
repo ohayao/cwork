@@ -2,7 +2,7 @@
 #define _SYSINFO_H_
 #include <pthread.h>
 #include <MQTTClient.h>
-#include "bridge/ble/ble_admin.h"
+//#include "bridge/ble/ble_admin.h"
 
 enum BLE_TASK {
     BLE_NONE_TASK = 0, // 没有任务

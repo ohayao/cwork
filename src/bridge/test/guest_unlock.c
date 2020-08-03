@@ -25,6 +25,8 @@
 #include <bridge/ble/ble_guest.h>
 #include "bridge/lock/messages/UnlockResponse.h"
 
+static sysinfo_t g_sysif;
+
 void saveTaskData(task_node_t *ptn) {
 	if (!ptn) return;
 
@@ -35,21 +37,21 @@ void saveTaskData(task_node_t *ptn) {
 			case TASK_BLE_ADMIN_UNLOCK:
 				{
 					printf( "saving ble TASK_BLE_ADMIN_UNLOCK data\n");
-					ble_admin_result_t *admin_unlock_result = (ble_admin_result_t *)ble_data->ble_result;
+					ble_guest_result_t *guest_unlock_result = (ble_guest_result_t *)ble_data->ble_result;
 
-					int unlock_error = admin_unlock_result->unlock_result;
+					int unlock_error = guest_unlock_result->unlock_result;
 					if (unlock_error) {
 						printf( "unlock error\n");
 					} else {
 						printf( "unlock success\n");
 					}
-					printf( "admin_unlock response\n");
-					IgUnlockResponse *unlock_response = admin_unlock_result->cmd_response;
+					printf( "guest_unlock response\n");
+					IgUnlockResponse *unlock_response = guest_unlock_result->cmd_response;
 					if (unlock_response->has_operation_id) {
-						printf( "admin_unlock operation id[%d].\n", unlock_response->operation_id);
+						printf( "guest_unlock operation id[%d].\n", unlock_response->operation_id);
 					}
 					if (unlock_response->has_result) {
-						printf( "admin_unlock result[%d].\n", unlock_response->result);
+						printf( "guest_unlock result[%d].\n", unlock_response->result);
 					}
 					break;
 				}
@@ -62,13 +64,13 @@ void saveTaskData(task_node_t *ptn) {
 int testUnLock(igm_lock_t *lock) {
     printf("UnLock cmd ask invoker to release the lock.\n");
       
-    ble_admin_param_t *admin_param = (ble_admin_param_t *)malloc(sizeof(ble_admin_param_t));
-    bleInitGuestParam(admin_param);
-    bleSetGuestParam(admin_param, lock);
+    ble_guest_param_t *guest_param = (ble_guest_param_t *)malloc(sizeof(ble_guest_param_t));
+    bleInitGuestParam(guest_param);
+    bleSetGuestParam(guest_param, lock);
 
     ble_data_t *ble_data = malloc(sizeof(ble_data_t));
     bleInitData(ble_data);
-    bleSetBleParam(ble_data, admin_param, sizeof(ble_admin_param_t));
+    bleSetBleParam(ble_data, guest_param, sizeof(ble_guest_param_t));
 
     fsm_table_t *unlock_fsm = getGuestUnlockFsmTable();
     int fsm_max_n = getGuestUnlockFsmTableLen();
@@ -76,6 +78,7 @@ int testUnLock(igm_lock_t *lock) {
     int error = 0;
 
     task_node_t *tn = (task_node_t *)malloc(sizeof(task_node_t));
+	tn->sysif = &g_sysif;
     tn->ble_data = ble_data;
 
     tn->sm_table_len = fsm_max_n;
@@ -102,15 +105,15 @@ int testUnLock(igm_lock_t *lock) {
     }
 
     saveTaskData(tn);
-    ble_admin_result_t *admin_unlock_result = (ble_admin_result_t *)ble_data->ble_result;
-    releaseGuestResult(&admin_unlock_result);
+    ble_guest_result_t *guest_unlock_result = (ble_guest_result_t *)ble_data->ble_result;
+    releaseGuestResult(&guest_unlock_result);
     bleReleaseBleResult(ble_data);
     free(ble_data);
     ble_data = NULL;
     free(tn);
     tn = NULL;
-    free(admin_param);
-    admin_param = NULL;
+    free(guest_param);
+    guest_param = NULL;
     printf( "unlock end-------\n");
     return 0;
 }
@@ -131,9 +134,9 @@ int main(int argc, char *argv[]) {
 
 	uint8_t tmp_buff[1024];
 	memset(tmp_buff, 0, sizeof(tmp_buff));
-	int admin_len = hexStrToByte(argv[2], tmp_buff, strlen(argv[2]));
-	setLockKey(lock, tmp_buff, admin_len);
-    printf( "setLockKey success, size[%d]\n", admin_len);
+	int guest_len = hexStrToByte(argv[2], tmp_buff, strlen(argv[2]));
+	setLockKey(lock, tmp_buff, guest_len);
+    printf( "setLockKey success, size[%d]\n", guest_len);
 
     memset(tmp_buff, 0, sizeof(tmp_buff));
     int password_size = hexStrToByte(argv[3], tmp_buff, strlen(argv[3]));
@@ -155,7 +158,7 @@ int main(int argc, char *argv[]) {
     printf( "unlock cmd test start\n");
     int res = testUnLock(lock);
     printf( "unlock cmd test end\n");
-    releaseLock(&lock);
+//    releaseLock(&lock);
     return 0;
 }
 

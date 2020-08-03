@@ -21,7 +21,7 @@
 #include <bridge/ble/lock.h>
 #include <bridge/ble/ble_pairing.h>
 #include <bridge/bridge_main/lock_list.h>
-#include <bridge/ble/ble_admin.h>
+//#include <bridge/ble/ble_guest.h>
 #include <bridge/ble/ble_pairing.h>
 #include <bridge/mqtt/mqtt_constant.h>
 #include <bridge/mqtt/mqtt_util.h>
@@ -36,7 +36,7 @@ void addAdminTask(igm_lock_t *lock, int msg_id);
 
 int FSMHandle(task_node_t* tn) {
     if(NULL == tn->task_sm_table) {
-        serverLog(LL_ERROR, "sm_table is NULL.");
+        printf( "sm_table is NULL.");
         return -1;
     }
     // sizeof 在定义某数组的时候, sizeof 指针 返回整个数组的字节数
@@ -45,13 +45,13 @@ int FSMHandle(task_node_t* tn) {
     // 也就是只会返回 sm_table 当中某一项的大小
     // 所以我手动返回了长度.
 	unsigned int table_max_num = tn->sm_table_len;
-    serverLog(LL_NOTICE, "table_max_num %d", table_max_num);
+    printf( "table_max_num %d", table_max_num);
 	int flag = 0;
     // 这儿是遍历所有的状态.
 	for (int i = 0; i<table_max_num; i++) {
-        serverLog(LL_NOTICE, "FSMHandle i %d ", i);
+        printf( "FSMHandle i %d ", i);
 		if (tn->cur_state == tn->task_sm_table[i].cur_state) {
-            serverLog(LL_NOTICE, "eventActFun begin---------------");
+            printf( "eventActFun begin---------------");
             // 增加一个判断当前函数, 是否当前函数出错. 0 表示没问题
 			int event_result = tn->task_sm_table[i].eventActFun(tn);
             if (event_result)
@@ -64,18 +64,18 @@ int FSMHandle(task_node_t* tn) {
                 tn->cur_state = tn->task_sm_table[i].next_state;
                 flag = 1;
             }
-            serverLog(LL_NOTICE, "eventActFun end-----------------");
+            printf( "eventActFun end-----------------");
             
 		}
 	}
-    serverLog(LL_NOTICE, "FSMHandle out for end-----------------");
+    printf( "FSMHandle out for end-----------------");
     if (0 == flag) {
 		// do nothing
         // sm or cur_state err
-        serverLog(LL_ERROR, "something wrogin int fsm, one of the event function error, state(%d) error.", tn->cur_state);
+        printf( "something wrogin int fsm, one of the event function error, state(%d) error.", tn->cur_state);
         return -1;
 	}
-    serverLog(LL_NOTICE, "FSMHandle end");
+    printf( "FSMHandle end");
     return 0;
 }
 
@@ -88,26 +88,26 @@ void addDiscoverTask(int msg_id)
 {
     // 设置需要的参数
     ble_discover_param_t discover_param;
-    serverLog(LL_NOTICE, "1. set scan_timeout to 5");
+    printf( "1. set scan_timeout to 5");
     discover_param.scan_timeout = 5;
-    serverLog(LL_NOTICE, "2. set msg_id to 0(or anything you want)");
+    printf( "2. set msg_id to 0(or anything you want)");
     // 把参数写入data, 当前有个问题就是, 使用完, 得访问的人记的释放.
-    serverLog(LL_NOTICE, "3. alloc ble data datatype, ble_data is used to devliver parameters and get result data");
+    printf( "3. alloc ble data datatype, ble_data is used to devliver parameters and get result data");
     ble_data_t *ble_data = calloc(sizeof(ble_data_t), 1);
     bleInitData(ble_data);
-    serverLog(LL_NOTICE, "3. set ble parametes to ble data");
+    printf( "3. set ble parametes to ble data");
     bleSetBleParam(ble_data, &discover_param, sizeof(ble_discover_param_t));
     // 与记有多少个结果, 30个锁
-    serverLog(LL_NOTICE, "3. init ble result memory, suppose the max num of locks is 30");
+    printf( "3. init ble result memory, suppose the max num of locks is 30");
     bleInitResults(ble_data, 30, sizeof(igm_lock_t));
 
     // 插入系统的队列
-    serverLog(LL_NOTICE, "4. used InsertBle2DFront to insert the task to system.");
+    printf( "4. used InsertBle2DFront to insert the task to system.");
     InsertBle2DTail(msg_id, BLE_DISCOVER_BEGIN, 
         ble_data, sizeof(ble_data_t),
         getDiscoverFsmTable(), getDiscoverFsmTableLen(), TASK_BLE_DISCOVER
     );
-    serverLog(LL_NOTICE, "5. Add Discover task.");
+    printf( "5. Add Discover task.");
     return;
 }
 
@@ -118,17 +118,17 @@ void saveTaskData(task_node_t *ptn) {
         int task_type = ptn->task_type;
         switch (task_type) {
             case TASK_BLE_DISCOVER: {
-                    serverLog(LL_NOTICE, "saving ble TASK_BLE_DISCOVER data");
+                    printf( "saving ble TASK_BLE_DISCOVER data");
                     int num_of_result = bleGetNumsOfResult(ble_data);
                     void *result = ble_data->ble_result;
                     for (int j=0; j < num_of_result; j++) {
                         igm_lock_t *lock = bleGetNResult(ble_data, j, sizeof(igm_lock_t));
-                        serverLog(LL_NOTICE, "name %s  addr: %s", lock->name, lock->addr);
+                        printf( "name %s  addr: %s", lock->name, lock->addr);
                         insertLock(lock);
                         // test 需要, 
                         // if (!lock->paired)
                         // {
-                        //     serverLog(LL_NOTICE, "try to pair name %s  addr: %s", lock->name, lock->addr);
+                        //     printf( "try to pair name %s  addr: %s", lock->name, lock->addr);
                         //     addPairingTask(lock);
                         // }              
                     }
@@ -142,17 +142,17 @@ void saveTaskData(task_node_t *ptn) {
 
 int main() {
     // Init(NULL);
-    serverLog(LL_NOTICE,"test ble discover Ready to start.");
+    printf("test ble discover Ready to start.");
     int msg_id = 1;
     addDiscoverTask(msg_id);
     while(1) {
         //if empty, sleep(0.5);
         //do it , after set into waiting_list
         if (IsDEmpty()) {
-            serverLog(LL_NOTICE,"doing_task_head is empty, check Lock list.");
+            printf("doing_task_head is empty, check Lock list.");
             // 应该去检查waiting list
             printLockList();
-            serverLog(LL_NOTICE,"doing_task_head is empty, ready to sleep.");
+            printf("doing_task_head is empty, ready to sleep.");
             // sleep(1);
             // 只是用于来扫描一次
             break;
@@ -167,11 +167,11 @@ int main() {
                 int ret = FSMHandle(ptn);
                 if(ret)
                 {
-                    serverLog(LL_NOTICE, "one mission error");
+                    printf( "one mission error");
                 }
                 else
                 {
-                    serverLog(LL_NOTICE, "one mission finished, delete this task");
+                    printf( "one mission finished, delete this task");
                 }
                 saveTaskData(ptn);
                 DeleteDTask(&ptn); // 自动置 ptn 为 NULL
@@ -179,7 +179,7 @@ int main() {
                 task_node_t *tmp = NextDTask(ptn);
                 if (tmp)
                 {
-                    serverLog(LL_NOTICE, "NextDTask not NULL");
+                    printf( "NextDTask not NULL");
                 }
                 
                 ptn = tmp;
