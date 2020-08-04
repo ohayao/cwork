@@ -129,3 +129,10 @@ add_executable(wifi_pairing ./wifi_pairing.c)
 target_link_libraries(wifi_pairing
   ${TEST_DEPENDENCIES}
 )
+
+
+# 测试 wifi_pairing 功能
+add_executable(wifi_setting ./wifi_setting.c)
+target_link_libraries(wifi_setting
+  ${TEST_DEPENDENCIES}
+)

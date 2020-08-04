@@ -41,7 +41,7 @@ typedef enum {
   S_REPLY_STEP4,
   C_WRITE_COMMIT,
 	S_PAIRING_COMPLETE,
-  ERR_EVENT,
+  ERR_EVENT=7,
 } PAIRING_EVENT;
 
 typedef enum {
@@ -51,9 +51,19 @@ typedef enum {
   PAIRING_STEP3,
 	PAIRING_STEP4,
 	PAIRING_COMMIT,
-	PAIRING_COMPLETE,
-	PAIRING_IDLE,
+	PAIRING_COMPLETE = 6
 } PAIRING_STATUS;
+
+typedef enum {
+  C_WRITE_WIFI_REQUEST=8,
+  S_REPLY_WIFI_RESPONSE=9
+} SET_WIFI_EVENT;
+
+typedef enum {
+	SET_WIFI_BEGIN = 7,
+  SET_WIFI_REQUEST,
+	SET_WIFI_COMPLETE=9,
+} SET_WIFI_STATUS;
 
 typedef enum{
 	NONE = 0,					// 没有任何接收数据
@@ -124,4 +134,7 @@ IgErrorCode ig_pairing_step4(
   uint32_t *bytes_written);
 IgErrorCode ig_commit_pairing(
   uint8_t *encrypt_commit_Bytes, uint32_t encrypt_commit_Bytes_len, IgPairingResult *pairing_result_out);
+
+// debug
+void showAllKeys();
 #endif

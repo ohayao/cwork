@@ -128,7 +128,7 @@ void handleStep4(const uint8_t* data, size_t data_length)
 
 void handleStep2(const uint8_t* data, size_t data_length)
 {
-  serverLog(LL_NOTICE, "---------------- handleStep4: ");
+  serverLog(LL_NOTICE, "---------------- handleStep2: ");
   int ret = 0;
   size_t payload_len = 0;
 	uint8_t *payloadBytes = NULL;
@@ -192,6 +192,7 @@ static void message_handler(
     break;
   case PAIRING_STEP3:
     handleStep4(data, data_length);
+    g_main_loop_quit(loop);
     break;
   case PAIRING_COMMIT:
     break;
@@ -199,7 +200,6 @@ static void message_handler(
     serverLog(LL_ERROR, "error pairing_status");
     break;
   }
-  
 }
 
 int register_pairing_notfication()

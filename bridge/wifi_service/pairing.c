@@ -127,7 +127,7 @@ int isRecvDataAlloc(RecvData *recv_pairing_data)
 
 int isRecvFullPkg(RecvData *recv_pairing_data)
 {
-  printf("---------- recv len %u, data len %u\n", recv_pairing_data->recv_len, recv_pairing_data->data_len);
+  // printf("---------- recv len %u, data len %u\n", recv_pairing_data->recv_len, recv_pairing_data->data_len);
   return recv_pairing_data->recv_len == recv_pairing_data->data_len;
 }
 
@@ -145,7 +145,6 @@ int copyData(RecvData *recv_pairing_data, uint8_t *data, uint16_t data_length)
   }
   if (recv_pairing_data->data_len < recv_pairing_data->recv_len+data_length)
   {
-    
     serverLog(LL_ERROR, "recv_pairing_data->data_len too samll, data len %d, recv len %d, data length %d", recv_pairing_data->data_len, recv_pairing_data->recv_len, data_length);
     return 3;
   }
@@ -177,12 +176,12 @@ void recvData(RecvData *recv_pairing_data, uint8_t * data, uint16_t data_length)
   // {
   //   resetRecvData(recv_pairing_data);
   // }
-  printf("data length: %u\n", data_length);
-  for (int i = 0; i < data_length; ++i)
-  {
-    printf(" %x", data[i]);
-  }
-  printf("\n");
+  // printf("data length: %u\n", data_length);
+  // for (int i = 0; i < data_length; ++i)
+  // {
+  //   printf(" %x", data[i]);
+  // }
+  // printf("\n");
   int err = 0;
   uint16_t pkg_len = 0;
   switch (recv_pairing_data->recv_status)
@@ -190,25 +189,25 @@ void recvData(RecvData *recv_pairing_data, uint8_t * data, uint16_t data_length)
     case NONE:
     {
       // 创建新的存储空间, 准备接收
-      serverLog(LL_NOTICE, "recvData NONE-------------------");
+      // serverLog(LL_NOTICE, "recvData NONE-------------------");
       // 所获得的, 是 整个蓝牙包 (长度+加密报文)
       // 首先释放数据
       pkg_len = getDataLength(data, &(recv_pairing_data->n_size_byte), &(recv_pairing_data->pkg_len));
-      serverLog(LL_NOTICE, "pkg_len: %u", pkg_len);
+      // serverLog(LL_NOTICE, "pkg_len: %u", pkg_len);
       if (allocRecvData(recv_pairing_data, pkg_len))
       {
         serverLog(LL_ERROR, "recvData alloc data err");
         // TODO: some fix method?
         return;
       }
-      serverLog(LL_NOTICE, "------- data_len1: %u", recv_pairing_data->data_len);
+      // serverLog(LL_NOTICE, "------- data_len1: %u", recv_pairing_data->data_len);
       // 把当前的数据复制上去
       if (copyData(recv_pairing_data, data, data_length))
       {
         serverLog(LL_ERROR, "copyData err");
         return;
       }
-      serverLog(LL_NOTICE, "------- data_len2: %u", recv_pairing_data->data_len);
+      // serverLog(LL_NOTICE, "------- data_len2: %u", recv_pairing_data->data_len);
       for (int i = 0; i < data_length; ++i)
       {
         printf(" %x", recv_pairing_data->data[i]);
@@ -227,14 +226,14 @@ void recvData(RecvData *recv_pairing_data, uint8_t * data, uint16_t data_length)
       break;
     }
     case GOT_PREV_DATA:
-      serverLog(LL_NOTICE, "recvData GOT_PREV_DATA-------------------");
-      serverLog(LL_NOTICE, "recvData pkg-------------------");
+      // serverLog(LL_NOTICE, "recvData GOT_PREV_DATA-------------------");
+      // serverLog(LL_NOTICE, "recvData pkg-------------------");
       /* code */
       if (copyData(recv_pairing_data, data, data_length))
       {
         serverLog(LL_ERROR, "copyData err");
       }
-      serverLog(LL_NOTICE, "------- data_len2: %u", recv_pairing_data->data_len);
+      // serverLog(LL_NOTICE, "------- data_len2: %u", recv_pairing_data->data_len);
       if (recv_pairing_data && isRecvFullPkg(recv_pairing_data))
       {
         serverLog(LL_NOTICE, "setRecvDataStatus FINISHED_SUCCESS");
@@ -242,8 +241,8 @@ void recvData(RecvData *recv_pairing_data, uint8_t * data, uint16_t data_length)
       }
       break;
     case FINISHED_SUCCESS:
-      serverLog(LL_NOTICE, "recvData FINISHED_SUCCESS-------------------");
-      serverLog(LL_NOTICE, "------- data_len2: %u", recv_pairing_data->data_len);
+      // serverLog(LL_NOTICE, "recvData FINISHED_SUCCESS-------------------");
+      // serverLog(LL_NOTICE, "------- data_len2: %u", recv_pairing_data->data_len);
       /* code */
       break;
     case FINISHED_ERROR:
@@ -687,7 +686,7 @@ IgErrorCode ig_pairing_step4(
     ig_PairingStep3_deinit(&step3);
     return IG_ERROR_INVALID_MESSAGE;
   }
-  serverLog(LL_NOTICE, "ig_PairingStep3_is_valid");
+  // serverLog(LL_NOTICE, "ig_PairingStep3_is_valid");
   
   setPairingPinKey(&step3);
   setPairingPassword(&step3);

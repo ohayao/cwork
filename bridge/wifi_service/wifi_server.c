@@ -54,9 +54,9 @@
 #define ADPTER_IFACE					"org.bluez.Adapter1"
 
 /* Immediate Alert Service UUID */
-// pairing service
-#define PAIRING_SERVICE_UUID	"12345678-0000-1000-8000-00805f9b34fb"
-#define PAIRING_SERVICE_CHR_UUID		"12345678-0000-1000-8000-00805f9b34fb"
+// wifi request service
+#define WIFI_SERVICE_UUID	"87654321-0000-1000-8000-00805f9b34fb"
+#define WIFI_SERVICE_CHR_UUID		"87654321-0000-1000-8000-00805f9b34fb"
 
 /* Random UUID for testing purpose */
 #define READ_WRITE_DESCRIPTOR_UUID	"8260c653-1a54-426b-9e36-e84c238bc669"
@@ -95,8 +95,8 @@ struct descriptor {
 static GDBusProxy *adapter_proxy;
 static GDBusProxy *ad_proxy;
 
-// 利用命名管道 传送 数据给另外的矩阵
-int wfd;
+// 
+int rfd;
 
 // 状态机结构体
 // struct connection
@@ -116,226 +116,8 @@ static int parse_options(DBusMessageIter *iter, const char **device);
 static bool chr_read(struct characteristic *chr, DBusMessageIter *iter);
 static int parse_value(DBusMessageIter *iter, const uint8_t **value, int *len);
 
-
-
 // 状态机相关代码
 static FSM *fsm = NULL;
-
-// 总体和 pairing_fsm.c 的一致
-// 还没写, 根据现在的不同, 等待改写
-
-int handleWriteStep1(void *arg)
-{
-
-	serverLog(LL_NOTICE, "we get client write step1, trans fsm to pairing step1");
-	return 0;
-}
-
-// arg 是 characteristic
-int handleReplyStep2(void *arg)
-{
-	serverLog(LL_NOTICE, "----------------------- handleReplyStep2 we are going to reply cliet step2, trans fsm to pairing step2");
-	int ret = 0;
-	struct characteristic *chr = (struct characteristic *)arg;
-	RecvData *recv_pairing_data = chr->recv_pairing_data;
-	if (recv_pairing_data == NULL)
-  {
-    serverLog(LL_ERROR, "handleWriteStep1  recv_pairing_data null");
-    return 1;
-  }
-
-	size_t step1_len = 0;
-  uint8_t *step1_payload_bytes = NULL;
-	if (getRecvPkgLen(recv_pairing_data, &step1_len))
-	{
-		serverLog(LL_ERROR, "getRecvPkgLen error");
-		return 1;
-	}
-	// serverLog(LL_NOTICE, "getRecvPkgLen success, size %u", step1_len);
-
-	step1_payload_bytes = malloc(step1_len);
-  memset(step1_payload_bytes, 0, step1_len);
-
-	if (getPkgFromRecvData(recv_pairing_data, step1_payload_bytes))
-	{
-		serverLog(LL_ERROR, "getPkgFromRecvData error");
-		return 1;
-	}
-	// serverLog(LL_NOTICE, "getPkgFromRecvData success");
-
-	uint8_t *step2_bytes = NULL;
-  uint32_t step2_size = ig_pairing_step2_size();
-  uint32_t step2_writen_len = 0;
-
-	if (step2_size == 0)
-	{
-		serverLog(LL_ERROR, "ig_pairing_step2_size error");
-		return 1;
-	}
-
-	step2_bytes = malloc(step2_size);
-  memset(step2_bytes, 0, step2_size);
-
-	if (server_gen_pairing_step2(
-      step1_payload_bytes, step1_len, step2_bytes, step2_size, &step2_writen_len))
-	{
-		serverLog(LL_ERROR, "server_gen_pairing_step2 error");
-		return 1;
-	}
-
-	serverLog(LL_NOTICE, "server_gen_pairing_step2 success");
-
-	if (!ig_PairingStep2_is_valid((IgPairingStep2 *)step2_bytes))
-	{
-		serverLog(LL_ERROR, "step2 not valid error");
-		return 1;
-	}
-
-	uint8_t *payloadBytes = NULL;
-  uint32_t payload_len = 0;
-
-	if (!build_msg_payload(
-      &payloadBytes, &payload_len, step2_bytes, step2_writen_len))
-	{
-		serverLog(LL_ERROR, "failed in build_msg_payload");
-		return 1;
-	}
-	// serverLog(LL_NOTICE, "success in build_msg_payload, size: %u", payload_len);
-
-	// 已经验证, 能够成功收到
-	// for (int i = 0; i < payload_len; ++i)
-	// {
-	// 	printf(" %x", payloadBytes[i]);
-	// }
-	// printf("\n");
-	chr_write(chr, payloadBytes, payload_len);
-
-	if (step1_payload_bytes) 
-	{
-		free(step1_payload_bytes);
-		step1_payload_bytes = NULL;
-	}
-
-	if (step2_bytes)
-	{
-		free(step2_bytes);
-		step2_bytes = NULL;
-	}
-
-
-	if (payloadBytes)
-	{
-		free(payloadBytes);
-		payloadBytes = NULL;
-	}
-
-	serverLog(LL_NOTICE, "handleReplyStep2 resetRecvData");
-	resetRecvData(recv_pairing_data);
-	return 0;
-}
-
-// 还没写, 根据现在的不同, 等待改写
-int handleWriteStep3(void *arg)
-{
-	serverLog(LL_NOTICE, "we get client write step3, trans fsm to pairing step3");
-	return 0;
-}
-
-int handleReplyStep4(void *arg)
-{
-	serverLog(LL_NOTICE, "----------------------- handleReplyStep4  we are going to reply cliet step4, trans fsm to pairing step4");
-	int ret = 0;
-	struct characteristic *chr = (struct characteristic *)arg;
-	RecvData *recv_pairing_data = chr->recv_pairing_data;
-
-	if (recv_pairing_data == NULL)
-  {
-    serverLog(LL_ERROR, "handleWriteStep1  recv_pairing_data null");
-    return 1;
-  }
-
-	size_t step3_len = 0;
-  uint8_t *step3_payload_bytes = NULL;
-
-	if (getRecvPkgLen(recv_pairing_data, &step3_len))
-	{
-		serverLog(LL_ERROR, "getRecvPkgLen error");
-		return 1;
-	}
-
-	step3_payload_bytes = malloc(step3_len);
-	memset(step3_payload_bytes, 0, step3_len);
-
-	if (getPkgFromRecvData(recv_pairing_data, step3_payload_bytes))
-	{
-		serverLog(LL_ERROR, "getPkgFromRecvData error");
-		return 1;
-	}
-	// serverLog(LL_NOTICE, "getPkgFromRecvData success");
-
-
-	uint32_t encrypt_step4_bytes_len = ig_pairing_step4_size();
-  uint8_t encrypt_step4_bytes[encrypt_step4_bytes_len];
-  uint32_t encrypt_step4_writen_len = 0;
-
-	ig_pairing_step4(
-      step3_payload_bytes, step3_len, 
-      encrypt_step4_bytes, encrypt_step4_bytes_len, &encrypt_step4_writen_len);
-	if (encrypt_step4_writen_len == UINT32_MAX)
-	{
-		serverLog(LL_ERROR, "ig_pairing_step4 error");
-		return 1;
-	}
-
-	uint32_t payload_len = 0;
-  uint8_t *payloadBytes = NULL;
-
-	if (!build_msg_payload(
-      &payloadBytes, &payload_len, 
-      encrypt_step4_bytes, encrypt_step4_writen_len))
-	{
-		serverLog(LL_ERROR, "failed in build_msg_payload");
-		return 1;
-	}
-
-	// 用于验证,是否我发送的, 对面客户已经收到这个信息
-	// for (int i = 0; i < payload_len; ++i)
-	// {
-	// 	printf(" %x", payloadBytes[i]);
-	// }
-	// printf("\n");
-	chr_write(chr, payloadBytes, payload_len);
-
-	if (step3_payload_bytes)
-	{
-		free(step3_payload_bytes);
-		step3_payload_bytes = NULL;
-	}
-
-	if (payloadBytes)
-	{
-		free(payloadBytes);
-		payloadBytes = NULL;
-	}
-	serverLog(LL_NOTICE, "handleReplyStep4 resetRecvData");
-	resetRecvData(recv_pairing_data);
-	return 0;
-}
-
-// 还没写, 根据现在的不同, 等待改写
-int handleWriteCommit(void *arg)
-{
-	serverLog(LL_NOTICE, "we get client write commit, trans fsm to pairing complete");
-	return 0;
-}
-
-// 对 commit 的处理
-int handlePairingComplete(void *arg)
-{	
-	serverLog(LL_NOTICE, " handlePairingComplete");
-	
-	return 0;
-}
 
 // 对 完成 pairing 后, set wifi request 的处理
 int handleSetWifiRequest(void *arg)
@@ -353,30 +135,6 @@ int handleReplyWifiResponse(void *arg)
 	return 0;
 }
 
-void handleStep1Wrong(void *arg)
-{
-
-}
-
-void handleStep2Wrong(void *arg)
-{
-	
-}
-
-void handleStep3Wrong(void *arg)
-{
-	
-}
-
-void handleStep4Wrong(void *arg)
-{
-	
-}
-
-void handleCommitWrong(void *arg)
-{
-	
-}
 
 int getGlobalFSM()
 {
@@ -393,11 +151,11 @@ int getGlobalFSM()
 // 然后, 需要适配以下数据的不同
 // 在server 当中, 是什么数据呢
 // 在这儿, 初始化状态机的处理函数
-int initPairingFsm()
+int initWifiRequestFsm()
 {
 	uint8_t max_trans_num;
 	FSMTransform trans_item;
-	max_trans_num = 7;
+	max_trans_num = 10;
   
   if (getFSMTransTable(fsm, max_trans_num))
   {
@@ -406,121 +164,9 @@ int initPairingFsm()
   }
   serverLog(LL_NOTICE, "getFSMTransTable success");
 
-	// 1
-	// 使得 状态机从 Pairing Begin , 变成 PAIRING_STEP1
-  if (fillTransItem(&trans_item, 
-    C_WRITE_STEP1, PAIRING_BEGIN, handleWriteStep1, PAIRING_STEP1))
-  {
-    serverLog(LL_ERROR, "fillTransItem err");
-    return 1;
-  }
-  // serverLog(LL_NOTICE, "fillTransItem event C_WRITE_STEP1");
-
-  if (fillFSMTransItem(fsm, &trans_item))
-  {
-    serverLog(LL_ERROR, "fillFSMTransItem err");
-    return 1;
-  }
-
-	// 2
-	// 从 PAIRING_STEP1 -> PAIRING_STEP2
-  // C_WRITE_STEP1, from PAIRING_STEP1 to  PAIRING_STEP2
-  // handleWriteStep1: client 写入一个 step1, 那么就会有把状态从 PAIRING_STEP1 -> PAIRING_STEP2,
-  // 因为接收到了之后, 就会直接返回一个pairing step2, 所以是到pairing step2
-	// 这儿, 暂时不管出错处理
-  if (fillTransItem(&trans_item, 
-    S_REPLY_STEP2, PAIRING_STEP1, handleReplyStep2, PAIRING_STEP2))
-  {
-    serverLog(LL_ERROR, "fillTransItem err");
-    return 1;
-  }
-  // serverLog(LL_NOTICE, "fillTransItem event C_WRITE_STEP1");
-
-  if (fillFSMTransItem(fsm, &trans_item))
-  {
-    serverLog(LL_ERROR, "fillFSMTransItem err");
-    return 1;
-  }
-
-	// 3 事件, 从 PAIRING_STEP3 到 PAIRING_STEP4  
-  // 因为会我们会返回 step3 给客户端
-  // C_WRITE_STEP3, from PAIRING_STEP3 to PAIRING_STEP3
-  // handleWriteStep3: client 写入一个 step3, 那么就会有把状态从 PAIRING_STEP2 -> PAIRING_STEP4,
-  // 因为服务器会发送一个step3, 返回给客户一个step4,然后等待commit
-  if (fillTransItem(&trans_item, 
-    C_WRITE_STEP3, PAIRING_STEP2, handleWriteStep3, PAIRING_STEP3))
-  {
-    serverLog(LL_ERROR, "fillTransItem err");
-    return 1;
-  }
-  serverLog(LL_NOTICE, "fillTransItem event C_WRITE_STEP3");
-
-  if (fillFSMTransItem(fsm, &trans_item))
-  {
-    serverLog(LL_ERROR, "fillFSMTransItem err");
-    return 1;
-  }
-  serverLog(LL_NOTICE, "fillFSMTransItem event C_WRITE_STEP3");
-
-	// 4 事件, 从 PAIRING_STEP3 到 PAIRING_STEP4  
-  // 因为会我们会返回 step3 给客户端
-  // C_WRITE_STEP3, from PAIRING_STEP3 to PAIRING_STEP3
-  // handleWriteStep3: client 写入一个 step3, 那么就会有把状态从 PAIRING_STEP2 -> PAIRING_STEP4,
-  // 因为服务器会发送一个step3, 返回给客户一个step4,然后等待commit
-  if (fillTransItem(&trans_item, 
-    S_REPLY_STEP4, PAIRING_STEP3, handleReplyStep4, PAIRING_STEP4))
-  {
-    serverLog(LL_ERROR, "fillTransItem err");
-    return 1;
-  }
-  serverLog(LL_NOTICE, "fillTransItem event C_WRITE_STEP3");
-
-  if (fillFSMTransItem(fsm, &trans_item))
-  {
-    serverLog(LL_ERROR, "fillFSMTransItem err");
-    return 1;
-  }
-  serverLog(LL_NOTICE, "fillFSMTransItem event C_WRITE_STEP3");
-
-	// 5
-  // S_REPLY_STEP4, from PAIRING_COMMIT to PAIRING_COMPLETE
-  // handleWriteCommit: 客户接收到 到一个 Commit 消息, 然后会返回一个
-  if (fillTransItem(&trans_item, 
-    C_WRITE_COMMIT, PAIRING_STEP4, handleWriteCommit, PAIRING_COMPLETE))
-  {
-    serverLog(LL_ERROR, "fillTransItem err");
-    return 1;
-  }
-  // serverLog(LL_NOTICE, "fillTransItem event S_REPLY_STEP4");
-
-  if (fillFSMTransItem(fsm, &trans_item))
-  {
-    serverLog(LL_ERROR, "fillFSMTransItem err");
-    return 1;
-  }
-  // serverLog(LL_NOTICE, "fillFSMTransItem event S_REPLY_STEP4");
-
-	// 6
-  // S_REPLY_STEP4, from PAIRING_COMMIT to PAIRING_COMPLETE
-  // handleWriteCommit: 客户接收到 到一个 Commit 消息, 然后会返回一个
-  if (fillTransItem(&trans_item, 
-    S_PAIRING_COMPLETE, PAIRING_COMPLETE, handlePairingComplete, PAIRING_BEGIN))
-  {
-    serverLog(LL_ERROR, "fillTransItem err");
-    return 1;
-  }
-  // serverLog(LL_NOTICE, "fillTransItem event C_WRITE_COMMIT");
-
-  if (fillFSMTransItem(fsm, &trans_item))
-  {
-    serverLog(LL_ERROR, "fillFSMTransItem err");
-    return 1;
-  }
-  // serverLog(LL_NOTICE, "fillFSMTransItem event S_REPLY_STEP4");
-
-	// 7 SET_WIFI_BEGIN to SET_WIFI_REQUEST
+	// 2 PAIRING_BEGIN to SET_WIFI_REQUEST
 	if (fillTransItem(&trans_item, 
-    S_PAIRING_COMPLETE, PAIRING_COMPLETE, handlePairingComplete, SET_WIFI_BEGIN))
+    C_WRITE_WIFI_REQUEST, SET_WIFI_BEGIN, handleSetWifiRequest, SET_WIFI_REQUEST))
   {
     serverLog(LL_ERROR, "fillTransItem err");
     return 1;
@@ -533,11 +179,23 @@ int initPairingFsm()
     return 1;
   }
 
-	
+	// 3 SET_WIFI_REQUEST to SET_WIFI_COMPLETE
+	if (fillTransItem(&trans_item, 
+    S_REPLY_WIFI_RESPONSE, SET_WIFI_REQUEST, handleReplyWifiResponse, SET_WIFI_COMPLETE))
+  {
+    serverLog(LL_ERROR, "fillTransItem err");
+    return 1;
+  }
+  // serverLog(LL_NOTICE, "fillTransItem event C_WRITE_COMMIT");
 
+  if (fillFSMTransItem(fsm, &trans_item))
+  {
+    serverLog(LL_ERROR, "fillFSMTransItem err");
+    return 1;
+  }
 
 	// 把虚拟机, 弄成 PAIRING_BEGIN, 也就是空闲的意思啦
-	initFSMCurState(fsm, PAIRING_BEGIN);
+	initFSMCurState(fsm, SET_WIFI_BEGIN);
 }
 
 
@@ -953,34 +611,16 @@ static void chr_write(struct characteristic *chr, const uint8_t *value, int len)
 
 // 根据 FSM的当前状态, 给出现在应该发送的时间
 // 大概的想法就是, 
-// PAIRING_BEGIN -> C_WRITE_STEP1
-// PAIRING_STEP2 -> C_WRITE_STEP3
-// PAIRING_STEP4 -> C_WRITE_COMMIT
-// 整一个状态机会是这样
-// 1.PAIRING_BEGIN, server 没有事情做的时候, 
-// 2.任何包, 都会产生 C_WRITE_STEP1 事件, 并且设置状态为 PAIRING_STEP1
-// 3. 这时候, 对 PAIRING_STEP1的处理, 可能让转台记转换为 PAIRING_STEP2 , 也可能转换为 BEGIN(因为出错),
+// 
 void decideEvent(void *arg)
 {
 	struct characteristic *chr = (struct characteristic *)arg;
 	switch(fsm->cur_state)
 	{
-		case PAIRING_BEGIN:
+		case SET_WIFI_BEGIN:
 		{
 			serverLog(LL_NOTICE, "decideEvent PAIRING_BEGIN");
-			chr->event = C_WRITE_STEP1;
-			break;
-		}
-		case PAIRING_STEP2:
-		{
-			serverLog(LL_NOTICE, "decideEvent PAIRING_STEP2");
-			chr->event = C_WRITE_STEP3;
-			break;
-		}
-		case PAIRING_STEP4:
-		{
-			serverLog(LL_NOTICE, "decideEvent PAIRING_STEP4");
-			chr->event = C_WRITE_COMMIT;
+			chr->event = C_WRITE_WIFI_REQUEST;
 			break;
 		}
 		default:
@@ -997,58 +637,17 @@ void handleClientEvent(void *arg)
 	int handle_res = 0;
 	switch (chr->event)
 	{
-	case C_WRITE_STEP1:
+	case C_WRITE_WIFI_REQUEST:
 		// 首先转换状态, 到 step1
-		serverLog(LL_NOTICE, "handleClientEvent C_WRITE_STEP1 cur_state %d", fsm->cur_state);
+		serverLog(LL_NOTICE, "handleClientEvent C_WRITE_WIFI_REQUEST cur_state %d", fsm->cur_state);
 		handle_res = handleEvent(fsm, chr->event, NULL);
 		if (handle_res)
 		{
 			serverLog(LL_ERROR, "handle event C_WRITE_STEP1 error");
 		}
 		serverLog(LL_NOTICE, "handleClientEvent C_WRITE_STEP1 cur_state %d", fsm->cur_state);
-		chr->event = S_REPLY_STEP2;
-		// 然后生成 step2
-		// 这儿别传错数据, 都使用chr 进行传递
-		handle_res = handleEvent(fsm, chr->event, chr);
-		if (handle_res)
-		{
-			serverLog(LL_ERROR, "handle event S_REPLY_STEP2 error");
-		}
-		serverLog(LL_NOTICE, "handleClientEvent C_WRITE_STEP1 cur_state %d", fsm->cur_state);
+		
 		/* code */
-		break;
-	case C_WRITE_STEP3:
-		serverLog(LL_NOTICE, "handleClientEvent C_WRITE_STEP3 cur_state %d", fsm->cur_state);
-		// 首先转换到 step3
-		handle_res = handleEvent(fsm, chr->event, NULL);
-		if (handle_res)
-		{
-			serverLog(LL_ERROR, "handle event C_WRITE_STEP1 error");
-		}
-		serverLog(LL_NOTICE, "handleClientEvent C_WRITE_STEP3 cur_state %d", fsm->cur_state);
-		chr->event = S_REPLY_STEP4;
-		handle_res = handleEvent(fsm, chr->event, chr);
-		if (handle_res)
-		{
-			serverLog(LL_ERROR, "handle event S_REPLY_STEP2 error");
-		}
-		serverLog(LL_NOTICE, "handleClientEvent C_WRITE_STEP3 cur_state %d", fsm->cur_state);
-		break;
-	case C_WRITE_COMMIT:
-		serverLog(LL_NOTICE, "handleClientEvent C_WRITE_COMMIT cur_state %d", fsm->cur_state);
-		// 首先转换状态到 C_WRITE_COMMIT
-		handle_res = handleEvent(fsm, chr->event, NULL);
-		if (handle_res)
-		{
-			serverLog(LL_ERROR, "handle event C_WRITE_COMMIT error");
-		}
-		serverLog(LL_NOTICE, "handleClientEvent C_WRITE_COMMIT cur_state %d", fsm->cur_state);
-		chr->event = S_PAIRING_COMPLETE;
-		handle_res = handleEvent(fsm, chr->event, NULL);
-		if (handle_res)
-		{
-			serverLog(LL_ERROR, "handle event C_WRITE_COMMIT error");
-		}
 		break;
 	default:
 		serverLog(LL_ERROR, "default error event");
@@ -1095,6 +694,7 @@ static DBusMessage *chr_write_value(DBusConnection *conn, DBusMessage *msg,
 		return dbus_message_new_method_return(msg);
 	}
 	// want't to shut the warming up
+	serverLog(LL_NOTICE, " chr_write_value recv data");
 	recvData(chr->recv_pairing_data, (uint8_t *)value, len);
 	// printf("value len %d----------\n", len);
 	// printf("------------------- write value: \n");
@@ -1111,9 +711,9 @@ static DBusMessage *chr_write_value(DBusConnection *conn, DBusMessage *msg,
 	if(isRecvFullPkg(chr->recv_pairing_data))
 	{
 		// 这样就只会返回一个恢复,所以要弄好
-		// serverLog(LL_NOTICE, "-------- get full pkg");
-		decideEvent(user_data);
-		handleClientEvent(user_data);
+		serverLog(LL_NOTICE, "-------- get full pkg");
+		// decideEvent(user_data);
+		// handleClientEvent(user_data);
 		// chr_write(chr, value, len);
 	}
 	
@@ -1311,8 +911,8 @@ static gboolean register_characteristic(const char *chr_uuid,
   serverLog(LL_NOTICE, "getFSM success");
 
 	// 初始化全局的 fsm
-	serverLog(LL_NOTICE, "---------- initPairingFsm success");
-	initPairingFsm();
+	serverLog(LL_NOTICE, "---------- initWifiRequestFsm success");
+	initWifiRequestFsm();
 	
 	if (!g_dbus_register_interface(connection, chr->path, GATT_CHR_IFACE,
 					chr_methods, NULL, chr_properties,
@@ -1381,13 +981,13 @@ static void create_services()
 	uint8_t *set_wifi_info_request = malloc(sizeof(SetWIFIInfoRequest));
 	initWifiInfoRequest((SetWIFIInfoRequest*)set_wifi_info_request);
 
-	service_path = register_service(PAIRING_SERVICE_UUID);
+	service_path = register_service(WIFI_SERVICE_UUID);
 	if (!service_path)
 		return;
 
 	/* Add Alert Level Characteristic to Immediate Alert Service */
 	// 添加wifi 的特征进取
-	if (!register_characteristic(PAIRING_SERVICE_CHR_UUID,
+	if (!register_characteristic(WIFI_SERVICE_CHR_UUID,
 						set_wifi_info_request, sizeof(SetWIFIInfoRequest),
 						pairing_info_props,	// chr wifi 的属性?
 						READ_WRITE_DESCRIPTOR_UUID,

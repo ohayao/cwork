@@ -62,3 +62,9 @@ target_link_libraries(server
   ${GLIB_LDFLAGS} ${GIO_UNIX_LDFLAGS} ${DBUS_LDFLAGS} 
   bluez_gdbus ign_wifi_service ${WIFI_DEPENDENCIES} ign_wifi_fsm1
 )
+
+add_executable(wifi_server ./wifi_server.c ./error.c ad.c)
+target_link_libraries(wifi_server
+  ${GLIB_LDFLAGS} ${GIO_UNIX_LDFLAGS} ${DBUS_LDFLAGS} 
+  bluez_gdbus ign_wifi_service ${WIFI_DEPENDENCIES} ign_wifi_fsm1
+)

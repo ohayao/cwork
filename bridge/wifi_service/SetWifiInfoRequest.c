@@ -20,12 +20,35 @@ void initWifiInfoRequest(SetWIFIInfoRequest * wifi_info)
 
 void deinitWifiInfoRequest(SetWIFIInfoRequest * wifi_info)
 {
-  
+  if (wifi_info->has_ssid)
+  {
+    wifi_info->has_ssid = false;
+    free(wifi_info->ssid);
+    wifi_info->ssid = NULL;
+    wifi_info->ssid_len = 0;
+  }
+
+  if (wifi_info->has_token)
+  {
+    wifi_info->has_token = false;
+    free(wifi_info->token);
+    wifi_info->token = NULL;
+    wifi_info->token_len = 0;
+  }
+
+  if (wifi_info->has_password)
+  {
+    wifi_info->has_password = false;
+    free(wifi_info->password);
+    wifi_info->password = NULL;
+    wifi_info->password_len = 0;
+  }
 }
 
 int setWifiInfoRequestSSID(SetWIFIInfoRequest * wifi_info_request, char *ssid, size_t ssid_len)
 {
   if (!wifi_info_request) return 1;
+  wifi_info_request->ssid = malloc(ssid_len);
   memset(wifi_info_request->ssid,0, sizeof(wifi_info_request->ssid));
   memcpy(wifi_info_request->ssid, ssid, ssid_len);
   wifi_info_request->has_ssid = true;
@@ -33,9 +56,21 @@ int setWifiInfoRequestSSID(SetWIFIInfoRequest * wifi_info_request, char *ssid, s
   return 0;
 }
 
+int setWifiInfoRequestToken(SetWIFIInfoRequest * wifi_info_request, char *token, size_t token_len)
+{
+  if (!wifi_info_request) return 1;
+  wifi_info_request->token = malloc(token_len);
+  memset(wifi_info_request->token,0, sizeof(wifi_info_request->token));
+  memcpy(wifi_info_request->token, token, token_len);
+  wifi_info_request->has_token = true;
+  wifi_info_request->token_len = token_len;
+  return 0;
+}
+
 int setWifiInfoRequestPassword(SetWIFIInfoRequest * wifi_info_request, char *password, size_t password_len)
 {
   if (!wifi_info_request) return 1;
+  wifi_info_request->password = malloc(password_len);
   memset(wifi_info_request->password,0, sizeof(wifi_info_request->password));
   memcpy(wifi_info_request->password, password, password_len);
   wifi_info_request->has_password = true;
@@ -50,7 +85,7 @@ int isWifiInfoRequestInvalid(SetWIFIInfoRequest * obj)
   return !obj->has_password && !obj->has_ssid;
 }
 
-int encodeWifiInfoRequest(SetWIFIInfoRequest * obj, uint8_t *retval,uint32_t length,size_t *written_length)
+int encodeWifiInfoRequest(SetWIFIInfoRequest * obj, uint8_t *retval, size_t length,size_t *written_length)
 {
   if (isWifiInfoRequestInvalid(obj)) return 1;
 

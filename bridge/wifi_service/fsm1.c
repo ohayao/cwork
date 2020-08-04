@@ -64,8 +64,8 @@ int handleEvent(FSM *fsm, uint8_t event, void *arg)
     uint8_t next_state;
     uint8_t cur_state = fsm->cur_state;
     uint8_t flag = 0;
-    serverLog(LL_NOTICE, "cur_state %d event %d", cur_state, event);
-    serverLog(LL_NOTICE, "max_state_num %d", fsm->max_state_num);
+    // serverLog(LL_NOTICE, "cur_state %d event %d", cur_state, event);
+    // serverLog(LL_NOTICE, "max_state_num %d", fsm->max_state_num);
     for (uint8_t i = 0; i < fsm->max_state_num; i++)// 遍历状态表
     {
         // serverLog(LL_NOTICE, "event %d cur_state %d, trans table state: %d, event : %d", 
