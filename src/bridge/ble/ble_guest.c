@@ -210,10 +210,17 @@ static size_t main_loop_timeout = 5;
 static gboolean stop_main_loop_func(gpointer data) {
 	serverLog(LL_ERROR, "stop_main_loop_func timeout");
 	task_node_t *task_node = (task_node_t *)data;
+	g_source_remove(task_node->timeout_id);
 	ble_data_t *ble_data = task_node->ble_data;
 	guest_connection_t *guest_connection = (guest_connection_t *)ble_data->ble_connection;
 	guest_connection->waiting_err = 1;
-	g_source_remove(task_node->timeout_id);
+/*
+	int ret = releaseGuestConnection(&guest_connection);
+	if (ret) {
+		serverLog(LL_ERROR, "register_guest_notfication releaseGuestConnection error");
+		return ret;
+	}
+*/
 	g_main_loop_quit(task_node->loop);
 	return FALSE;
 }
@@ -221,24 +228,21 @@ static gboolean stop_main_loop_func(gpointer data) {
 //  ------------------------ Guest step start ------------------------
 
 fsm_table_t guest_fsm_table[GUEST_SM_TABLE_LEN] = {
-  {BLE_GUEST_BEGIN,       register_guest_notfication,  BLE_GUEST_STEP2},
-  {BLE_GUEST_STEP2,       waiting_guest_step2,         BLE_GUEST_STEP3},
-  {BLE_GUEST_STEP3,       write_guest_step3,         BLE_GUEST_STEP4},
-  {BLE_GUEST_STEP4, waiting_guest_step4,     BLE_GUEST_DONE},
+  {BLE_GUEST_BEGIN,     register_guest_notfication,		BLE_GUEST_STEP2},
+  {BLE_GUEST_STEP2,     waiting_guest_step2,			BLE_GUEST_STEP3},
+  {BLE_GUEST_STEP3,     write_guest_step3,				BLE_GUEST_STEP4},
+  {BLE_GUEST_STEP4,		waiting_guest_step4,		BLE_GUEST_DONE},
 };
 
 void message_handler(const uuid_t* uuid, const uint8_t* data, size_t data_length, void* user_data) {
-	serverLog(LL_NOTICE, "message_handler---------------");
-	printf("message_handler---------------\n");
+	serverLog(LL_NOTICE, "-------------new msg in message_handler---------------");
 	task_node_t *task_node = (task_node_t *)user_data;
 	ble_data_t *ble_data = task_node->ble_data;
 	guest_connection_t *guest_connection = (guest_connection_t *)ble_data->ble_connection;
 
-	printf("get gatt notify, step[%d], data_len[%d], data[", guest_connection->guest_step, data_length);
-	for(int i=0; i<data_length; i++){
-		printf("%02x", data[i]);
-	}
-	printf("]\n");
+	char xbuf[1024] = {0};
+	ByteToHexStr(data, xbuf, data_length);
+	serverLog(LL_NOTICE,"get gatt notify, step[%d], data_len[%d], data[%s].", guest_connection->guest_step, data_length, xbuf);
 	switch(guest_connection->guest_step) {
 		case BLE_GUEST_BEGIN:
 			{
@@ -258,15 +262,15 @@ void message_handler(const uuid_t* uuid, const uint8_t* data, size_t data_length
 				handle_unpair_responce(data, data_length,user_data);
 				break;
 			}
-		case BLE_GUEST_UNLOCK_REQUEST:
+		case BLE_GUEST_UNLOCK_RESULT:
 			{
-				printf("in message_handler, BLE_GUEST_UNLOCK_REQUEST do handle_unlock_responce.\n");
+				serverLog(LL_NOTICE,"in message_handler, BLE_GUEST_UNLOCK_REQUEST do handle_unlock_responce.");
 				handle_unlock_responce(data, data_length, user_data);
 				break;
 			}
-		case BLE_GUEST_LOCK_REQUEST:
+		case BLE_GUEST_LOCK_RESULT:
 			{
-				printf("in message_handler, BLE_GUEST_LOCK_REQUEST do handle_lock_responce.\n");
+				serverLog(LL_NOTICE,"in message_handler, BLE_GUEST_LOCK_REQUEST do handle_lock_responce.");
 				handle_lock_responce(data, data_length, user_data);
 				break;
 			}
@@ -361,7 +365,7 @@ int register_guest_notfication(void *arg) {
 		}
 	}
 
-	printf("in register_guest_notfication ready to connection adapter[%d], lockaddr[%s].\n", si->ble_adapter, guest_connection->lock->addr);
+	serverLog(LL_NOTICE,"in register_guest_notfication ready to connection adapter[%d], lockaddr[%s].", si->ble_adapter, guest_connection->lock->addr);
 	//optimise this short connection to long!
 	guest_connection->gatt_connection = gattlib_connect(si->ble_adapter, guest_connection->lock->addr, GATTLIB_CONNECTION_OPTIONS_LEGACY_DEFAULT);
 	if (NULL == guest_connection->gatt_connection) {
@@ -374,7 +378,7 @@ int register_guest_notfication(void *arg) {
 		goto GUEST_ERROR_EXIT;
 	}
 	//serverLog(LL_NOTICE, "gattlib_string_to_uuid to guest_uuid[%02x] success.", guest_connection->guest_uuid);
-	printf("gattlib_string_to_uuid to guest_uuid[%02x] success.\n", guest_connection->guest_uuid);
+	serverLog(LL_NOTICE,"gattlib_string_to_uuid to guest_uuid[%02x] success.", guest_connection->guest_uuid);
 	//*/
 
 	gattlib_register_notification(guest_connection->gatt_connection, message_handler, arg);
@@ -386,7 +390,9 @@ int register_guest_notfication(void *arg) {
 	serverLog(LL_NOTICE, "success to start notification" );
 
 	guest_connection->guest_step = BLE_GUEST_BEGIN;
+	//if(NULL == task_node->loop) {
 	task_node->loop = g_main_loop_new(NULL, 0);
+	//}
 	if (main_loop_timeout>0) {
 		task_node->timeout_id = g_timeout_add_seconds(main_loop_timeout, stop_main_loop_func, arg);
 	}
@@ -470,12 +476,12 @@ int handle_step2_message(const uint8_t* data, int data_length,void* user_data) {
 	guest_connection_t *guest_connection = (guest_connection_t *)ble_data->ble_connection;
 	save_message_data(data, data_length, user_data);
 
-	printf("in handle_step2_message step_max_size[%d], step_cur_size[%d]\n", guest_connection->step_max_size, guest_connection->step_cur_size);
+	serverLog(LL_NOTICE,"in handle_step2_message step_max_size[%d], step_cur_size[%d]", guest_connection->step_max_size, guest_connection->step_cur_size);
 	if (guest_connection->step_max_size == guest_connection->step_cur_size) {
 		serverLog(LL_NOTICE, "handle_step2_message RECV step2 data finished");
 		guest_connection->guest_step = BLE_GUEST_STEP3;
 	}else{
-		printf("Err!\n");
+		serverLog(LL_NOTICE,"Err!");
 	}
 }
 
@@ -483,7 +489,7 @@ int save_message_data(const uint8_t* data, int data_length, void* user_data) {
     task_node_t *task_node = (task_node_t *)user_data;
     ble_data_t *ble_data = task_node->ble_data;
     guest_connection_t *guest_connection = (guest_connection_t *)ble_data->ble_connection;
-	printf("in save_message_data, data_length[%d], step_max_size[%d], step_cur_size[%d].\n", data_length, guest_connection->step_max_size, guest_connection->step_cur_size);
+	serverLog(LL_NOTICE,"in save_message_data head, data_length[%d], step_max_size[%d], step_cur_size[%d].", data_length, guest_connection->step_max_size, guest_connection->step_cur_size);
 
     // 如果没有分配内存                            
     if (0 == guest_connection->step_max_size) {
@@ -509,12 +515,12 @@ int save_message_data(const uint8_t* data, int data_length, void* user_data) {
         }
     }
 
-    int size_left = guest_connection->step_max_size - guest_connection->step_cur_size;
     // 帕不够
-    if (size_left < data_length) {
-        serverLog(LL_NOTICE, "in save_message_data size_left[%d] < data_length[%d]..", size_left , data_length);
-        guest_connection->step_max_size += 85;
-		guest_connection->step_data = (uint8_t *)realloc(guest_connection->step_data, guest_connection->step_max_size);
+    //int size_left = guest_connection->step_max_size - guest_connection->step_cur_size;
+    //if (size_left < data_length) {
+    //    serverLog(LL_NOTICE, "in save_message_data size_left[%d] < data_length[%d]..", size_left , data_length);
+    //    guest_connection->step_max_size += 85;
+	//	guest_connection->step_data = (uint8_t *)realloc(guest_connection->step_data, guest_connection->step_max_size);
 	/*
         uint8_t *old_data = guest_connection->step_data;
         guest_connection->step_data = (uint8_t *)malloc(guest_connection->step_max_size);
@@ -526,12 +532,13 @@ int save_message_data(const uint8_t* data, int data_length, void* user_data) {
         free(old_data);
         old_data = NULL;
 	*/
-    }
+    //}
 
     // 空间肯定足够, 直接放下空间里面
     for (int j = 0; j < data_length; ) {
         guest_connection->step_data[guest_connection->step_cur_size++] = data[j++];
     }
+	serverLog(LL_NOTICE,"in save_message_data tail, data_length[%d], step_max_size[%d], step_cur_size[%d].", data_length, guest_connection->step_max_size, guest_connection->step_cur_size);
 	return 0;
 }
 
@@ -548,14 +555,14 @@ int write_guest_step1(void *arg) {
 	int step1Len = 0;
 	int connectionID = 0;
 
-	printf("in write_guest_step1, do igloohome_ble_lock_crypto_GuestConnection_beginConnection, key[%02x],key_len[%d].\n", guest_connection->lock->key, guest_connection->lock->key_len);
+	serverLog(LL_NOTICE,"in write_guest_step1, do igloohome_ble_lock_crypto_GuestConnection_beginConnection, key[%02x],key_len[%d].", guest_connection->lock->key, guest_connection->lock->key_len);
 	ret = igloohome_ble_lock_crypto_GuestConnection_beginConnection(guest_connection->lock->key, guest_connection->lock->key_len);
 	if (ERROR_CONNECTION_ID == ret) {
 		serverLog(LL_ERROR, "igloohome_ble_lock_crypto_GuestConnection_beginConnection error[%d], key[%s], ken_len[%d]", ret, guest_connection->lock->key, guest_connection->lock->key_len);
 		goto GUEST_STEP1_ERROR_EXIT;
 	}
 	connectionID = ret;
-	printf("igloohome_ble_lock_crypto_GuestConnection_beginConnection success. connectionID[%d]\n", connectionID);
+	serverLog(LL_NOTICE,"igloohome_ble_lock_crypto_GuestConnection_beginConnection success. connectionID[%d]", connectionID);
 	setLockConnectionID(guest_connection->lock, connectionID);
 	serverLog(LL_NOTICE, "set connectionID to Lock");
 	
@@ -568,13 +575,13 @@ int write_guest_step1(void *arg) {
 		serverLog(LL_ERROR, "igloohome_ble_lock_crypto_GuestConnection_genConnStep1Native err");
 		goto GUEST_STEP1_ERROR_EXIT;
 	}
-	printf("igloohome_ble_lock_crypto_GuestConnection_genConnStep1Native success, connectionID[%d], ret step1Len[%d], token[%02x], token_len[%d].\n", connectionID, step1Len, guest_connection->lock->token, guest_connection->lock->token_len);
+	serverLog(LL_NOTICE,"igloohome_ble_lock_crypto_GuestConnection_genConnStep1Native success, connectionID[%d], ret step1Len[%d], token[%02x], token_len[%d].", connectionID, step1Len, guest_connection->lock->token, guest_connection->lock->token_len);
 
 	if (!build_msg_payload(&payloadBytes, &payload_len, step1Bytes, step1Len)) {
 		serverLog(LL_ERROR, "failed in build_msg_payload.");
 		goto GUEST_STEP1_ERROR_EXIT;
 	}
-	printf("build_msg_payload success.\n");
+	serverLog(LL_NOTICE,"build_msg_payload success.");
 
 	ret = write_char_by_uuid_multi_atts(
 			guest_connection->gatt_connection,
@@ -584,7 +591,7 @@ int write_guest_step1(void *arg) {
 		serverLog(LL_ERROR, "write_char_by_uuid_multi_atts err[%d]", ret);
 		goto GUEST_STEP1_ERROR_EXIT;
 	}
-	printf("write_char_by_uuid_multi_atts ret[%d] succ, payload_len[%d].\n", ret, payload_len);
+	serverLog(LL_NOTICE,"write_char_by_uuid_multi_atts ret[%d] succ, payload_len[%d].", ret, payload_len);
 
 	//guest_connection->guest_step = BLE_GUEST_STEP3;
 
@@ -665,7 +672,7 @@ int write_guest_step3(void *arg) {
 		serverLog(LL_ERROR, "igloohome_ble_lock_crypto_GuestConnection_genConnStep3Native err");
 		goto GUEST_STEP1_ERROR_EXIT;
 	}
-	printf("igloohome_ble_lock_crypto_GuestConnection_genConnStep3Native success.\n");
+	serverLog(LL_NOTICE,"igloohome_ble_lock_crypto_GuestConnection_genConnStep3Native success.");
 
 	if (!build_msg_payload(&payloadBytes, &payload_len, step2Bytes, step2Len)) {
 		serverLog(LL_ERROR, "failed in build_msg_payload");
@@ -680,7 +687,7 @@ int write_guest_step3(void *arg) {
 		serverLog(LL_ERROR, "write_char_by_uuid_multi_atts err[%d]", ret);
 		goto GUEST_STEP1_ERROR_EXIT;
 	}
-	printf("in write_guest_step3 write_char_by_uuid_multi_atts ret[%d], payload_len[%d].\n", ret, payload_len);
+	serverLog(LL_NOTICE,"in write_guest_step3 write_char_by_uuid_multi_atts ret[%d], payload_len[%d].", ret, payload_len);
 
 	guest_connection->guest_step = BLE_GUEST_STEP4;
 
@@ -767,14 +774,13 @@ int handle_step4_message(const uint8_t* data, int data_length,void* user_data) {
 	task_node_t *task_node = (task_node_t *)user_data;
 	ble_data_t *ble_data = task_node->ble_data;
 	//******
-	g_main_loop_quit(task_node->loop);
 
 	guest_connection_t *guest_connection = (guest_connection_t *)ble_data->ble_connection;
 
 	save_message_data(data, data_length, user_data);
 
 	if (guest_connection->step_max_size == guest_connection->step_cur_size) {
-		int ret;
+		g_main_loop_quit(task_node->loop);
 		serverLog(LL_NOTICE, "handle_step4_message RECV step3 data finished[%d]", guest_connection->step_max_size);
 		guest_connection->guest_step = BLE_GUEST_STEP4;
 
@@ -789,17 +795,18 @@ int handle_step4_message(const uint8_t* data, int data_length,void* user_data) {
 			guest_connection->receive_err = 1;
 			goto STEP4_EXIT;
 		}
-		printf("igloohome_ble_lock_crypto_GuestConnection_recConnStep4Native success\n");
+		serverLog(LL_NOTICE,"igloohome_ble_lock_crypto_GuestConnection_recConnStep4Native success");
 		if (guest_connection->has_ble_result) {
 			serverLog(LL_NOTICE, "set guest result to success");
 			setGuestResultErr(guest_connection->ble_result, 0);
 		}
 		// 返回参数给调用进程
 		serverLog(LL_NOTICE, "handle_step4_message bleSetBleResult to ble data");
-		printf("\nguest connection finish.\n");
+		serverLog(LL_NOTICE,"guest connection finish.");
 
 	}else{
 		serverLog(LL_ERROR, "step_max_size[%d] != step_cur_size[%d] err!", guest_connection->step_max_size, guest_connection->step_cur_size);
+		return 0;
 	}
 
 STEP4_EXIT:
@@ -848,12 +855,17 @@ static int write_lock_request(void *arg) {
 	ig_LockRequest_init(&lock_request);
 	ig_LockRequest_set_operation_id(&lock_request, requestID);
 	ig_LockRequest_set_password(&lock_request, guest_connection->lock->password, guest_connection->lock->password_size);
+	//encode without encryption
 	IgSerializerError IgErr = ig_LockRequest_encode(&lock_request, buf, buf_size, &encode_size);
 	if (IgErr) {
 		serverLog(LL_ERROR, "ig_UnpairRequest_encode err[%d].", IgErr);
 		goto LOCK_REQUEST_ERROR;
 	}
 	serverLog(LL_NOTICE, "ig_UnpairRequest_encode success.");
+	//@@@test
+	char xbuf[1024] = {0};
+	ByteToHexStr(buf, xbuf, encode_size);
+	serverLog(LL_NOTICE,"ig_LockRequest_encode success, buf:[%s].", xbuf);
 
 	retvalLen = igloohome_ble_lock_crypto_GuestConnection_encryptNative(
 			guest_connection->lock->connectionID, buf, encode_size, &retvalBytes);
@@ -868,6 +880,10 @@ static int write_lock_request(void *arg) {
 		goto LOCK_REQUEST_ERROR;
 	}
 	serverLog(LL_NOTICE, "build_msg_payload success");
+	//@@@test
+	memset(xbuf,0x0,sizeof(xbuf));
+	ByteToHexStr(encryptPayloadBytes, xbuf, encryptPayloadBytes_len);
+	serverLog(LL_NOTICE, "build_msg_payload success, encryptPayloadBytes:[%s].", xbuf);
 
 	ret = write_char_by_uuid_multi_atts(
 			guest_connection->gatt_connection, &guest_connection->guest_uuid, 
@@ -882,8 +898,8 @@ static int write_lock_request(void *arg) {
 	encryptPayloadBytes = NULL;
 	free(retvalBytes);
 	retvalBytes = NULL;
-	ig_LockRequest_deinit(&lock_request);
-	guest_connection->guest_step = BLE_GUEST_LOCK_REQUEST;
+//	ig_LockRequest_deinit(&lock_request);
+	guest_connection->guest_step = BLE_GUEST_LOCK_RESULT;
 	serverLog(LL_NOTICE, "exit write lock request success");
 	return 0;
 
@@ -923,17 +939,15 @@ static int waiting_lock_result(void *arg) {
 	// 在这儿用g_main_loop_run等待, 用线程锁和睡眠的方法不行, 就像是bluez不会调用
 	// 我的回调函数, 在 rtos 应该会有相应的方法实现这样的等待事件到来的方法.
 	// 当前 Linux 下, 这样用, works 
-	printf("waiting_lock_result new g_main_loop_run.\n");
+	serverLog(LL_NOTICE,"waiting_lock_result new g_main_loop_run.");
 	g_main_loop_run(task_node->loop);
 	if (guest_connection->waiting_err || guest_connection->receive_err)
 		goto WAITING_LOCK_ERROR;
 	serverLog(LL_NOTICE, "waiting_lock_result exit task_node->loop");
 	g_source_remove(task_node->timeout_id);
-	printf("waiting_lock_result will g_main_loop_unref.\n");
+	serverLog(LL_NOTICE,"waiting_lock_result will g_main_loop_unref.");
 	g_main_loop_unref(task_node->loop);
 	task_node->loop = NULL;
-
-	serverLog(LL_NOTICE, "waiting_lock_result exit task_node->loop");
 
 	releaseGuestConnectionData(guest_connection);
 	int ret = releaseGuestConnection(&guest_connection);
@@ -951,7 +965,6 @@ static int waiting_lock_result(void *arg) {
 	}
 	ble_data->adapter = NULL;
 */
-	serverLog(LL_NOTICE, " exit return 0");
 	return 0;
 
 WAITING_LOCK_ERROR:
@@ -979,7 +992,7 @@ WAITING_LOCK_ERROR:
 }
 
 static int handle_lock_responce(const uint8_t* data, int data_length,void* user_data) {
-	printf("in handle_lock_responce -------------------------\n");
+	serverLog(LL_NOTICE,"in handle_lock_responce -------------------------");
 	task_node_t *task_node = (task_node_t *)user_data;
 	ble_data_t *ble_data = task_node->ble_data;
 	guest_connection_t *guest_connection = (guest_connection_t *)ble_data->ble_connection;
@@ -990,7 +1003,8 @@ static int handle_lock_responce(const uint8_t* data, int data_length,void* user_
 	save_message_data(data, data_length, user_data);
 
 	if (guest_connection->step_max_size == guest_connection->step_cur_size) {
-		int ret;
+		serverLog(LL_NOTICE,"@@@ in handle_lock_responce do g_main_loop_quit, should no time out!");
+		g_main_loop_quit(task_node->loop);
 		serverLog(LL_NOTICE, "handle_lock_responce RECV step2 data finished");
 
 		size_t messageLen = guest_connection->step_max_size - guest_connection->n_size_byte;
@@ -1031,16 +1045,15 @@ static int handle_lock_responce(const uint8_t* data, int data_length,void* user_
 		serverLog(LL_NOTICE, "igloohome_ble_lock_crypto_GuestConnection_endConnection success");
 		serverLog(LL_NOTICE, "LOCK_RESULT_EXIT--------------------------------");
 
-LOCK_RESPONCE_EXIT:
-		if (responceBytes) free(responceBytes);
-		printf("in handle_lock_responce will g_main_loop_quit.\n");
-		g_main_loop_quit(task_node->loop);
-
 	} else {
 		serverLog(LL_ERROR, "Recv ERR, step_max_size[%d], step_cur_size[%d].", guest_connection->step_max_size, guest_connection->step_cur_size);
-		printf("Recv ERR, step_max_size[%d], step_cur_size[%d].\n", guest_connection->step_max_size, guest_connection->step_cur_size);
-		return -1;
+		return 0;
 	}
+
+LOCK_RESPONCE_EXIT:
+		if (responceBytes) free(responceBytes);
+		serverLog(LL_NOTICE,"in handle_lock_responce will g_main_loop_quit.");
+
 	return 0;
 }
 
@@ -1091,22 +1104,14 @@ static int write_unlock_request(void *arg) {
 		goto UNLOCK_REQUEST_ERROR;
 	}
 	serverLog(LL_NOTICE, "ig_GuestUnlockRequest_encode success." );
-	//@@@test
-	printf("ig_GuestUnlockRequest_encode success, buf:[");
-	for(int i=0; i<encode_size; i++) {
-		printf("%02x", buf[i]);
-	}
-	printf("]\n");
 
 	//add
 	char* plockcmd = buf;//task_node->lock_cmd;
 	unsigned int lockcmd_size = encode_size;//task_node->lock_cmd_size; 
 	//@@@test
-	printf("@@@ lock_cmd size[%u], lock_cmd[", lockcmd_size);//task_node->lock_cmd_size);
-	for(int i=0; i<lockcmd_size; i++) {
-		printf("%02x", plockcmd[i]);
-	}
-	printf("]\n");
+	char xbuf[1024] = {0};
+	ByteToHexStr(plockcmd, xbuf, lockcmd_size);
+	serverLog(LL_NOTICE,"@@@ ig_UnlockRequest_encode success, lock_cmd size[%u], lock_cmd[%s]", lockcmd_size, xbuf);//task_node->lock_cmd_size);
 
 	retvalLen = igloohome_ble_lock_crypto_GuestConnection_encryptNative(
 			guest_connection->lock->connectionID, plockcmd, lockcmd_size, &retvalBytes);
@@ -1122,11 +1127,9 @@ static int write_unlock_request(void *arg) {
 	}
 	serverLog(LL_NOTICE, "build_msg_payload success.");
 	//@@@test
-	printf("build_msg_payload success, encryptPayloadBytes:[");
-	for(int i=0; i<encryptPayloadBytes_len; i++) {
-		printf("%02x", encryptPayloadBytes[i]);
-	}
-	printf("]\n");
+	memset(xbuf,0x0,sizeof(xbuf));
+	ByteToHexStr(encryptPayloadBytes, xbuf, encryptPayloadBytes_len);
+	serverLog(LL_NOTICE, "build_msg_payload success, encryptPayloadBytes:[%s].", xbuf);
 
 	ret = write_char_by_uuid_multi_atts(
 			guest_connection->gatt_connection, &guest_connection->guest_uuid, 
@@ -1142,7 +1145,7 @@ static int write_unlock_request(void *arg) {
 	free(retvalBytes);
 	retvalBytes = NULL;
 	//ig_GuestUnlockRequest_deinit(&unlock_request);
-	guest_connection->guest_step = BLE_GUEST_UNLOCK_REQUEST;
+	guest_connection->guest_step = BLE_GUEST_UNLOCK_RESULT; //BLE_GUEST_UNLOCK_REQUEST;
 	return 0;
 
 UNLOCK_REQUEST_ERROR:
@@ -1179,22 +1182,22 @@ static int waiting_unlock_result(void *arg) {
 	serverLog(LL_NOTICE, "waiting_unlock_result");
 	task_node_t *task_node = (task_node_t *)arg;
 	ble_data_t *ble_data = (ble_data_t *)(task_node->ble_data);
-	guest_connection_t *guest_connection = 
-		(guest_connection_t *)ble_data->ble_connection;
+	guest_connection_t *guest_connection = (guest_connection_t *)ble_data->ble_connection;
 
-	printf("in waiting_unlock_result new g_main_loop_run.\n");
+	serverLog(LL_NOTICE,"in waiting_unlock_result new g_main_loop_run.");
 	g_main_loop_run(task_node->loop);
-	if (guest_connection->waiting_err || guest_connection->receive_err)
+	if (guest_connection->waiting_err || guest_connection->receive_err){
+		serverLog(LL_NOTICE,"waiting_err[%d], receive_err[%d]", guest_connection->waiting_err, guest_connection->receive_err);
 		goto WAITING_UNLOCK_ERROR;
+	}
 	g_source_remove(task_node->timeout_id);
-	printf("in waiting_unlock_result will g_main_loop_unref.\n");
+	serverLog(LL_NOTICE,"in waiting_unlock_result will g_main_loop_unref.");
 	g_main_loop_unref(task_node->loop);
 	task_node->loop = NULL;
 
 	releaseGuestConnectionData(guest_connection);
 	int ret = releaseGuestConnection(&guest_connection);
-	if (ret)
-	{
+	if (ret) {
 		serverLog(LL_ERROR, "waiting_unlock_result releaseGuestConnection error");
 		return ret;
 	}
@@ -1241,12 +1244,13 @@ static int handle_unlock_responce(const uint8_t* data, int data_length,void* use
 	int responceLen;
 	uint8_t *responceBytes = NULL;
 
+	guest_connection->guest_step = BLE_GUEST_UNLOCK_RESULT;
 	save_message_data(data, data_length, user_data);
 
 	if (guest_connection->step_max_size == guest_connection->step_cur_size) {
-		int ret;
+		serverLog(LL_NOTICE,"@@@ in handle_lock_responce do g_main_loop_quit, should no time out!");
+		g_main_loop_quit(task_node->loop);
 		serverLog(LL_NOTICE, "handle_unlock_responce RECV step2 data finished");
-		guest_connection->guest_step = BLE_GUEST_UNLOCK_RESULT;
 
 		size_t messageLen = guest_connection->step_max_size - guest_connection->n_size_byte;
 		uint8_t *data_start = guest_connection->step_data + guest_connection->n_size_byte;
@@ -1265,17 +1269,16 @@ static int handle_unlock_responce(const uint8_t* data, int data_length,void* use
 		IgUnlockResponse guest_unlock_responce;
 		ig_UnlockResponse_init(&guest_unlock_responce);
 		IgSerializerError err = ig_UnlockResponse_decode( responceBytes, responceLen, &guest_unlock_responce, 0);
-		if (err)
-		{
+		if (err) {
 			serverLog(LL_NOTICE, "ig_GuestUnlockResponse_decode err %d", err);
 			guest_connection->receive_err = 1;
 			goto UNLOCK_RESPONCE_EXIT;
 		}
-		serverLog(LL_NOTICE, "has unlock response %d error %d", guest_unlock_responce.has_result, guest_unlock_responce.result);
+		serverLog(LL_NOTICE, "has unlock response [%d] error [%d].", guest_unlock_responce.has_result, guest_unlock_responce.result);
 
 		if (guest_connection->has_ble_result && guest_unlock_responce.has_result) {
-			serverLog(LL_NOTICE, "set guest result to success");
-			guest_connection->ble_result->unlock_result= guest_unlock_responce.result;
+			serverLog(LL_NOTICE, "set guest result to success.");
+			guest_connection->ble_result->unlock_result = guest_unlock_responce.result;
 		}
 		// 复制所返回的结果 这儿会有内存申请
 		setGuestResultCMDResponse( guest_connection->ble_result, &guest_unlock_responce, sizeof(IgUnlockResponse));
@@ -1291,15 +1294,16 @@ static int handle_unlock_responce(const uint8_t* data, int data_length,void* use
 
 		serverLog(LL_NOTICE, "UNLOCK_RESULT_EXIT--------------------------------");
 
-UNLOCK_RESPONCE_EXIT:
-		if (responceBytes) free(responceBytes);
-		printf("in handle_unlock_responce will g_main_loop_quit.\n");
-		g_main_loop_quit(task_node->loop);
 	} else {
 		serverLog(LL_ERROR, "Recv ERR, step_max_size[%d], step_cur_size[%d].", guest_connection->step_max_size, guest_connection->step_cur_size);
-		printf("Recv ERR, step_max_size[%d], step_cur_size[%d].\n", guest_connection->step_max_size, guest_connection->step_cur_size);
-		return -1;
+		return 0;
 	}
+
+UNLOCK_RESPONCE_EXIT:
+		if (responceBytes) free(responceBytes);
+		serverLog(LL_NOTICE,"in handle_unlock_responce will g_main_loop_quit.");
+
+	return 0;
 }
 
 
@@ -1447,7 +1451,7 @@ static int waitingGetLogsResult(void *arg) {
 	return 0;
 
 WAITING_GETLOGS_ERROR:
-	serverLog(LL_ERROR, "WAITING_UNLOCK_ERROR ");
+	serverLog(LL_ERROR, "WAITING_GETLOGS_ERROR ");
 	g_main_loop_unref(task_node->loop);
 	task_node->loop = NULL;
 	releaseGuestConnectionData(guest_connection);
@@ -1821,22 +1825,16 @@ static int writeCreatePinRequest(void *arg) {
 	}
 
 	ig_CreatePinRequest_set_new_pin( &create_pin_request, request->new_pin, request->new_pin_size);
-	serverLog(LL_NOTICE, "ig_CreatePinRequest_set_new_pin");
 	//@@@test
-	printf("ig_CreatePinRequest_set_new_pin:[");
-	for (int j = 0; j<create_pin_request.new_pin_size; j++) {
-		printf ("%02x", create_pin_request.new_pin[j]);
-	}
-	printf("]\n");
+	char xbuf[1024] = {0};
+	ByteToHexStr(create_pin_request.new_pin, xbuf, create_pin_request.new_pin_size);
+	serverLog(LL_NOTICE,"ig_CreatePinRequest_set_new_pin:[%s].", xbuf);
 
 	ig_CreatePinRequest_set_password(&create_pin_request, request->password, request->password_size);
-	serverLog(LL_NOTICE, "ig_CreatePinRequest_set_password");
 	//@@@test
-	printf("ig_CreatePinRequest_set_password:[");
-	for (int j = 0; j < create_pin_request.password_size; j++) {
-		printf ("%02x ", create_pin_request.password[j]);
-	}
-	printf("]\n");
+	memset(xbuf, 0x0, sizeof(xbuf));
+	ByteToHexStr(create_pin_request.password, xbuf, create_pin_request.password_size);
+	serverLog(LL_NOTICE,"ig_CreatePinRequest_set_password:[%s]", xbuf);
 
 	// optionnal
 	if (request->has_start_date) {
@@ -1862,7 +1860,7 @@ static int writeCreatePinRequest(void *arg) {
 		serverLog(LL_NOTICE, "ig_CreatePinRequest_set_operation_id %d", create_pin_request.operation_id);
 	}
 	//@@test
-	printf("create pin option: start_date[%u], end_date[%u], pin_type[%d], operation_id[%d].\n", 
+	serverLog(LL_NOTICE,"create pin option: start_date[%u], end_date[%u], pin_type[%d], operation_id[%d].", 
 		create_pin_request.start_date,
 		create_pin_request.end_date,
 		create_pin_request.pin_type,
@@ -1892,11 +1890,9 @@ static int writeCreatePinRequest(void *arg) {
 	}
 	serverLog(LL_NOTICE, "build_msg_payload success.");
 	//@@@test
-	printf("create pin build_msg_payload success, encryptPayloadBytes:[");
-	for(int i=0;i<encryptPayloadBytes_len;i++){
-		printf("%02x", encryptPayloadBytes[i]);
-	}
-	printf("]\n");
+	memset(xbuf,0x0,sizeof(xbuf));
+	ByteToHexStr(encryptPayloadBytes, xbuf, encryptPayloadBytes_len);
+	serverLog(LL_NOTICE, "build_msg_payload success, encryptPayloadBytes:[%s].", xbuf);
 
 	ret = write_char_by_uuid_multi_atts(
 			guest_connection->gatt_connection, &guest_connection->guest_uuid, 
@@ -3045,9 +3041,9 @@ static int handle_unpair_responce(const uint8_t* data, int data_length,void* use
     // serverLog(LL_NOTICE, "unpair responce :");
     // for (int j = 0; j < responceLen; j++)
     // {
-    //   printf("%02x ", responceBytes[j]);
+    //   serverLog(LL_NOTICE,"%02x ", responceBytes[j]);
     // }
-    // printf("\n");
+    // serverLog(LL_NOTICE,"");
     IgUnpairResponse unpair_resppnce;
     ig_UnpairResponse_init(&unpair_resppnce);
     IgSerializerError err = ig_UnpairResponse_decode(
@@ -3175,7 +3171,7 @@ void bleReleaseGuestResult(ble_guest_result_t **pp_result) {
 
 void setGuestResultErr(ble_guest_result_t *ble_result, int err) {
 	if(NULL == ble_result){
-		printf("in setGuestResultErr result is NULL!\n");
+		serverLog(LL_NOTICE,"in setGuestResultErr result is NULL!");
 		return;
 	}
 	ble_result->result = err;
@@ -3184,7 +3180,7 @@ void setGuestResultErr(ble_guest_result_t *ble_result, int err) {
 
 void setGuestResultGetLogsErr(ble_guest_result_t *result, int err) {
 	if(NULL == result) {
-		printf("in setGuestResultGetLogsErr result is NULL!\n");
+		serverLog(LL_NOTICE,"in setGuestResultGetLogsErr result is NULL!");
 		return;
 	}
 
@@ -3194,7 +3190,7 @@ void setGuestResultGetLogsErr(ble_guest_result_t *result, int err) {
 
 void setGuestResultLockErr(ble_guest_result_t *result, int err) {
 	if(NULL == result) {
-		printf("in setGuestResultLockErr result is NULL!\n");
+		serverLog(LL_NOTICE,"in setGuestResultLockErr result is NULL!");
 		return;
 	}
 	result->lock_result = err;
@@ -3203,7 +3199,7 @@ void setGuestResultLockErr(ble_guest_result_t *result, int err) {
 
 void setGuestResultUnlockErr(ble_guest_result_t *result, int err) {
 	if(NULL == result) {
-		printf("in setGuestResultUnlockErr result is NULL!\n");
+		serverLog(LL_NOTICE,"in setGuestResultUnlockErr result is NULL!");
 		return;
 	}
 	result->unlock_result = err;
