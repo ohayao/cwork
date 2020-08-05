@@ -1,101 +1,75 @@
-#include "bridge/wifi_service/SetWifiInfoRequest.h"
-#include <string.h>
+#include "bridge/wifi_service/crypt.h"
+#include <stdio.h>
+#include <stdlib.h>
 #include "bridge/lock/external/cbor/cbor.h"
 
-
-int getWifiInfoRequest(SetWIFIInfoRequest **pp_wifi_info)
+int initCrypt(Crypt *obj)
 {
-  if(!pp_wifi_info) return 1;
-  if (*pp_wifi_info) free(*pp_wifi_info);
-  *pp_wifi_info = NULL;
-  *pp_wifi_info = malloc(sizeof(SetWIFIInfoRequest));
-  if (!*pp_wifi_info) return 1;
-  return 0;
-}
-
-void initWifiInfoRequest(SetWIFIInfoRequest * wifi_info)
-{
-  memset(wifi_info, 0, sizeof(SetWIFIInfoRequest));
-}
-
-void deinitWifiInfoRequest(SetWIFIInfoRequest * wifi_info)
-{
-  if (wifi_info->has_ssid)
-  {
-    wifi_info->has_ssid = false;
-    free(wifi_info->ssid);
-    wifi_info->ssid = NULL;
-    wifi_info->ssid_len = 0;
-  }
-
-  if (wifi_info->has_token)
-  {
-    wifi_info->has_token = false;
-    free(wifi_info->token);
-    wifi_info->token = NULL;
-    wifi_info->token_len = 0;
-  }
-
-  if (wifi_info->has_password)
-  {
-    wifi_info->has_password = false;
-    free(wifi_info->password);
-    wifi_info->password = NULL;
-    wifi_info->password_len = 0;
-  }
-}
-
-int setWifiInfoRequestSSID(SetWIFIInfoRequest * wifi_info_request, char *ssid, size_t ssid_len)
-{
-  if (!wifi_info_request) return 1;
-  wifi_info_request->ssid = malloc(ssid_len);
-  memset(wifi_info_request->ssid,0, sizeof(wifi_info_request->ssid));
-  memcpy(wifi_info_request->ssid, ssid, ssid_len);
-  wifi_info_request->has_ssid = true;
-  wifi_info_request->ssid_len = ssid_len;
-  return 0;
-}
-
-int setWifiInfoRequestToken(SetWIFIInfoRequest * wifi_info_request, char *token, size_t token_len)
-{
-  if (!wifi_info_request) return 1;
-  wifi_info_request->token = malloc(token_len);
-  memset(wifi_info_request->token,0, sizeof(wifi_info_request->token));
-  memcpy(wifi_info_request->token, token, token_len);
-  wifi_info_request->has_token = true;
-  wifi_info_request->token_len = token_len;
-  return 0;
-}
-
-int setWifiInfoRequestPassword(SetWIFIInfoRequest * wifi_info_request, char *password, size_t password_len)
-{
-  if (!wifi_info_request) return 1;
-  wifi_info_request->password = malloc(password_len);
-  memset(wifi_info_request->password,0, sizeof(wifi_info_request->password));
-  memcpy(wifi_info_request->password, password, password_len);
-  wifi_info_request->has_password = true;
-  wifi_info_request->password_len = password_len;
-  return 0;
-}
-
-
-int isWifiInfoRequestInvalid(SetWIFIInfoRequest * obj)
-{
-  // obj is null, invalid
   if (!obj) return 1;
-  return !obj->has_password && !obj->has_ssid;
+  memset(obj, 0, sizeof(Crypt));
+  return 0;
+} 
+
+int getCrypt(Crypt **pobj)
+{
+  if (*pobj) return 1;
+  *pobj = (Crypt *)malloc(sizeof(Crypt));
+  Crypt *obj = *pobj;
+  if (!obj) return 1;
+  return 0;
 }
 
-int encodeWifiInfoRequest(SetWIFIInfoRequest * obj, uint8_t *retval, size_t length,size_t *written_length)
+int setCryptAdminKey(Crypt *data, uint8_t *admin_key, size_t admin_key_len)
 {
-  if (isWifiInfoRequestInvalid(obj)) return 1;
+  if (!data || !admin_key) return 1;
+  data->server_pairing_admin_key = (uint8_t *)malloc(admin_key_len);
+  memset(data->server_pairing_admin_key,0, admin_key_len);
+  memcpy(data->server_pairing_admin_key, admin_key, admin_key_len);
+  data->has_server_pairing_admin_key = true;
+  data->server_pairing_admin_key_len = admin_key_len;
+  return 0;
+}
+
+int setCryptClientNonce(Crypt *data, uint8_t *client_nonce, size_t client_nonce_len)
+{
+  if (!data || !client_nonce) return 1;
+  data->client_nonce = (uint8_t *)malloc(client_nonce_len);
+  memset(data->client_nonce, 0, client_nonce_len);
+  memcpy(data->client_nonce, client_nonce, client_nonce_len);
+  data->has_client_nonce = true;
+  data->client_nonce_len = client_nonce_len;
+  return 0;
+}
+
+int setCryptServerNonce(Crypt *data, uint8_t *server_nonce, size_t server_nonce_len)
+{
+  if (!data || !server_nonce) return 1;
+  data->server_nonce = (uint8_t *)malloc(server_nonce_len);
+  memset(data->server_nonce, 0, server_nonce_len);
+  memcpy(data->server_nonce, server_nonce, server_nonce_len);
+  data->has_server_nonce = true;
+  data->server_nonce_len = server_nonce_len;
+  return 0;
+}
+
+int isCryptInvalid(Crypt * obj)
+{
+  if (!obj) return 1;
+  // 必须这三个都有, 才合法
+  printf("isCryptInvalid %d %d %d\n", (!obj->has_client_nonce), (!obj->has_server_nonce), (!obj->has_server_pairing_admin_key));
+  return !obj->has_client_nonce || !obj->has_server_nonce || !obj->has_server_pairing_admin_key;
+}
+
+int encodeCrypt(Crypt * obj, uint8_t *retval, size_t length,size_t *written_length)
+{
+  if (isCryptInvalid(obj)) return 1;
 
   CborEncoder encoder;
   CborEncoder map;
   CborError err;
 
   //msg_id + ssid  + password
-  size_t fields_size = 1 + 1 + 1;
+  size_t fields_size = 1 + 1 + 1 + 1;
 
   cbor_encoder_init(&encoder, retval, length, 0);
   err = cbor_encoder_create_map(&encoder, &map, fields_size);
@@ -107,16 +81,22 @@ int encodeWifiInfoRequest(SetWIFIInfoRequest * obj, uint8_t *retval, size_t leng
   err = cbor_encode_uint(&map, 51);
   if(err) return err;
 
-  // add ssid
+  // add admin key, 11
   err = cbor_encode_uint(&map, 11);
   if(err) return err;
-  err = cbor_encode_byte_string(&map, obj->ssid, strlen(obj->ssid));
+  err = cbor_encode_byte_string(&map, obj->server_pairing_admin_key, obj->server_pairing_admin_key_len);
   if(err) return err;
 
-  // add password
+  // add server nonce 
   err = cbor_encode_uint(&map, 12);
   if(err) return err;
-  err = cbor_encode_byte_string(&map, obj->password, strlen(obj->password));
+  err = cbor_encode_byte_string(&map, obj->server_nonce, obj->server_nonce_len);
+  if(err) return err;
+
+  // add client nonce 
+  err = cbor_encode_uint(&map, 13);
+  if(err) return err;
+  err = cbor_encode_byte_string(&map, obj->client_nonce, obj->client_nonce_len);
   if(err) return err;
 
   // close
@@ -129,7 +109,7 @@ int encodeWifiInfoRequest(SetWIFIInfoRequest * obj, uint8_t *retval, size_t leng
   return 0;
 }
 
-int decodeWifiInfoRequest(uint8_t *buf,size_t buf_size, SetWIFIInfoRequest *retval,size_t index)
+int decodeCrypt(uint8_t *buf,size_t buf_size, Crypt *retval, size_t index)
 {
   CborParser parser;
   CborValue it;
@@ -191,7 +171,7 @@ int decodeWifiInfoRequest(uint8_t *buf,size_t buf_size, SetWIFIInfoRequest *retv
                 uint8_t data_arr[size];
                 err = cbor_value_copy_byte_string(&content, data_arr, &size, &content);
                 if(err) return  err;
-                setWifiInfoRequestSSID(retval, data_arr, size);
+                setCryptAdminKey(retval, data_arr, size);
                 break;
             }
 
@@ -204,9 +184,21 @@ int decodeWifiInfoRequest(uint8_t *buf,size_t buf_size, SetWIFIInfoRequest *retv
                 uint8_t data_arr[size];
                 err = cbor_value_copy_byte_string(&content, data_arr, &size, &content);
                 if(err) return  err;
-                setWifiInfoRequestPassword(retval, data_arr, size);
+                setCryptServerNonce(retval, data_arr, size);
                 break;
             }
+          case 13:
+            if(value_type == CborByteStringType){
+                size_t size;
+                err = cbor_value_get_string_length(&content, &size);
+                if(err) return err;
+                uint8_t data_arr[size];
+                err = cbor_value_copy_byte_string(&content, data_arr, &size, &content);
+                if(err) return  err;
+                setCryptClientNonce(retval, data_arr, size);
+                break;
+            }
+            break;
           default:
             return 2006;
         }

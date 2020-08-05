@@ -47,6 +47,7 @@ set(WIFI_FSM_HDR
 set(WIFI_FSM_SRC
   ./fsm1.c
   ./pairing.c
+  crypt.c
 )
 
 add_library(ign_wifi_fsm1
@@ -55,7 +56,6 @@ add_library(ign_wifi_fsm1
 target_link_libraries(ign_wifi_fsm1
   lock
 )
-
 
 add_executable(server ./server.c ./error.c ad.c)
 target_link_libraries(server

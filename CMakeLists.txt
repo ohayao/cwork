@@ -15,5 +15,5 @@ set(GATTLIB_ROOT_DIR ${CMAKE_SOURCE_DIR}/bridge/gattlib)
 
 # include_directories(${GATTLIB_ROOT_DIR}/common ${CMAKE_CURRENT_BINARY_DIR} ${GIO_UNIX_INCLUDE_DIRS} ${BLUEZ_INCLUDE_DIRS})
 
-
+message(${CMAKE_SOURCE_DIR})
 add_subdirectory("bridge")

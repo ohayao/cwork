@@ -4,8 +4,9 @@
 #include "bridge/gattlib/gattlib.h"
 #include "bridge/ble/ble_operation.h"
 #include "bridge/wifi_service/pairing.h"
-#include <glib.h>
 
+#include <glib.h>
+#include <ctype.h>
 static char wifi_setting_str[] = "87654321-0000-1000-8000-00805f9b34fb";
 uuid_t wifi_setting_uuid = {};
 
@@ -15,6 +16,10 @@ char *SSID = "Google";
 char *SSID_PASSWD = "12345678";
 char *SSID_TOKEN = "12345678";
 bool is_registered = false;
+
+uint8_t admin_key[16];
+uint8_t client_nonce[12];
+uint8_t server_nonce[12];
 
 GMainLoop *loop = NULL;
 
@@ -145,8 +150,69 @@ void endGattConnection()
 
 }
 
+int hexStrToByte(const char* source, uint8_t* dest, int sourceLen)
+{
+    short i;
+    unsigned char highByte, lowByte;
+    
+    for (i = 0; i < sourceLen; i += 2)
+    {
+        highByte = toupper(source[i]);
+        lowByte  = toupper(source[i + 1]);
+        if (highByte > 0x39)
+            highByte -= 0x37;
+        else
+            highByte -= 0x30;
+ 
+        if (lowByte > 0x39)
+            lowByte -= 0x37;
+        else
+            lowByte -= 0x30;
+ 
+        dest[i / 2] = (highByte << 4) | lowByte;
+    }
+    return sourceLen /2 ;
+}
+
 int main(int argc, char *argv[])
 {
+  if (argc != 4) {
+    serverLog(LL_NOTICE, "%s <MAC> <client_nonce> <server_nonce> <admin_key>\n", argv[0]);
+    return 1;
+  }
+
+  uint8_t tmp_buff[100];
+  memset(tmp_buff, 0, sizeof(tmp_buff));
+  int client_nonce_len = hexStrToByte(argv[2], tmp_buff, strlen(argv[2]));
+  memcpy(client_nonce, tmp_buff, client_nonce_len);
+  serverLog(LL_NOTICE, "client_nonce: ");
+  for (int i = 0; i < client_nonce_len; ++i)
+  {
+    printf(" %x", tmp_buff[i]);
+  }
+  printf("\n");
+
+
+  memset(tmp_buff, 0, sizeof(tmp_buff));
+  int server_nonce_len = hexStrToByte(argv[3], tmp_buff, strlen(argv[2]));
+  memcpy(server_nonce, tmp_buff, server_nonce_len);
+  serverLog(LL_NOTICE, "server_nonce: ");
+  for (int i = 0; i < server_nonce_len; ++i)
+  {
+    printf(" %x", tmp_buff[i]);
+  }
+  printf("\n");
+
+  memset(tmp_buff, 0, sizeof(tmp_buff));
+  int admin_key_len = hexStrToByte(argv[4], tmp_buff, strlen(argv[2]));
+  memcpy(admin_key, tmp_buff, admin_key_len);
+  serverLog(LL_NOTICE, "admin_key: ");
+  for (int i = 0; i < admin_key_len; ++i)
+  {
+    printf(" %x", tmp_buff[i]);
+  }
+  printf("\n");
+
   // 先注册
   if (register_pairing_notfication(NULL))
   {

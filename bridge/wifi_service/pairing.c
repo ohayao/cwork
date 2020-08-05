@@ -765,3 +765,52 @@ IgErrorCode ig_commit_pairing(uint8_t *encrypt_commit_Bytes, uint32_t encrypt_co
   ig_PairingCommit_deinit(&pairing_commit);
   return IG_ERROR_NONE;
 }
+
+int makeCrypt(Crypt **p_reval, size_t *written_len)
+{
+  Crypt *reval = *p_reval;
+  // reval has to be NULL
+  if (reval)
+  {
+    serverLog(LL_ERROR, "reval has to be NULL");
+    return 1;
+  }
+  if (getCrypt(p_reval))
+  {
+    serverLog(LL_ERROR, "getCrypt error");
+    return 1;
+  }
+  reval = *p_reval;
+  if (initCrypt(reval))
+  {
+    serverLog(LL_ERROR, "initCrypt error");
+    return 1;
+  }
+  if (setCryptAdminKey(reval, 
+      server_pairing_admin_key, sizeof(server_pairing_admin_key)))
+  {
+    serverLog(LL_ERROR, "setCryptAdminKey error");
+    return 1;
+  }
+  if (setCryptServerNonce(reval, 
+        server_nonce, sizeof(server_nonce)))
+  {
+    serverLog(LL_ERROR, "setCryptServerNonce error");
+    return 1;
+  }
+    
+  if (setCryptClientNonce(reval, 
+        client_nonce, sizeof(client_nonce)))
+  {
+    serverLog(LL_ERROR, "setCryptClientNonce error");
+    return 1;
+  } 
+  
+  if (isCryptInvalid(reval))
+  {
+    serverLog(LL_ERROR, "isCryptInvalid error");
+    return 1;
+  }
+  *written_len = sizeof(Crypt);
+  return 0;
+}

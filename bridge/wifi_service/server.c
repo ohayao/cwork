@@ -32,9 +32,18 @@
 #include <unistd.h>
 #include <string.h>
 #include <sys/signalfd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h> 
+#include <fcntl.h>
+#include <netinet/in.h>
+#include <netdb.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
 
 #include <glib.h>
 #include <dbus/dbus.h>
+
 
 #include "gdbus/gdbus.h"
 
@@ -45,6 +54,7 @@
 #include "bridge/bridge_main/log.h"
 #include "bridge/ble/ble_operation.h"
 #include "bridge/wifi_service/ad.h"
+#include "bridge/wifi_service/crypt.h"
 
 #define GATT_MGR_IFACE			"org.bluez.GattManager1"
 #define GATT_SERVICE_IFACE		"org.bluez.GattService1"
@@ -52,6 +62,9 @@
 #define GATT_DESCRIPTOR_IFACE		"org.bluez.GattDescriptor1"
 #define LE_AD_MGR_IFACE 			"org.bluez.LEAdvertisingManager1"
 #define ADPTER_IFACE					"org.bluez.Adapter1"
+
+#define SET_CRYPT_PORT 13140
+#define SET_CRYPT_IP "127.0.1.1"
 
 /* Immediate Alert Service UUID */
 // pairing service
@@ -92,12 +105,15 @@ struct descriptor {
 	int vlen;
 	const char **props;
 };
+
 static GDBusProxy *adapter_proxy;
 static GDBusProxy *ad_proxy;
 
 // 利用命名管道 传送 数据给另外的矩阵
-int wfd;
-
+int write_socket;
+Crypt *set_wifi_crypt;
+size_t set_wifi_crypt_len;
+struct sockaddr_in server_addr;
 // 状态机结构体
 // struct connection
 /*
@@ -116,10 +132,52 @@ static int parse_options(DBusMessageIter *iter, const char **device);
 static bool chr_read(struct characteristic *chr, DBusMessageIter *iter);
 static int parse_value(DBusMessageIter *iter, const uint8_t **value, int *len);
 
-
-
 // 状态机相关代码
 static FSM *fsm = NULL;
+
+int sendCrypt(int write_fd, uint8_t *data, size_t data_len)
+{
+	if (write_fd < 0 || !data || data_len == 0) return 1;
+
+	serverLog(LL_NOTICE, "-------------------- sendCrypt data:");
+	for (int i = 0; i < data_len; ++i)
+	{
+		printf(" %x", data[i]);
+	}
+	printf("\n");
+	if (write(write_fd, data, data_len) < 0)
+	{
+		serverLog(LL_ERROR, "sendCrypt write error");
+		return 1;
+	}
+	return 0;
+}
+
+// 
+void createSocket()
+{
+	serverLog(LL_NOTICE, "createSocket ");
+	struct hostent *host;
+	host =gethostbyname(SET_CRYPT_IP);
+	if (!host)
+	{
+		serverLog(LL_ERROR, "createSocket gethostbyname err");
+		return;
+	}
+
+	write_socket = socket(AF_INET,SOCK_STREAM,0);
+	if (write_socket == -1)
+	{
+		serverLog(LL_ERROR, "createSocket socket err");
+		return;
+	}
+	
+	server_addr.sin_family=AF_INET;
+	server_addr.sin_port=htons(SET_CRYPT_PORT);
+	server_addr.sin_addr=*((struct in_addr *)host->h_addr_list[0]);
+
+	
+}
 
 // 总体和 pairing_fsm.c 的一致
 // 还没写, 根据现在的不同, 等待改写
@@ -333,7 +391,72 @@ int handleWriteCommit(void *arg)
 int handlePairingComplete(void *arg)
 {	
 	serverLog(LL_NOTICE, " handlePairingComplete");
-	
+	set_wifi_crypt = NULL;
+	set_wifi_crypt_len = 0;
+	if (makeCrypt(&set_wifi_crypt, &set_wifi_crypt_len))
+	{
+		serverLog(LL_ERROR, " makeCrypt err");
+		return 1;
+	}
+	size_t data_len = 1024;
+	uint8_t data[data_len];
+	memset(data, 0, data_len);
+	size_t written_data_len = 0;
+
+	if (encodeCrypt(set_wifi_crypt, data, data_len, &written_data_len))
+	{
+		serverLog(LL_NOTICE, "encodeCrypt error");
+		return 1;
+	}
+	serverLog(LL_NOTICE, "encodeCrypt data len %d", written_data_len);
+
+	if(connect(write_socket, (struct sockaddr *)&server_addr,sizeof(server_addr)) < 0)
+	{
+		serverLog(LL_ERROR, "handlePairingComplete connect err");
+		return 1;
+	}
+	serverLog(LL_NOTICE, "connect success");
+
+	if (sendCrypt(write_socket, data, written_data_len))
+	{
+		serverLog(LL_ERROR, "sendCrypt err");
+		return 1;
+	}
+	serverLog(LL_NOTICE, "sendCrypt success");
+	close(write_socket);
+
+
+	serverLog(LL_NOTICE, "Crypt Client nonce");
+	if (set_wifi_crypt->has_client_nonce)
+	{
+		serverLog(LL_NOTICE, "Crypt Client nonce 2");
+		for (int i = 0; i < set_wifi_crypt->client_nonce_len; ++i)
+		{
+			printf(" %x", set_wifi_crypt->client_nonce[i]);
+		}
+		printf("\n");
+	}
+
+	serverLog(LL_NOTICE, "Crypt Server nonce");
+	if (set_wifi_crypt->has_server_nonce)
+	{
+		for (int i = 0; i < set_wifi_crypt->server_nonce_len; ++i)
+		{
+			printf(" %x", set_wifi_crypt->server_nonce[i]);
+		}
+		printf("\n");
+	}
+
+	serverLog(LL_NOTICE, "Crypt admin key");
+	if (set_wifi_crypt->has_server_pairing_admin_key)
+	{
+		for (int i = 0; i < set_wifi_crypt->server_pairing_admin_key_len; ++i)
+		{
+			printf(" %x", set_wifi_crypt->server_pairing_admin_key[i]);
+		}
+		printf("\n");
+	}
+
 	return 0;
 }
 
@@ -1616,6 +1739,8 @@ int main(int argc, char *argv[])
 {
 	GDBusClient *client;
 	guint signal;
+
+	createSocket();
 
 	signal = setup_signalfd();
 	if (signal == 0)

@@ -8,6 +8,8 @@
 #include "bridge/lock/messages/PairingStep3.h"
 #include "bridge/lock/messages/PairingStep4.h"
 #include "bridge/lock/messages/PairingCommit.h"
+#include "bridge/wifi_service/crypt.h"
+
 
 #define IG_KEY_EXCHANGE_PUBLIC_LENGTH 64
 #define IG_KEY_EXCHANGE_PRIVATE_LENGTH 32
@@ -95,6 +97,7 @@ typedef struct IgPairingResult {
 	uint8_t *dst;	// do not free
 } IgPairingResult;
 
+int makeCrypt(Crypt **p_reval, size_t *written_len);
 int getRecvData(RecvData **p_recv_data);
 int freeRecvData(RecvData **p_recv_data);
 int initRecvData(RecvData *recv_data);

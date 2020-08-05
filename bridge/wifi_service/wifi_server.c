@@ -32,6 +32,13 @@
 #include <unistd.h>
 #include <string.h>
 #include <sys/signalfd.h>
+#include <netdb.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
+#include <sys/types.h>
+#include <fcntl.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 
 #include <glib.h>
 #include <dbus/dbus.h>
@@ -52,6 +59,9 @@
 #define GATT_DESCRIPTOR_IFACE		"org.bluez.GattDescriptor1"
 #define LE_AD_MGR_IFACE 			"org.bluez.LEAdvertisingManager1"
 #define ADPTER_IFACE					"org.bluez.Adapter1"
+
+#define SET_CRYPT_PORT 13140
+#define SET_CRYPT_IP "127.0.1.1"
 
 /* Immediate Alert Service UUID */
 // wifi request service
@@ -95,8 +105,16 @@ struct descriptor {
 static GDBusProxy *adapter_proxy;
 static GDBusProxy *ad_proxy;
 
-// 
-int rfd;
+int read_socket;
+pthread_mutex_t crypt_mutex = PTHREAD_MUTEX_INITIALIZER;
+Crypt *set_wifi_crypt;
+size_t set_wifi_crypt_len;
+struct sockaddr_in server_addr;
+pthread_t server_tid;
+#define MAX_CLIENT 5 //连接队列中的个数
+#define BUF_SIZE   1024
+int fd[MAX_CLIENT];
+int conn_amount; //当前的连接数
 
 // 状态机结构体
 // struct connection
@@ -118,6 +136,209 @@ static int parse_value(DBusMessageIter *iter, const uint8_t **value, int *len);
 
 // 状态机相关代码
 static FSM *fsm = NULL;
+
+void *serverThread(void *arg)
+{
+	serverLog(LL_NOTICE, "serverThread start");
+	// pthread_detach(pthread_self());
+	set_wifi_crypt = (Crypt *)malloc(sizeof(Crypt));
+	int yes = 1;
+	struct sockaddr_in server_addr;
+	struct sockaddr_in client_addr;
+	char buf[BUF_SIZE];
+	int nbytes;
+	int fdmax;
+	fd_set read_fds;
+	int newfd;
+	int addrlen;
+	struct timeval tv;
+	int ret;
+
+	read_socket = socket(AF_INET,SOCK_STREAM,0);
+	if (-1 == read_socket)
+	{
+		serverLog(LL_ERROR, "createServer socket");
+		pthread_exit(NULL);
+	}
+	serverLog(LL_NOTICE, "socket success");
+
+	/*"address already in use" error message */
+	if(setsockopt(read_socket, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1)
+	{
+		perror("Server-setsockopt() error lol!");
+		pthread_exit(NULL);
+	}
+
+	serverLog(LL_NOTICE, "setsockopt() success\n");
+
+	server_addr.sin_family=AF_INET;
+	server_addr.sin_port=htons(SET_CRYPT_PORT);
+	(server_addr.sin_addr).s_addr=htonl(INADDR_ANY);
+
+	if(-1==bind(read_socket,(struct sockaddr *)&server_addr,sizeof(server_addr)))  //套接字与端口绑定
+	{
+		serverLog(LL_ERROR, "bind errer");
+		pthread_exit(NULL);
+	}
+	serverLog(LL_NOTICE, "bind success");
+
+	if(-1==listen(read_socket, MAX_CLIENT)) //5是最大连接数，指服务器最多连接5个用户
+	{
+		serverLog(LL_ERROR, "listen");
+		pthread_exit(NULL);
+	}
+	serverLog(LL_NOTICE, "listen() success\n");
+
+	fdmax = read_socket; /* so far, it's this one*/
+	conn_amount = 0;
+
+	for(;;)
+	{
+		FD_ZERO(&read_fds); //清除描述符集
+		FD_SET(read_socket, &read_fds); //把sock_fd加入描述符集
+		tv.tv_sec = 30;
+		tv.tv_usec =0;
+		for (int i=0;i<MAX_CLIENT;i++) 
+    {
+      if(fd[i]!=0)
+      {
+        FD_SET(fd[i], &read_fds);
+      }
+    }
+		ret = select(fdmax+1, &read_fds, NULL, NULL, &tv);
+		if( ret == -1)
+		{
+			serverLog(LL_ERROR, "Server-select() error");
+			pthread_exit(NULL);
+		}
+		else if (ret == 0)
+		{
+			serverLog(LL_ERROR, "timeout error");
+			continue;
+		}
+
+		serverLog(LL_NOTICE, "select() success\n");
+		/*run through the existing connections looking for data to be read*/
+		serverLog(LL_NOTICE, "start to check new connection\n");
+		if (FD_ISSET(read_socket, &read_fds))
+		{
+			newfd = accept(read_socket, (struct sockaddr *)&client_addr, &addrlen);
+			if (newfd <= 0)
+			{
+				serverLog(LL_ERROR,"accept error");
+				continue;
+			}
+			if (conn_amount < MAX_CLIENT)
+			{
+				for (int i = 0; i < MAX_CLIENT; ++i)
+				{
+					if (fd[i] == 0)
+					{
+						fd[i] = newfd;
+						break;
+					}
+				}
+				++conn_amount;
+				serverLog(LL_NOTICE, "new connection client[%d]%s:%d", conn_amount,inet_ntoa(client_addr.sin_addr),ntohs(client_addr.sin_port));
+				if (newfd > fdmax)
+				{
+					fdmax = newfd;
+				}
+			}
+			else
+			{
+				serverLog(LL_ERROR, "max connections arrive ,exit");
+				close(newfd);
+				continue;
+			}
+			// show client
+			for (int i = 0; i < MAX_CLIENT; ++i)
+			{
+				serverLog(LL_NOTICE, "[%d]: %d ",i,fd[i]);
+			}
+		}
+
+		serverLog(LL_NOTICE, "start to check connect data");
+		for(int i = 0; i < conn_amount; i++)
+		{
+			if (FD_ISSET(fd[i], &read_fds))
+			{
+				ret = recv(fd[i], buf, sizeof(buf),0);
+				if (ret <= 0)
+				{
+					serverLog(LL_NOTICE, "client[%d] close\n",i);
+					close(fd[i]);
+					FD_CLR(fd[i], &read_fds);
+					fd[i]=0;
+					conn_amount--;
+				}
+				else
+				{
+					if(ret < BUF_SIZE)
+					{
+						serverLog(LL_NOTICE, "received data:");
+						for (int i = 0; i < ret; ++i)
+						{
+							printf(" %x", buf[i]);
+						}
+						printf("\n");
+						
+						serverLog(LL_NOTICE, "get client[%d] data", i);
+						if (decodeCrypt(buf, ret, set_wifi_crypt, 0))
+						{
+							serverLog(LL_ERROR, "decodeCrypt error");
+							continue;
+						}
+						serverLog(LL_NOTICE, "decodeCrypt success");
+
+						serverLog(LL_NOTICE, "Crypt Client nonce");
+						if (set_wifi_crypt->has_client_nonce)
+						{
+							for (int i = 0; i < set_wifi_crypt->client_nonce_len; ++i)
+							{
+								printf("%2x", set_wifi_crypt->client_nonce[i]);
+							}
+							printf("\n");
+						}
+
+						serverLog(LL_NOTICE, "Crypt Server nonce");
+						if (set_wifi_crypt->has_server_nonce)
+						{
+							for (int i = 0; i < set_wifi_crypt->server_nonce_len; ++i)
+							{
+								printf("%2x", set_wifi_crypt->server_nonce[i]);
+							}
+							printf("\n");
+						}
+
+						serverLog(LL_NOTICE, "Crypt admin key");
+						if (set_wifi_crypt->has_server_pairing_admin_key)
+						{
+							for (int i = 0; i < set_wifi_crypt->server_pairing_admin_key_len; ++i)
+							{
+								printf("%2x", set_wifi_crypt->server_pairing_admin_key[i]);
+							}
+							printf("\n");
+						}
+					}
+					
+				}
+			}
+			
+		}
+	}
+	exit(0);
+}
+
+void createServerThread()
+{
+	if ( pthread_create(&server_tid,NULL,serverThread,NULL) == -1){
+
+		serverLog(LL_ERROR, "pthread_create err");
+		return;
+	}
+	serverLog(LL_NOTICE, "createServerThread success");
+}
 
 // 对 完成 pairing 后, set wifi request 的处理
 int handleSetWifiRequest(void *arg)
@@ -1241,7 +1462,7 @@ int main(int argc, char *argv[])
 
 	g_dbus_client_set_proxy_handlers(client, proxy_added_cb, NULL, NULL,
 									NULL);
-	
+	createServerThread();
 	g_main_loop_run(main_loop);
 
 	g_dbus_client_unref(client);
