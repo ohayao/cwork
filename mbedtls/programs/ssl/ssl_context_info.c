@@ -381,7 +381,8 @@ size_t read_next_b64_code( uint8_t **b64, size_t *max_len )
     char pad = 0;
     char c = 0;
 
-    while( EOF != c )
+//while( EOF != c )
+    while(1)
     {
         char c_valid = 0;
 
