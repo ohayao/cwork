@@ -692,12 +692,6 @@ int Init(void* tn) {
 		return -3;
 	}
 
-/*
-    ret = download_ca();
-    if(ret) {
-        serverLog(LL_ERROR, "download_ca err[%d]", ret);
-    }
-*/
 	memset(TOPIC_PUB, 0, sizeof(TOPIC_PUB));
 	memset(TOPIC_SUB, 0, sizeof(TOPIC_SUB));
 	snprintf(TOPIC_PUB, sizeof(TOPIC_PUB), "%s%s", PUB_TOPIC_PREFIX, g_sysif.mac);
@@ -711,6 +705,14 @@ int Init(void* tn) {
         //benny, if connection fail, set the light : can not connect wifi
     } while(0 != ret);
     serverLog(LL_NOTICE, "init Wifi connection success");
+
+/*
+	// jason download ca
+    ret = download_ca();
+    if(ret) {
+        serverLog(LL_ERROR, "download_ca err[%d]", ret);
+    }
+*/
 
 	do {
 		ret = Init_MQTT(&g_sysif.mqtt_c);
@@ -737,6 +739,7 @@ int Init(void* tn) {
 	//
     GetUserInfo();
 
+	printf("Init Finish!\n");
     return 0;
 }
 

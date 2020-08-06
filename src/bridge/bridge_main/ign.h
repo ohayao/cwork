@@ -87,8 +87,7 @@ int hexStrToByte(const char* source, uint8_t* dest, int sourceLen) {
     short i;
     unsigned char highByte, lowByte;
     
-    for (i = 0; i < sourceLen; i += 2)
-    {
+    for (i = 0; i < sourceLen; i += 2) {
         highByte = toupper(source[i]);
         lowByte  = toupper(source[i + 1]);
         if (highByte > 0x39)
@@ -100,10 +99,34 @@ int hexStrToByte(const char* source, uint8_t* dest, int sourceLen) {
             lowByte -= 0x37;
         else
             lowByte -= 0x30;
- 
-        dest[i / 2] = (highByte << 4) | lowByte;
-    }
-    return sourceLen /2 ;
+
+		dest[i / 2] = (highByte << 4) | lowByte;
+	}
+	return sourceLen /2 ;
+}
+
+void ByteToHexStr(const unsigned char* source, char* dest, int sourceLen) {
+	short i;
+	unsigned char highByte, lowByte;
+
+	for (i = 0; i < sourceLen; i++) {
+		highByte = source[i] >> 4;
+		lowByte = source[i] & 0x0f;
+
+		highByte += 0x30;
+
+		if (highByte > 0x39)
+			dest[i * 2] = highByte + 0x07;
+		else
+			dest[i * 2] = highByte;
+
+		lowByte += 0x30;
+		if (lowByte > 0x39)
+			dest[i * 2 + 1] = lowByte + 0x07;
+		else
+			dest[i * 2 + 1] = lowByte;
+	}
+	return;
 }
 /*
 int create_gatt_connection(const char* addr, gatt_connection_t** gatt_connection, void** gatt_adapter) {
