@@ -8,9 +8,11 @@
 #include <sys/time.h>
 #include <syslog.h>
 
+
 #include "util.h"
 #include "task_queue.h"
 #include "ign.h"
+#include "profile.h"
 
 #include "pb_encode.h"
 #include "pb_decode.h"
@@ -25,6 +27,9 @@
 //定义订阅和发布web端TOPIC
 #define SUB_WEBDEMO "/WEBSOCKET_DEMO_SUB"
 #define PUB_WEBDEMO "/WEBSOCKET_DEMO_PUB"
+
+#define RUN_SUCCESS 0
+#define RUN_FAIL -1
 
 LIST_HEAD(waiting_task_head);
 LIST_HEAD(doing_task_head);
@@ -52,8 +57,29 @@ void write_file_content(char *path,char *content){
     fclose(csr);
 }
 
+
 int download_ca();
 int download_ca(){
+    char localip[20],publicip[20],macaddr[18];
+    memset(localip,0,sizeof(localip));
+    memset(publicip,0,sizeof(publicip));
+    memset(macaddr,0,sizeof(macaddr));
+    Pro_GetLocalIP(localip);
+    Pro_GetPublicIP(publicip);
+    Pro_GetMacAddr(macaddr);
+    printf("LocalIP=%s;PublicIP=%s;MacAddr=%s\n",localip,publicip,macaddr);
+    
+    double cpuRate=Pro_GetCpuRate();
+    PRO_MEMORY_INFO *mem=Pro_GetMemoryInfo();
+    PRO_DISK_INFO *disk=Pro_GetDiskInfo();
+    printf("CpuRate=%.4f;MemTotal=%d,free=%d,usedRate=%.4f;DiskTotal=%d,used=%d,used=%.4f\n",
+           cpuRate,
+           mem->total,mem->free,mem->used_rate,
+           disk->total,disk->used,disk->used_rate);
+    printf("BootStartTime= %d\n",Pro_GetInitedTime());
+    PRO_WIFI_INFO *wf= Pro_GetWifiInfo();
+    printf("WIFI: ssid=%s signal=%d\n",wf->ssid,wf->signal);
+    //return 0;
     char *url;
     char data[1024], response[4096];
     int  i, ret, size;
