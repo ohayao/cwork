@@ -106,6 +106,7 @@ static GDBusProxy *adapter_proxy;
 static GDBusProxy *ad_proxy;
 
 int read_socket;
+bool seted_wifi_crypt = false;
 pthread_mutex_t crypt_mutex = PTHREAD_MUTEX_INITIALIZER;
 Crypt *set_wifi_crypt;
 size_t set_wifi_crypt_len;
@@ -137,6 +138,8 @@ void cmd_discoverable();
 static int parse_options(DBusMessageIter *iter, const char **device);
 static bool chr_read(struct characteristic *chr, DBusMessageIter *iter);
 static int parse_value(DBusMessageIter *iter, const uint8_t **value, int *len);
+void decideEvent(void *arg);
+void handleClientEvent(void *arg);
 
 // 状态机相关代码
 static FSM *fsm = NULL;
@@ -294,13 +297,14 @@ void *serverThread(void *arg)
 							continue;
 						}
 						serverLog(LL_NOTICE, "decodeCrypt success");
-
+						seted_wifi_crypt = true;
+						
 						serverLog(LL_NOTICE, "Crypt Client nonce");
 						if (set_wifi_crypt->has_client_nonce)
 						{
 							for (int i = 0; i < set_wifi_crypt->client_nonce_len; ++i)
 							{
-								printf("%2x", set_wifi_crypt->client_nonce[i]);
+								printf("%02x", set_wifi_crypt->client_nonce[i]);
 							}
 							printf("\n");
 						}
@@ -310,7 +314,7 @@ void *serverThread(void *arg)
 						{
 							for (int i = 0; i < set_wifi_crypt->server_nonce_len; ++i)
 							{
-								printf("%2x", set_wifi_crypt->server_nonce[i]);
+								printf("%02x", set_wifi_crypt->server_nonce[i]);
 							}
 							printf("\n");
 						}
@@ -320,14 +324,12 @@ void *serverThread(void *arg)
 						{
 							for (int i = 0; i < set_wifi_crypt->server_pairing_admin_key_len; ++i)
 							{
-								printf("%2x", set_wifi_crypt->server_pairing_admin_key[i]);
+								printf("%02x", set_wifi_crypt->server_pairing_admin_key[i]);
 							}
 							printf("\n");
 						}
 						_unlockCrypt();
 						// 多线程了, 还没加锁, 出错再加
-						decideEvent();
-						handleClientEvent();
 					}
 					
 				}
@@ -361,7 +363,12 @@ int handleSetWifiRequest(void *arg)
 int handlePairingCrypt(void *arg)
 {
 	serverLog(LL_NOTICE, " handlePairingCrypt");
-
+	if (!seted_wifi_crypt)
+	{
+		serverLog(LL_ERROR, "handlePairingCrypt you are not paired");
+		return 1;
+	}
+	return 0;
 }
 
 // 正确返回 response
@@ -450,7 +457,7 @@ int initWifiRequestFsm()
   }
 
 	// 把虚拟机, 弄成 PAIRING_BEGIN, 也就是空闲的意思啦
-	initFSMCurState(fsm, SET_WIFI_BEGIN);
+	initFSMCurState(fsm, SET_WIFI_NOTPAIR);
 }
 
 

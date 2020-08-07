@@ -22,9 +22,9 @@ char *SSID_PASSWD = "12345678";
 char *SSID_TOKEN = "12345678";
 bool is_registered = false;
 
-uint8_t admin_key[16];
-uint8_t client_nonce[12];
-uint8_t server_nonce[12];
+uint8_t admin_key[16+1];
+uint8_t client_nonce[12+1];
+uint8_t server_nonce[12+1];
 
 GMainLoop *loop = NULL;
 
@@ -67,14 +67,24 @@ int write_wifi_request(){
   }
   serverLog(LL_NOTICE, " encodeWifiInfoRequest success");
 
-  uint32_t encrypted_bytes_written_len = 0;
+  int encrypted_bytes_written_len = 0;
   uint8_t encrypt_bytes[encoded_write_len];
 
   encrypted_bytes_written_len = encryptData(
     encoded_request, encoded_write_len, encrypt_bytes, encoded_write_len,
     admin_key, 16, client_nonce, 12);
+  if (encrypted_bytes_written_len <= 0)
+  {
+    serverLog(LL_ERROR, "client encryptDataSize error");
+    return 1;
+  }
 
-  serverLog(LL_NOTICE, "encryptData success");
+  serverLog(LL_NOTICE, "encryptData success %lu", encrypted_bytes_written_len);
+  for (int i = 0; i < encrypted_bytes_written_len; ++i)
+  {
+    printf(" %x", encrypt_bytes[i]);
+  }
+  printf("\n");
 
   size_t payload_len = 0;
   uint8_t *payloadBytes = NULL;
@@ -197,7 +207,7 @@ int main(int argc, char *argv[])
 
   uint8_t tmp_buff[100];
   memset(tmp_buff, 0, sizeof(tmp_buff));
-  int client_nonce_len = hexStrToByte(argv[2], tmp_buff, strlen(argv[2]));
+  int client_nonce_len = hexStrToByte(argv[1], tmp_buff, strlen(argv[1]));
   memcpy(client_nonce, tmp_buff, client_nonce_len);
   serverLog(LL_NOTICE, "client_nonce: ");
   for (int i = 0; i < client_nonce_len; ++i)
@@ -208,7 +218,7 @@ int main(int argc, char *argv[])
 
 
   memset(tmp_buff, 0, sizeof(tmp_buff));
-  int server_nonce_len = hexStrToByte(argv[3], tmp_buff, strlen(argv[2]));
+  int server_nonce_len = hexStrToByte(argv[2], tmp_buff, strlen(argv[2]));
   memcpy(server_nonce, tmp_buff, server_nonce_len);
   serverLog(LL_NOTICE, "server_nonce: ");
   for (int i = 0; i < server_nonce_len; ++i)
@@ -218,7 +228,8 @@ int main(int argc, char *argv[])
   printf("\n");
 
   memset(tmp_buff, 0, sizeof(tmp_buff));
-  int admin_key_len = hexStrToByte(argv[4], tmp_buff, strlen(argv[2]));
+  int admin_key_len = hexStrToByte(argv[3], tmp_buff, strlen(argv[3]));
+  printf("%d \n", admin_key_len);
   memcpy(admin_key, tmp_buff, admin_key_len);
   serverLog(LL_NOTICE, "admin_key: ");
   for (int i = 0; i < admin_key_len; ++i)
