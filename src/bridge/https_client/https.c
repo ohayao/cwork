@@ -1261,7 +1261,7 @@ int http_read_chunked(HTTP_INFO *hi, char *response, int size)
 /*---------------------------新增---------------------------------*/
 int http_get_with_auth(HTTP_INFO *hi, char *url,char *authorization, char *response, int size)
 {
-    char        request[1024], err[100];
+    char        request[2048], err[100];
     char        host[256], port[10], dir[1024];
     int         sock_fd, https, verify;
     int         ret, opt, len;
@@ -1352,11 +1352,8 @@ int http_get_with_auth(HTTP_INFO *hi, char *url,char *authorization, char *respo
         else if(ret < 0)
         {
             https_close(hi);
-
             mbedtls_strerror(ret, err, 100);
-
             snprintf(response, 256, "socket error: %s(%d)", err, ret);
-
             return -1;
         }
         else if(ret == 0)
@@ -1401,7 +1398,7 @@ int http_get_with_auth(HTTP_INFO *hi, char *url,char *authorization, char *respo
 /*-----------------------------新增----------------------------------------*/
 int http_post_with_auth(HTTP_INFO *hi, char *url,char *authorization, char *data, char *response, int size)
 {
-    char        request[1024], err[100];
+    char        request[2048], err[100];
     char        host[256], port[10], dir[1024];
     int         sock_fd, https, verify;
     int         ret, opt, len;
