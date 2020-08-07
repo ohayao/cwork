@@ -7,6 +7,7 @@
 #include <bridge/bridge_main/mutex_helper.h>
 #include <bridge/bridge_main/task_queue.h>
 #include <bridge/bridge_main/wait_ble.h>
+#include "bridge/bridge_main/profile.h"
 #include <bridge/ble/ble_discover.h>
 #include <bridge/ble/lock.h>
 #include <bridge/bridge_main/lock_list.h>
@@ -424,33 +425,41 @@ ign_BridgeProfile Create_IgnBridgeProfile(sysinfo_t* ps){
     bp.mac_addr.size = bp.bt_id.size;
     memcpy(bp.bt_id.bytes, temp, strlen(temp));
     memcpy(bp.mac_addr.bytes, temp, strlen(temp));
+    
+    char localip[20],publicip[20],ma[20];                                                                                                                                                                                         
+    memset(localip,0,sizeof(localip));
+    memset(publicip,0,sizeof(publicip));
+    memset(ma,0,sizeof(ma));
+    Pro_GetLocalIP(localip);
+    Pro_GetPublicIP(publicip);
 
-    memset(temp, 0, sizeof(temp));
-    strcpy(temp, "local_ip");
-    bp.local_ip.size = strlen(temp);
-    memcpy(bp.local_ip.bytes, temp, strlen(temp));
+    bp.local_ip.size = strlen(localip);
+    memcpy(bp.local_ip.bytes, localip, strlen(localip));
 
-    memset(temp,0,sizeof(temp));
-    strcpy(temp,"public_ip");
-    bp.public_ip.size=strlen(temp);
-    memcpy(bp.public_ip.bytes,temp,strlen(temp));
-
-    memset(temp,0,sizeof(temp));
-    strcpy(temp,"sys_statics");
-    bp.sys_statics.size=strlen(temp);
-    memcpy(bp.sys_statics.bytes,temp,strlen(temp));
-
-    memset(temp,0,sizeof(temp));
-    strcpy(temp,"wifi_ssid");
-    bp.wifi_ssid.size = strlen(temp);
-    memcpy(bp.wifi_ssid.bytes,temp,strlen(temp));
-    bp.wifi_signal = 2;
-    bp.inited_time = get_ustime();
-
-    memset(temp,0,sizeof(temp));
-    strcpy(temp,"bridge_name");
+    bp.public_ip.size=strlen(publicip);
+    memcpy(bp.public_ip.bytes,publicip,strlen(publicip));
+                                                 
+    PRO_DISK_INFO *di=Pro_GetDiskInfo();
+    PRO_MEMORY_INFO *mi=Pro_GetMemoryInfo();
+    char cpu[200];
+    memset(cpu,0,sizeof(cpu));
+    sprintf(cpu,"CR:%.4f;MT:%d,MF:%d,MUR:%.4f;DT:%d,DU:%d,DUR:%.4f",
+            Pro_GetCpuRate(),
+            mi->total,mi->free,mi->used_rate,
+            di->total,di->used,di->used_rate);
+    bp.sys_statics.size=strlen(cpu);
+    memcpy(bp.sys_statics.bytes,cpu,strlen(cpu));
+    
+    PRO_WIFI_INFO *wf=Pro_GetWifiInfo();
+    bp.wifi_ssid.size = strlen(wf->ssid);
+    memcpy(bp.wifi_ssid.bytes,wf->ssid,strlen(wf->ssid));
+    bp.wifi_signal = wf->signal;
+    bp.inited_time = Pro_GetInitedTime();
+    Pro_GetMacAddrs(ma);
     bp.name.size = strlen(temp);
-    memcpy(bp.name.bytes, temp, strlen(temp));
+    memcpy(bp.name.bytes, ma, strlen(ma));
+    printf("[DEVICEINFO]LocalIP=%s PublicIP=%s Name=%s Sys_statics=%s Wifi_ssid=%s Wifi_signal=%d inited_time=%d\n",
+            bp.local_ip.bytes,bp.public_ip.bytes,bp.name.bytes,bp.sys_statics.bytes,bp.wifi_ssid.bytes,bp.wifi_signal,bp.inited_time);
     return bp;
 }
 

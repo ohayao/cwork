@@ -2,11 +2,17 @@
 pkg_search_module(GLIB REQUIRED glib-2.0)
 include_directories(${GLIB_INCLUDE_DIRS})
 
+include_directories(../../../mbedtls)
+
 set(IGN_DEPENDENCIES
+  mbedtls
+  mbedcrypto
+  mbedx509
   pthread
   ble
   mqtt
   ign_proto
+  https_client
 )
 
 set(IGN_LIB_SRCS
