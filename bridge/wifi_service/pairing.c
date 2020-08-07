@@ -814,3 +814,4 @@ int makeCrypt(Crypt **p_reval, size_t *written_len)
   *written_len = sizeof(Crypt);
   return 0;
 }
+

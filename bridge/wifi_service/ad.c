@@ -359,22 +359,94 @@ void ad_register(DBusConnection *conn, GDBusProxy *manager, const char *type)
 	}
 }
 
-void ad_advertise_uuids(DBusConnection *conn, int argc, char *argv[])
+void ad_advertise_uuids(DBusConnection *conn, char *argv[])
 {
 	g_strfreev(ad.uuids);
 	ad.uuids = NULL;
 	ad.uuids_len = 0;
-
-	if (argc < 2 || !strlen(argv[1]))
-		return;
-
-	ad.uuids = g_strdupv(&argv[1]);
+	printf("ad_advertise_uuids: %s\n", argv[0]);
+	ad.uuids = g_strdupv(&argv[0]);
 	if (!ad.uuids) {
 		serverLog(LL_ERROR, "Failed to parse input\n");
 		return;
 	}
-
 	ad.uuids_len = g_strv_length(ad.uuids);
 
 	g_dbus_emit_property_changed(conn, AD_PATH, AD_IFACE, "ServiceUUIDs");
+}
+
+static void ad_clear_service(void)
+{
+	g_free(ad.service.uuid);
+	memset(&ad.service, 0, sizeof(ad.service));
+}
+
+void ad_advertise_tx_power(DBusConnection *conn, bool value)
+{
+	if (ad.tx_power == value)
+		return;
+
+	ad.tx_power = value;
+
+	g_dbus_emit_property_changed(conn, AD_PATH, AD_IFACE, "Includes");
+}
+
+
+void ad_advertise_name(DBusConnection *conn, bool value)
+{
+	if (ad.name == value)
+		return;
+
+	ad.name = value;
+
+	if (!value) {
+		g_free(ad.local_name);
+		ad.local_name = NULL;
+	}
+
+	g_dbus_emit_property_changed(conn, AD_PATH, AD_IFACE, "Includes");
+}
+
+void ad_advertise_appearance(DBusConnection *conn, bool value)
+{
+	if (ad.appearance == value)
+		return;
+
+	ad.appearance = value;
+
+	if (!value)
+		ad.local_appearance = UINT16_MAX;
+
+	g_dbus_emit_property_changed(conn, AD_PATH, AD_IFACE, "Includes");
+}
+
+void ad_advertise_local_appearance(DBusConnection *conn, uint16_t value)
+{
+	if (ad.local_appearance == value)
+		return;
+
+	ad.local_appearance = value;
+
+	g_dbus_emit_property_changed(conn, AD_PATH, AD_IFACE, "Appearance");
+}
+
+
+void ad_advertise_duration(DBusConnection *conn, uint16_t value)
+{
+	if (ad.duration == value)
+		return;
+
+	ad.duration = value;
+
+	g_dbus_emit_property_changed(conn, AD_PATH, AD_IFACE, "Duration");
+}
+
+void ad_advertise_timeout(DBusConnection *conn, uint16_t value)
+{
+	if (ad.timeout == value)
+		return;
+
+	ad.timeout = value;
+
+	g_dbus_emit_property_changed(conn, AD_PATH, AD_IFACE, "Timeout");
 }

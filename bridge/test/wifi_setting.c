@@ -4,6 +4,11 @@
 #include "bridge/gattlib/gattlib.h"
 #include "bridge/ble/ble_operation.h"
 #include "bridge/wifi_service/pairing.h"
+#include "bridge/lock/cifra/drbg.h"
+#include "bridge/lock/cifra/sha1.h"
+#include "bridge/lock/micro-ecc/uECC.h"
+#include "bridge/wifi_service/crypt.h"
+#include "bridge/lock/connection/encryption.h"
 
 #include <glib.h>
 #include <ctype.h>
@@ -54,18 +59,27 @@ int write_wifi_request(){
   serverLog(LL_NOTICE, " setWifiInfoRequestToken success");
   size_t len = 100;
   uint8_t encoded_request[len];
-  size_t write_len = 0;
-  if (encodeWifiInfoRequest(&request, encoded_request, len, &write_len))
+  size_t encoded_write_len = 0;
+  if (encodeWifiInfoRequest(&request, encoded_request, len, &encoded_write_len))
   {
     serverLog(LL_ERROR, "encodeWifiInfoRequest error");
     return 1;
   }
   serverLog(LL_NOTICE, " encodeWifiInfoRequest success");
 
+  uint32_t encrypted_bytes_written_len = 0;
+  uint8_t encrypt_bytes[encoded_write_len];
+
+  encrypted_bytes_written_len = encryptData(
+    encoded_request, encoded_write_len, encrypt_bytes, encoded_write_len,
+    admin_key, 16, client_nonce, 12);
+
+  serverLog(LL_NOTICE, "encryptData success");
+
   size_t payload_len = 0;
   uint8_t *payloadBytes = NULL;
 
-  if (!build_msg_payload(&payloadBytes, &payload_len, encoded_request, write_len))
+  if (!build_msg_payload(&payloadBytes, &payload_len, encrypt_bytes, encrypted_bytes_written_len))
 	{
     serverLog(LL_ERROR, "failed in build_msg_payload");
 		return 1;

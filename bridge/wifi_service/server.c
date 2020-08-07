@@ -40,6 +40,9 @@
 #include <netdb.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
+#include <bluetooth/bluetooth.h>
+#include <bluetooth/hci.h>
+#include <sys/ioctl.h>
 
 #include <glib.h>
 #include <dbus/dbus.h>
@@ -126,8 +129,9 @@ static const char *pairing_desc_props[] = { "read", "write", NULL };
 
 // functions
 static void chr_write(struct characteristic *chr, const uint8_t *value, int len);
-void cmd_advertise();
+void advertise();
 void cmd_discoverable();
+void initAdvertiseSetting();
 static int parse_options(DBusMessageIter *iter, const char **device);
 static bool chr_read(struct characteristic *chr, DBusMessageIter *iter);
 static int parse_value(DBusMessageIter *iter, const uint8_t **value, int *len);
@@ -1577,13 +1581,14 @@ static void proxy_added_cb(GDBusProxy *proxy, void *user_data)
 	if (!g_strcmp0(iface, LE_AD_MGR_IFACE))
 	{
 		ad_proxy = proxy;
-		cmd_advertise();
+		advertise();
+		initAdvertiseSetting();
 	}
 	else if (!g_strcmp0(iface, ADPTER_IFACE))
 	{
 		adapter_proxy = proxy;
 		// 仅仅是开启几秒
-		cmd_discoverable();
+		// cmd_discoverable();
 	}	
 
 	if (g_strcmp0(iface, GATT_MGR_IFACE))
@@ -1686,14 +1691,28 @@ static gboolean parse_argument(char *argv[], const char **arg_table, dbus_bool_t
 	return FALSE;
 }
 
+void initAdvertiseSetting()
+{
+	char *uuids[] = {
+		"12345678-0000-1000-8000-00805f9b34fb",
+		NULL //别删,会错, ok?
+	};
+	ad_advertise_uuids(connection, uuids);
+	ad_advertise_tx_power(connection, true);
+	ad_advertise_name(connection, true);
+	// ad_advertise_appearance(connection, true);
+	ad_advertise_duration(connection, 1);
+}
 
-void cmd_advertise()
+void advertise()
 {
 	serverLog(LL_NOTICE, "--------------- cmd_advertise()");
 	dbus_bool_t enable;
 	const char *type;
-	char *argv[1];
+	char *argv[2];
+	// on off broadcast peripheral
 	argv[0] = "broadcast";
+	argv[1] = NULL;
 
 	if (!parse_argument(argv, ad_arguments, &enable, &type))
 		return;
@@ -1718,28 +1737,46 @@ static void generic_callback(const DBusError *error, void *user_data)
 }
 
 // discoverble
+// 直接用hci 试试
 void cmd_discoverable()
 {
-	dbus_bool_t discoverable = true;
-	char *str = NULL;
+	// dbus_bool_t discoverable = true;
+	// char *str = NULL;
 
-	// 很有可能内存泄漏
-	str = g_strdup_printf("discoverable %s",
-				discoverable == TRUE ? "on" : "off");
+	// // 很有可能内存泄漏
+	// str = g_strdup_printf("discoverable %s",
+	// 			discoverable == TRUE ? "on" : "off");
 
-	if (g_dbus_proxy_set_property_basic(adapter_proxy, "Discoverable",
-					DBUS_TYPE_BOOLEAN, &discoverable,
-					generic_callback, str, g_free) == TRUE)
-		return;
+	// if (g_dbus_proxy_set_property_basic(adapter_proxy, "Discoverable",
+	// 				DBUS_TYPE_BOOLEAN, &discoverable,
+	// 				generic_callback, str, g_free) == TRUE)
+	// 	return;
 	
-	g_free(str);
+	// g_free(str);
+	int opt, ctl, i, cmd = 0;
+	int hdev = hci_get_route(NULL);
+	
+	if ((ctl = socket(AF_BLUETOOTH, SOCK_RAW, BTPROTO_HCI)) < 0) {
+		perror("Can't open HCI socket.");
+		exit(1);
+	}
+	serverLog(LL_NOTICE, "---------------------- get BLUETOOTHCTL socket success");
+	
+	struct hci_dev_req dr;
+	dr.dev_id  = hdev;
+	dr.dev_opt = SCAN_PAGE | SCAN_INQUIRY;
+	if (ioctl(ctl, HCISETSCAN, (unsigned long) &dr) < 0) {
+		serverLog(LL_ERROR, "ioctl error");
+		exit(1);
+	}
+	serverLog(LL_NOTICE, "---------------------- get ioctl socket success");
 }
 
 int main(int argc, char *argv[])
 {
 	GDBusClient *client;
 	guint signal;
-
+	cmd_discoverable();
 	createSocket();
 
 	signal = setup_signalfd();
@@ -1749,7 +1786,6 @@ int main(int argc, char *argv[])
 	// // 其实只是对 dbus 消息的设置
 	// // 还每有看到对 dbus 的订阅
 	connection = g_dbus_setup_bus(DBUS_BUS_SYSTEM, NULL, NULL);
-
 
 	main_loop = g_main_loop_new(NULL, FALSE);
 

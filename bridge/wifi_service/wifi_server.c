@@ -116,6 +116,10 @@ pthread_t server_tid;
 int fd[MAX_CLIENT];
 int conn_amount; //当前的连接数
 
+#define _lockCrypt() pthread_mutex_lock(&crypt_mutex)
+
+#define _unlockCrypt() pthread_mutex_unlock(&crypt_mutex)
+
 // 状态机结构体
 // struct connection
 /*
@@ -277,12 +281,12 @@ void *serverThread(void *arg)
 					if(ret < BUF_SIZE)
 					{
 						serverLog(LL_NOTICE, "received data:");
-						for (int i = 0; i < ret; ++i)
-						{
-							printf(" %x", buf[i]);
-						}
-						printf("\n");
-						
+						// for (int i = 0; i < ret; ++i)
+						// {
+						// 	printf(" %x", buf[i]);
+						// }
+						// printf("\n");
+						_lockCrypt();
 						serverLog(LL_NOTICE, "get client[%d] data", i);
 						if (decodeCrypt(buf, ret, set_wifi_crypt, 0))
 						{
@@ -320,6 +324,10 @@ void *serverThread(void *arg)
 							}
 							printf("\n");
 						}
+						_unlockCrypt();
+						// 多线程了, 还没加锁, 出错再加
+						decideEvent();
+						handleClientEvent();
 					}
 					
 				}
@@ -344,8 +352,16 @@ void createServerThread()
 int handleSetWifiRequest(void *arg)
 {	
 	serverLog(LL_NOTICE, " handleSetWifiRequest");
+
 	
 	return 0;
+}
+
+// 记录相关Crypt信息
+int handlePairingCrypt(void *arg)
+{
+	serverLog(LL_NOTICE, " handlePairingCrypt");
+
 }
 
 // 正确返回 response
@@ -377,13 +393,31 @@ int initWifiRequestFsm()
 	uint8_t max_trans_num;
 	FSMTransform trans_item;
 	max_trans_num = 10;
-  
+
   if (getFSMTransTable(fsm, max_trans_num))
   {
     serverLog(LL_ERROR, "getFSMTransTable err");
     return 1;
   }
   serverLog(LL_NOTICE, "getFSMTransTable success");
+
+	// 
+	// 1 SET_WIFI_REQUEST to SET_WIFI_COMPLETE
+	if (fillTransItem(&trans_item, 
+    S_RECV_PAIRING_CRYPT, SET_WIFI_NOTPAIR, handlePairingCrypt, SET_WIFI_BEGIN))
+  {
+    serverLog(LL_ERROR, "fillTransItem err");
+    return 1;
+  }
+  // serverLog(LL_NOTICE, "fillTransItem event C_WRITE_COMMIT");
+
+  if (fillFSMTransItem(fsm, &trans_item))
+  {
+    serverLog(LL_ERROR, "fillFSMTransItem err");
+    return 1;
+  }
+  
+	
 
 	// 2 PAIRING_BEGIN to SET_WIFI_REQUEST
 	if (fillTransItem(&trans_item, 
@@ -838,6 +872,12 @@ void decideEvent(void *arg)
 	struct characteristic *chr = (struct characteristic *)arg;
 	switch(fsm->cur_state)
 	{
+		case SET_WIFI_NOTPAIR:
+		{
+			serverLog(LL_NOTICE, "decideEvent SET_WIFI_NOTPAIR");
+			chr->event = S_RECV_PAIRING_CRYPT;
+			break;
+		}
 		case SET_WIFI_BEGIN:
 		{
 			serverLog(LL_NOTICE, "decideEvent PAIRING_BEGIN");
@@ -858,6 +898,17 @@ void handleClientEvent(void *arg)
 	int handle_res = 0;
 	switch (chr->event)
 	{
+	case S_RECV_PAIRING_CRYPT:
+	{
+		serverLog(LL_NOTICE, "handleClientEvent S_RECV_PAIRING_CRYPT cur_state %d", fsm->cur_state);
+		handle_res = handleEvent(fsm, chr->event, NULL);
+		if (handle_res)
+		{
+			serverLog(LL_ERROR, "handle event C_WRITE_STEP1 error");
+		}
+		serverLog(LL_NOTICE, "handleClientEvent S_RECV_PAIRING_CRYPT cur_state %d", fsm->cur_state);
+		break;
+	}
 	case C_WRITE_WIFI_REQUEST:
 		// 首先转换状态, 到 step1
 		serverLog(LL_NOTICE, "handleClientEvent C_WRITE_WIFI_REQUEST cur_state %d", fsm->cur_state);
