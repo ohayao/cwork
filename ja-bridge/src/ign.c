@@ -174,6 +174,41 @@ ign_BridgeProfile Create_IgnBridgeProfile(char *bridgeID);
     bp.bt_id.size=strlen(temp);
     memcpy(bp.bt_id.bytes,temp,strlen(temp));
 
+    char localip[20],publicip[20],ma[20];                                                                                                                                                                                         
+    memset(localip,0,sizeof(localip));
+    memset(publicip,0,sizeof(publicip));
+    memset(ma,0,sizeof(ma));
+    Pro_GetLocalIP(localip);
+    Pro_GetPublicIP(publicip);
+
+    bp.local_ip.size = strlen(localip);
+    memcpy(bp.local_ip.bytes, localip, strlen(localip));
+
+    bp.public_ip.size=strlen(publicip);
+    memcpy(bp.public_ip.bytes,publicip,strlen(publicip));
+        
+    PRO_DISK_INFO *di=Pro_GetDiskInfo();
+    PRO_MEMORY_INFO *mi=Pro_GetMemoryInfo();
+    char cpu[200];
+    memset(cpu,0,sizeof(cpu));
+    sprintf(cpu,"CR:%.4f;MT:%d,MF:%d,MUR:%.4f;DT:%d,DU:%d,DUR:%.4f",
+            Pro_GetCpuRate(),
+            mi->total,mi->free,mi->used_rate,
+            di->total,di->used,di->used_rate);
+    bp.sys_statics.size=strlen(cpu);
+    memcpy(bp.sys_statics.bytes,cpu,strlen(cpu));
+
+    PRO_WIFI_INFO *wf=Pro_GetWifiInfo();
+    bp.wifi_ssid.size = strlen(wf->ssid);
+    memcpy(bp.wifi_ssid.bytes,wf->ssid,strlen(wf->ssid));
+    bp.wifi_signal = wf->signal;
+    bp.inited_time = Pro_GetInitedTime();
+    Pro_GetMacAddrs(ma);
+    bp.name.size = strlen(temp);
+    memcpy(bp.name.bytes, ma, strlen(ma));
+    printf("==>>>>> LIP=%s PIP=%s NM=%s \nSYS=%s\n WIFI=%s SIGNAL=%d INITEDTIME=%d \n",
+           bp.local_ip.bytes,bp.public_ip.bytes,bp.name.bytes,bp.sys_statics.bytes,bp.wifi_ssid.bytes,bp.wifi_signal,bp.inited_time);
+    return bp;
     memset(temp,0,sizeof(temp));
     strcpy(temp,"DCA63210C7DA");
     bp.mac_addr.size=strlen(temp);
@@ -710,8 +745,8 @@ int WaitBtn(sysinfo_t *si){
 }
 
 int main() {
-    int res=download_ca();
-    printf("download_ca res=%d\n",res);
+//    int res=download_ca();
+  //  printf("download_ca res=%d\n",res);
     serverLog(LL_NOTICE,"Ready to start.");
     //daemon(1, 0);
     //sysinfo_t *si = malloc(sizeof(sysinfo_t));
