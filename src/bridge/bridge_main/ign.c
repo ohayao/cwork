@@ -38,6 +38,105 @@ void addDiscoverTask(int msg_id);
 void addAdminDoLockTask(igm_lock_t *lock);
 int Init_MQTT(MQTTClient* p_mqtt);
 
+
+int h_GetUserToken(char *userToken);
+int h_GetUserToken(char *userToken){
+    char data[1024],res[4096];
+    memset(data,0,sizeof(data));
+    memset(res,0,sizeof(res));
+    HTTP_INFO hi;
+    http_init(&hi, TRUE);
+    char *url = "https://tkm70zar9f.execute-api.ap-southeast-1.amazonaws.com/development/login";
+    sprintf(data,"{\"email\":\"cs.lim+bridge@igloohome.co\",\"password\":\"igloohome\"}");
+    int ret = http_post(&hi, url, data, res, sizeof(res));
+    http_close(&hi);
+    if(ret!=200){ 
+        printf("h_GetUserToken error [%d:%s]\n",ret,res);
+        return -1;                                                            
+    }
+    strncpy(userToken,res+16,strlen(res)-18);
+    return 0;                                            
+}
+
+int h_GetBridgeToken(char *userToken,char *bridgeToken);
+int h_GetBridgeToken(char *userToken,char *bridgeToken){
+    char res[4096];
+    memset(res,0,sizeof(res));
+    HTTP_INFO hi;
+    http_init(&hi,TRUE);
+    char *url="https://tkm70zar9f.execute-api.ap-southeast-1.amazonaws.com/development/token";
+    int ret=http_get_with_auth(&hi,url,userToken,res,4096);
+    //printf("----->> res=%s\n",res);
+    if(ret!=200) {
+        printf("h_GetBridgeToken error [%d:%s]\n",ret,res);
+        return -1;
+    }
+    strncpy(bridgeToken,res+18,strlen(res)-20);
+    return 0;
+}
+
+int h_downloadcsr(char *bridgeToken);
+int h_downloadcsr(char *bridgeToken){
+    char res[4096],url[200],bridgeID[20];
+    char *localCSR=get_file_content("../../../igkey/domain.csr");
+    memset(res,0,sizeof(res));
+    memset(url,0,sizeof(url));
+    memset(bridgeID,0,sizeof(bridgeID));
+    Pro_GetMacAddrs(bridgeID);
+    HTTP_INFO hi;
+    sprintf(url,"https://tkm70zar9f.execute-api.ap-southeast-1.amazonaws.com/development/devices/bridge/%s",bridgeID);
+
+    printf("h_downloadcsr,request_url=%s\n",url);
+    cJSON *root;
+    root=cJSON_CreateObject();
+    cJSON_AddStringToObject(root,"csr",localCSR);
+    char *sdata=cJSON_PrintUnformatted(root);
+    cJSON_Delete(root);
+    printf("________________Request BridgeToken\n%s\nBody Content\n%s\n",bridgeToken,sdata);
+    int ret=http_post_with_auth(&hi,url,bridgeToken,sdata,res,sizeof(res));
+    //printf("----->downloadcsr response[%s]\n",res);
+    if(ret!=200){
+        printf("h_downloadcsr error [%d:%s]\n",ret,res);
+        return -1;
+    }
+    root=cJSON_Parse(res);
+    if(root==NULL) {
+        printf("h_downloadcsr content not json type\n");
+        cJSON_Delete(root);
+        return -1;
+    }
+    cJSON *pem=cJSON_GetObjectItem(root,"pem");
+    printf("pem=%s\n",pem->valuestring);
+    write_file_content("../../../igkey/test_test_test_test.csr",pem->valuestring);
+    cJSON_Delete(root);
+    printf("=====>>>>>DOWNLOAD-CSR Over!!!!!\n");
+    return 0;
+}
+
+int download_ca();
+int download_ca(){
+    int ret;
+    char userToken[2048],bridgeToken[2048];
+    memset(userToken,0,sizeof(userToken));
+    memset(bridgeToken,0,sizeof(bridgeToken));
+    if((ret=h_GetUserToken(userToken))!=0){
+        printf("GetUserTokenError [%d]\n",ret);
+        return -1;                                    
+    }
+    if((ret=h_GetBridgeToken(userToken,bridgeToken))!=0){
+        printf("GetBridgeTokenError [%d]\n",ret);
+        return -1;                                    
+    }
+                        
+    if((ret=h_downloadcsr(bridgeToken))!=0){
+        printf("DownloadCSR Error[%d]\n",ret);
+        return -1;                        
+    }
+    return 0;
+                        
+}
+
+
 int SendMQTTMsg(ign_MsgInfo* msg, char* topic) {
 	if (NULL == g_sysif.mqtt_c) {
 		serverLog(LL_ERROR, "mqtt is NULL, no available connection.");
@@ -722,6 +821,19 @@ int Init(void* tn) {
         serverLog(LL_ERROR, "download_ca err[%d]", ret);
     }
 */
+    //下载证书 因为超时等不稳定因素 最多尝试5次
+    int try_times=0;
+    while(1){
+        ret=download_ca();
+        try_times++;
+        if(ret==0||try_times>4){
+            break;
+        }
+        sleep(1);
+    }
+    if(ret!=0 && try_times>4){
+        serverLog(LL_ERROR,"下载证书出错");
+    }
 
 	do {
 		ret = Init_MQTT(&g_sysif.mqtt_c);
