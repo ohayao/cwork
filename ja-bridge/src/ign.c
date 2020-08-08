@@ -57,78 +57,99 @@ void write_file_content(char *path,char *content){
     fclose(csr);
 }
 
-
-int download_ca();
-int download_ca(){
-    char localip[20],publicip[20],macaddr[18];
-    memset(localip,0,sizeof(localip));
-    memset(publicip,0,sizeof(publicip));
-    memset(macaddr,0,sizeof(macaddr));
-    Pro_GetLocalIP(localip);
-    Pro_GetPublicIP(publicip);
-    Pro_GetMacAddr(macaddr);
-    printf("LocalIP=%s;PublicIP=%s;MacAddr=%s\n",localip,publicip,macaddr);
-    
-    double cpuRate=Pro_GetCpuRate();
-    PRO_MEMORY_INFO *mem=Pro_GetMemoryInfo();
-    PRO_DISK_INFO *disk=Pro_GetDiskInfo();
-    printf("CpuRate=%.4f;MemTotal=%d,free=%d,usedRate=%.4f;DiskTotal=%d,used=%d,used=%.4f\n",
-           cpuRate,
-           mem->total,mem->free,mem->used_rate,
-           disk->total,disk->used,disk->used_rate);
-    printf("BootStartTime= %d\n",Pro_GetInitedTime());
-    PRO_WIFI_INFO *wf= Pro_GetWifiInfo();
-    printf("WIFI: ssid=%s signal=%d\n",wf->ssid,wf->signal);
-    //return 0;
-    char *url;
-    char data[1024], response[4096];
-    int  i, ret, size;
-
-    printf("=====>>>>>Step1. Get User login token\n");
-    HTTP_INFO hi1;
-    http_init(&hi1, TRUE);
-    url = "https://tkm70zar9f.execute-api.ap-southeast-1.amazonaws.com/development/login";
+int h_GetUserToken(char *userToken);
+int h_GetUserToken(char *userToken){
+    char data[1024],res[4096];
+    memset(data,0,sizeof(data));
+    memset(res,0,sizeof(res));
+    HTTP_INFO hi;
+    http_init(&hi, TRUE);
+    char *url = "https://tkm70zar9f.execute-api.ap-southeast-1.amazonaws.com/development/login";
     sprintf(data,"{\"email\":\"cs.lim+bridge@igloohome.co\",\"password\":\"igloohome\"}");
-    ret = http_post(&hi1, url, data, response, sizeof(response));
-    http_close(&hi1);
-    if(ret!=200) return -1;
-    char userToken[2048];
-    memset(userToken,0,sizeof(userToken));
-    strncpy(userToken,response+16,strlen(response)-18);
-    printf("UserToken=[%s]\n",userToken);
-    printf("=====>>>>>Step2. Get Bridge token\n");
-    memset(data,0,sizeof(data));
-    memset(response,0,sizeof(response));
-    HTTP_INFO hi2;
-    url="https://tkm70zar9f.execute-api.ap-southeast-1.amazonaws.com/development/token";
-    ret=http_get_with_auth(&hi2,url,userToken,response,sizeof(response));
-    http_close(&hi2);
-    if(ret!=200) return -2;
-    char biridgeToken[2048];
-    memset(biridgeToken,0,sizeof(biridgeToken));
-    strncpy(biridgeToken,response+18,strlen(response)-20);
-    printf("BirdgeTOken=[%s]\n",biridgeToken);
-    printf("=====>>>>>Step3. Download CA \n");
-    char* localCSR=get_file_content("/root/project/gomvc_blog/ign/webign.csr");
-    memset(data,0,sizeof(data));
-    memset(response,0,sizeof(response));
-    HTTP_INFO hi3;
-    url="https://tkm70zar9f.execute-api.ap-southeast-1.amazonaws.com/development/devices/bridge/DCA63210C7DA";
+    int ret = http_post(&hi, url, data, res, sizeof(res));
+    http_close(&hi);
+    if(ret!=200){ 
+        printf("h_GetUserToken error [%d:%s]\n",ret,res);
+        return -1;
+    }
+    strncpy(userToken,res+16,strlen(res)-18);
+    return 0;
+}
+
+int h_GetBridgeToken(char *userToken,char *bridgeToken);
+int h_GetBridgeToken(char *userToken,char *bridgeToken){
+    char res[4096];
+    memset(res,0,sizeof(res));
+    HTTP_INFO hi;
+    http_init(&hi,TRUE);
+    char *url="https://tkm70zar9f.execute-api.ap-southeast-1.amazonaws.com/development/token";
+    int ret=http_get_with_auth(&hi,url,userToken,res,4096);
+    //printf("----->> res=%s\n",res);
+    if(ret!=200) {
+        printf("h_GetBridgeToken error [%d:%s]\n",ret,res);
+        return -1;
+    }
+    strncpy(bridgeToken,res+18,strlen(res)-20);
+    return 0;
+
+}
+int h_downloadcsr(char *bridgeToken);
+int h_downloadcsr(char *bridgeToken){
+    char res[4096],url[200],bridgeID[20];
+    char *localCSR=get_file_content("./domain.csr");
+    memset(res,0,sizeof(res));
+    memset(url,0,sizeof(url));
+    memset(bridgeID,0,sizeof(bridgeID));
+    Pro_GetMacAddrs(bridgeID);
+    HTTP_INFO hi;
+    sprintf(url,"https://tkm70zar9f.execute-api.ap-southeast-1.amazonaws.com/development/devices/bridge/%s",bridgeID);
+
+    printf("h_downloadcsr,request_url=%s\n",url);
     cJSON *root;
     root=cJSON_CreateObject();
     cJSON_AddStringToObject(root,"csr",localCSR);
     char *sdata=cJSON_PrintUnformatted(root);
     cJSON_Delete(root);
-    printf("________________Request Body Content\n%s\n",sdata);
-    ret=http_post_with_auth(&hi3,url,biridgeToken,sdata,response,sizeof(response));
-    if(ret!=200) return -3;
-    root=cJSON_Parse(response);
-    if(root==NULL) return -4;
+    printf("________________Request BridgeToken\n%s\nBody Content\n%s\n",bridgeToken,sdata);
+    int ret=http_post_with_auth(&hi,url,bridgeToken,sdata,res,sizeof(res));
+    //printf("----->downloadcsr response[%s]\n",res);
+    if(ret!=200){
+        printf("h_downloadcsr error [%d:%s]\n",ret,res);
+        return -1;
+    }
+    root=cJSON_Parse(res);
+    if(root==NULL) {
+        printf("h_downloadcsr content not json type\n");
+        cJSON_Delete(root);
+        return -1;
+    }
     cJSON *pem=cJSON_GetObjectItem(root,"pem");
     printf("pem=%s\n",pem->valuestring);
     write_file_content("./test_test_test_test.csr",pem->valuestring);
     cJSON_Delete(root);
     printf("=====>>>>>DOWNLOAD-CSR Over!!!!!\n");
+    return 0;
+}
+int download_ca();
+int download_ca(){
+    int ret;
+    char userToken[2048],bridgeToken[2048];
+    memset(userToken,0,sizeof(userToken));
+    memset(bridgeToken,0,sizeof(bridgeToken));
+    if((ret=h_GetUserToken(userToken))!=0){
+        printf("GetUserTokenError [%d]\n",ret);
+        return -1;
+    }
+
+    if((ret=h_GetBridgeToken(userToken,bridgeToken))!=0){
+        printf("GetBridgeTokenError [%d]\n",ret);
+        return -1;
+    }
+    
+    if((ret=h_downloadcsr(bridgeToken))!=0){
+        printf("DownloadCSR Error[%d]\n",ret);
+        return -1;
+    }
     return 0;
 }
 
@@ -208,38 +229,6 @@ ign_BridgeProfile Create_IgnBridgeProfile(char *bridgeID);
     memcpy(bp.name.bytes, ma, strlen(ma));
     printf("==>>>>> LIP=%s PIP=%s NM=%s \nSYS=%s\n WIFI=%s SIGNAL=%d INITEDTIME=%d \n",
            bp.local_ip.bytes,bp.public_ip.bytes,bp.name.bytes,bp.sys_statics.bytes,bp.wifi_ssid.bytes,bp.wifi_signal,bp.inited_time);
-    return bp;
-    memset(temp,0,sizeof(temp));
-    strcpy(temp,"DCA63210C7DA");
-    bp.mac_addr.size=strlen(temp);
-    memcpy(bp.mac_addr.bytes,temp,strlen(temp));
-
-    memset(temp,0,sizeof(temp));
-    strcpy(temp,"local_ip");
-    bp.local_ip.size=strlen(temp);
-    memcpy(bp.local_ip.bytes,temp,strlen(temp));
-
-    memset(temp,0,sizeof(temp));
-    strcpy(temp,"public_ip");
-    bp.public_ip.size=strlen(temp);
-    memcpy(bp.public_ip.bytes,temp,strlen(temp));
-
-    memset(temp,0,sizeof(temp));
-    strcpy(temp,"sys_statics");
-    bp.sys_statics.size=strlen(temp);
-    memcpy(bp.sys_statics.bytes,temp,strlen(temp));
-
-    memset(temp,0,sizeof(temp));
-    strcpy(temp,"wifi_ssid");
-    bp.wifi_ssid.size=strlen(temp);
-    memcpy(bp.wifi_ssid.bytes,temp,strlen(temp));
-    bp.wifi_signal=2;
-    bp.inited_time=get_ustime();
-
-    memset(temp,0,sizeof(temp));
-    strcpy(temp,"bridge_name");
-    bp.name.size=strlen(temp);
-    memcpy(bp.name.bytes,temp,strlen(temp));
     return bp;
 }
 
@@ -745,8 +734,15 @@ int WaitBtn(sysinfo_t *si){
 }
 
 int main() {
-//    int res=download_ca();
-  //  printf("download_ca res=%d\n",res);
+    int try_time=0;
+    while(1){
+        int ret=download_ca();
+        try_time++;
+        if(ret==0||try_time>2){
+            break;
+        }
+        sleep(1);
+    }
     serverLog(LL_NOTICE,"Ready to start.");
     //daemon(1, 0);
     //sysinfo_t *si = malloc(sizeof(sysinfo_t));
