@@ -57,6 +57,38 @@ int write_wifi_request(){
     return 1;
   }
   serverLog(LL_NOTICE, " setWifiInfoRequestToken success");
+
+  
+  if (request.has_ssid)
+  {
+    serverLog(LL_NOTICE, "request ssid:");
+    for (int i = 0; i < request.ssid_len; ++i)
+    {
+      printf("%c", request.ssid[i]);
+    }
+    printf("\n");
+  }
+
+  if (request.has_password)
+  {
+    serverLog(LL_NOTICE, "request password:");
+    for (int i = 0; i < request.password_len; ++i)
+    {
+      printf("%c", request.password[i]);
+    }
+    printf("\n");
+  }
+  
+  if (request.has_token)
+  {
+    serverLog(LL_NOTICE, "request token:");
+    for (int i = 0; i < request.token_len; ++i)
+    {
+      printf("%c", request.token[i]);
+    }
+    printf("\n");
+  }
+
   size_t len = 100;
   uint8_t encoded_request[len];
   size_t encoded_write_len = 0;
@@ -65,13 +97,57 @@ int write_wifi_request(){
     serverLog(LL_ERROR, "encodeWifiInfoRequest error");
     return 1;
   }
-  serverLog(LL_NOTICE, " encodeWifiInfoRequest success");
+  serverLog(LL_NOTICE, " encodeWifiInfoRequest success, size: %lu", encoded_write_len);
+
+  // test decode
+  uint8_t deencoded_request[len];
+  size_t deencoded_write_len = 0;
+  SetWIFIInfoRequest decode_request;
+  if (decodeWifiInfoRequest(encoded_request, encoded_write_len, &decode_request, 0))
+  {
+    serverLog(LL_ERROR, "decodeWifiInfoRequest error");
+    return 1;
+  }
+  else
+  {
+    serverLog(LL_NOTICE, " decodeWifiInfoRequest success");
+    if (decode_request.has_ssid)
+    {
+      serverLog(LL_NOTICE, "request ssid:");
+      for (int i = 0; i < decode_request.ssid_len; ++i)
+      {
+        printf("%c", decode_request.ssid[i]);
+      }
+      printf("\n");
+    }
+
+    if (decode_request.has_password)
+    {
+      serverLog(LL_NOTICE, "request password:");
+      for (int i = 0; i < decode_request.password_len; ++i)
+      {
+        printf("%c", decode_request.password[i]);
+      }
+      printf("\n");
+    }
+    
+    if (decode_request.has_token)
+    {
+      serverLog(LL_NOTICE, "request token:");
+      for (int i = 0; i < decode_request.token_len; ++i)
+      {
+        printf("%c", decode_request.token[i]);
+      }
+      printf("\n");
+    }
+  }
 
   int encrypted_bytes_written_len = 0;
-  uint8_t encrypt_bytes[encoded_write_len];
+  size_t max_encrypt_len = 200;
+  uint8_t encrypt_bytes[max_encrypt_len];
 
   encrypted_bytes_written_len = encryptData(
-    encoded_request, encoded_write_len, encrypt_bytes, encoded_write_len,
+    encoded_request, encoded_write_len, encrypt_bytes, max_encrypt_len,
     admin_key, 16, client_nonce, 12);
   if (encrypted_bytes_written_len <= 0)
   {

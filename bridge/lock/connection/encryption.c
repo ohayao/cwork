@@ -40,13 +40,28 @@ int32_t encryptData(const uint8_t *dataIn, uint32_t dataInLen,
                      const uint8_t *key, uint32_t keyLen,
                      uint8_t *nonce, uint32_t nonceLen) {
     if (dataInLen > 4096)
+    {
+        serverLog(LL_ERROR, "dataInLen > 4096");
         return -1;
+    }    
     if (dataOutLen < encryptDataSize(dataInLen))
+    {
+        serverLog(LL_ERROR, "dataOutLen < encryptDataSize(dataInLen) ");
         return -1;
+    }
+        
     if (keyLen != 16 && keyLen != 24 && keyLen != 32)
+    {
+        serverLog(LL_ERROR, "keyLen != 16 && keyLen != 24 && keyLen != 32");
         return -1;
+    }
+        
     if (nonceLen != kNonceLength)
+    {
+        serverLog(LL_ERROR, "nonceLen != kNonceLength");
         return -1;
+    }
+        
 
     cf_aes_context aes_ctx;
     cf_aes_init(&aes_ctx, key, (size_t)keyLen);

@@ -95,7 +95,7 @@ int encodeWifiInfoRequest(SetWIFIInfoRequest * obj, uint8_t *retval, size_t leng
   CborError err;
 
   //msg_id + ssid  + password
-  size_t fields_size = 1 + 1 + 1;
+  size_t fields_size = 1 + 1 + 1 + 1;
 
   cbor_encoder_init(&encoder, retval, length, 0);
   err = cbor_encoder_create_map(&encoder, &map, fields_size);
@@ -110,13 +110,19 @@ int encodeWifiInfoRequest(SetWIFIInfoRequest * obj, uint8_t *retval, size_t leng
   // add ssid
   err = cbor_encode_uint(&map, 11);
   if(err) return err;
-  err = cbor_encode_byte_string(&map, obj->ssid, strlen(obj->ssid));
+  err = cbor_encode_byte_string(&map, obj->ssid, obj->ssid_len);
   if(err) return err;
 
   // add password
   err = cbor_encode_uint(&map, 12);
   if(err) return err;
-  err = cbor_encode_byte_string(&map, obj->password, strlen(obj->password));
+  err = cbor_encode_byte_string(&map, obj->password, obj->password_len);
+  if(err) return err;
+
+  // add token
+  err = cbor_encode_uint(&map, 13);
+  if(err) return err;
+  err = cbor_encode_byte_string(&map, obj->token, obj->token_len);
   if(err) return err;
 
   // close
@@ -205,6 +211,17 @@ int decodeWifiInfoRequest(uint8_t *buf,size_t buf_size, SetWIFIInfoRequest *retv
                 err = cbor_value_copy_byte_string(&content, data_arr, &size, &content);
                 if(err) return  err;
                 setWifiInfoRequestPassword(retval, data_arr, size);
+                break;
+            }
+          case 13:
+            if(value_type == CborByteStringType){
+                size_t size;
+                err = cbor_value_get_string_length(&content, &size);
+                if(err) return err;
+                uint8_t data_arr[size];
+                err = cbor_value_copy_byte_string(&content, data_arr, &size, &content);
+                if(err) return  err;
+                setWifiInfoRequestToken(retval, data_arr, size);
                 break;
             }
           default:

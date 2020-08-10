@@ -52,6 +52,7 @@
 #include "bridge/bridge_main/log.h"
 #include "bridge/ble/ble_operation.h"
 #include "bridge/wifi_service/ad.h"
+#include "bridge/lock/connection/encryption.h"
 
 #define GATT_MGR_IFACE			"org.bluez.GattManager1"
 #define GATT_SERVICE_IFACE		"org.bluez.GattService1"
@@ -353,9 +354,101 @@ void createServerThread()
 // 对 完成 pairing 后, set wifi request 的处理
 int handleSetWifiRequest(void *arg)
 {	
-	serverLog(LL_NOTICE, " handleSetWifiRequest");
+	serverLog(LL_NOTICE, "----------------------handleSetWifiRequest");
+	int ret = 0;
+	struct characteristic *chr = (struct characteristic *)arg;
+	RecvData *recv_pairing_data = chr->recv_pairing_data;
 
+	if (recv_pairing_data == NULL)
+  {
+    serverLog(LL_ERROR, "handleWriteStep1  recv_pairing_data null");
+    return 1;
+  }
+
+	size_t encrypted_request_len = 0;
+	uint8_t * encrypted_request_bytes = NULL;
+
+	if (getRecvPkgLen(recv_pairing_data, &encrypted_request_len))
+	{
+		serverLog(LL_ERROR, "getRecvPkgLen error");
+		return 1;
+	}
+	serverLog(LL_NOTICE, "getRecvPkgLen success, size %lu", encrypted_request_len);
+
+	encrypted_request_bytes = malloc(encrypted_request_len);
+	memset(encrypted_request_bytes, 0, encrypted_request_len);
+
+	if (getPkgFromRecvData(recv_pairing_data, encrypted_request_bytes))
+	{
+		serverLog(LL_ERROR, "getPkgFromRecvData error");
+		return 1;
+	}
+	serverLog(LL_NOTICE, "getPkgFromRecvData success: ");
+
+	for (int i = 0; i < encrypted_request_len; ++i)
+	{
+		printf(" %x", encrypted_request_bytes[i]);
+	}
+	printf("\n");
+
+	size_t max_decrypt_data_len = 1048;
+	uint8_t decrypted_data[max_decrypt_data_len];
+	size_t decrypted_bytes_written = 0;
+
+	decrypted_bytes_written = decryptData(
+		encrypted_request_bytes, encrypted_request_len,
+		decrypted_data, max_decrypt_data_len, 
+		set_wifi_crypt->server_pairing_admin_key, 16,
+		set_wifi_crypt->client_nonce, 12
+	);
+
+	if (decrypted_bytes_written == UINT32_MAX)
+	{
+		serverLog(LL_ERROR, "decryptData error");
+		return 1;
+	}
+	serverLog(LL_NOTICE, "decryptData success");
+
+	SetWIFIInfoRequest request;
+	int decode_res = decodeWifiInfoRequest(
+		decrypted_data, decrypted_bytes_written, &request, 0);
+	if (decode_res)
+	{
+		serverLog(LL_ERROR, "decodeWifiInfoRequest error");
+		return 1;
+	}
+	serverLog(LL_NOTICE, "decodeWifiInfoRequest success");
+
+	if (request.has_ssid)
+	{
+		serverLog(LL_NOTICE, "request ssid:");
+		for (int i = 0; i < request.ssid_len; ++i)
+		{
+			printf("%c", request.ssid[i]);
+		}
+		printf("\n");
+	}
+
+	if (request.has_password)
+	{
+		serverLog(LL_NOTICE, "request password:");
+		for (int i = 0; i < request.password_len; ++i)
+		{
+			printf("%c", request.password[i]);
+		}
+		printf("\n");
+	}
 	
+	if (request.has_token)
+	{
+		serverLog(LL_NOTICE, "request token:");
+		for (int i = 0; i < request.token_len; ++i)
+		{
+			printf("%c", request.token[i]);
+		}
+		printf("\n");
+	}
+
 	return 0;
 }
 
@@ -410,19 +503,19 @@ int initWifiRequestFsm()
 
 	// 
 	// 1 SET_WIFI_REQUEST to SET_WIFI_COMPLETE
-	if (fillTransItem(&trans_item, 
-    S_RECV_PAIRING_CRYPT, SET_WIFI_NOTPAIR, handlePairingCrypt, SET_WIFI_BEGIN))
-  {
-    serverLog(LL_ERROR, "fillTransItem err");
-    return 1;
-  }
-  // serverLog(LL_NOTICE, "fillTransItem event C_WRITE_COMMIT");
+	// if (fillTransItem(&trans_item, 
+  //   S_RECV_PAIRING_CRYPT, SET_WIFI_NOTPAIR, handlePairingCrypt, SET_WIFI_BEGIN))
+  // {
+  //   serverLog(LL_ERROR, "fillTransItem err");
+  //   return 1;
+  // }
+  // // serverLog(LL_NOTICE, "fillTransItem event C_WRITE_COMMIT");
 
-  if (fillFSMTransItem(fsm, &trans_item))
-  {
-    serverLog(LL_ERROR, "fillFSMTransItem err");
-    return 1;
-  }
+  // if (fillFSMTransItem(fsm, &trans_item))
+  // {
+  //   serverLog(LL_ERROR, "fillFSMTransItem err");
+  //   return 1;
+  // }
   
 	
 
@@ -457,7 +550,7 @@ int initWifiRequestFsm()
   }
 
 	// 把虚拟机, 弄成 PAIRING_BEGIN, 也就是空闲的意思啦
-	initFSMCurState(fsm, SET_WIFI_NOTPAIR);
+	initFSMCurState(fsm, SET_WIFI_BEGIN);
 }
 
 
@@ -879,12 +972,12 @@ void decideEvent(void *arg)
 	struct characteristic *chr = (struct characteristic *)arg;
 	switch(fsm->cur_state)
 	{
-		case SET_WIFI_NOTPAIR:
-		{
-			serverLog(LL_NOTICE, "decideEvent SET_WIFI_NOTPAIR");
-			chr->event = S_RECV_PAIRING_CRYPT;
-			break;
-		}
+		// case SET_WIFI_NOTPAIR:
+		// {
+		// 	serverLog(LL_NOTICE, "decideEvent SET_WIFI_NOTPAIR");
+		// 	chr->event = S_RECV_PAIRING_CRYPT;
+		// 	break;
+		// }
 		case SET_WIFI_BEGIN:
 		{
 			serverLog(LL_NOTICE, "decideEvent PAIRING_BEGIN");
@@ -905,21 +998,21 @@ void handleClientEvent(void *arg)
 	int handle_res = 0;
 	switch (chr->event)
 	{
-	case S_RECV_PAIRING_CRYPT:
-	{
-		serverLog(LL_NOTICE, "handleClientEvent S_RECV_PAIRING_CRYPT cur_state %d", fsm->cur_state);
-		handle_res = handleEvent(fsm, chr->event, NULL);
-		if (handle_res)
-		{
-			serverLog(LL_ERROR, "handle event C_WRITE_STEP1 error");
-		}
-		serverLog(LL_NOTICE, "handleClientEvent S_RECV_PAIRING_CRYPT cur_state %d", fsm->cur_state);
-		break;
-	}
+	// case S_RECV_PAIRING_CRYPT:
+	// {
+	// 	serverLog(LL_NOTICE, "handleClientEvent S_RECV_PAIRING_CRYPT cur_state %d", fsm->cur_state);
+	// 	handle_res = handleEvent(fsm, chr->event, NULL);
+	// 	if (handle_res)
+	// 	{
+	// 		serverLog(LL_ERROR, "handle event C_WRITE_STEP1 error");
+	// 	}
+	// 	serverLog(LL_NOTICE, "handleClientEvent S_RECV_PAIRING_CRYPT cur_state %d", fsm->cur_state);
+	// 	break;
+	// }
 	case C_WRITE_WIFI_REQUEST:
 		// 首先转换状态, 到 step1
 		serverLog(LL_NOTICE, "handleClientEvent C_WRITE_WIFI_REQUEST cur_state %d", fsm->cur_state);
-		handle_res = handleEvent(fsm, chr->event, NULL);
+		handle_res = handleEvent(fsm, chr->event, chr);
 		if (handle_res)
 		{
 			serverLog(LL_ERROR, "handle event C_WRITE_STEP1 error");
@@ -990,9 +1083,15 @@ static DBusMessage *chr_write_value(DBusConnection *conn, DBusMessage *msg,
 	if(isRecvFullPkg(chr->recv_pairing_data))
 	{
 		// 这样就只会返回一个恢复,所以要弄好
-		serverLog(LL_NOTICE, "-------- get full pkg");
-		// decideEvent(user_data);
-		// handleClientEvent(user_data);
+		// 如果没有和 Paired server pair, 是不会进行下面的一步
+		if (seted_wifi_crypt)
+		{
+			serverLog(LL_NOTICE, "-------- get full pkg and ");
+			decideEvent(user_data);
+			handleClientEvent(user_data);
+		}
+		
+		
 		// chr_write(chr, value, len);
 	}
 	
