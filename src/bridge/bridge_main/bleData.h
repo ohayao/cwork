@@ -1,6 +1,7 @@
 #ifndef _BLE_DATA_H_
 #define _BLE_DATA_H_
 
+#include <bridge/ble/ble_guest.h>
 // 所有的数据, 在这里都有一份
 // 所以使用者需要自己释放
 typedef struct BleData {
@@ -8,7 +9,7 @@ typedef struct BleData {
 	//void *adapter;
 	void *ble_param;  // 设置什么参数
 	int  ble_param_len;    
-	void *ble_result;   // 返回给你什么结果
+	ble_guest_result_t* ble_result;   // 返回给你什么结果
 	int ble_result_len;
 	int n_of_result;
 	void *ble_connection; // 为了能够线程安全, 所以不要用全局变量 
