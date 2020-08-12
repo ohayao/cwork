@@ -116,12 +116,26 @@ int Pro_GetMacAddr(char *mac_addr){
     int sock;
     if ((sock = socket (AF_INET, SOCK_STREAM, 0)) < 0)
     {
-        return 0;
+        return -1;
     }
     strcpy(ifreq.ifr_name, "eth0");
     if (ioctl(sock, SIOCGIFHWADDR, &ifreq) < 0)
     {
-        return 0;
+        printf("--->get eth0 info err\n");
+    }else{
+        printf("--->get eth0 info success\n");
+    }
+    if(ifreq.ifr_hwaddr.sa_data==NULL){
+        strcpy(ifreq.ifr_name,"wlp3s0");
+        if(ioctl(sock,SIOCGIFHWADDR,&ifreq)<0){
+            printf("--->get wlp3s0 info err\n");
+        }else{
+            printf("--->get wlp3s0 info success\n");
+        }
+    }
+    if(ifreq.ifr_hwaddr.sa_data==NULL){
+        printf("---> get macaddr failed\n");
+        return -1;
     }
     sprintf(mac_addr,"%X:%X:%X:%X:%X:%X", 
             (unsigned char) ifreq.ifr_hwaddr.sa_data[0], 
@@ -138,12 +152,26 @@ int Pro_GetMacAddrs(char *mac_addr){
     int sock;
     if ((sock = socket (AF_INET, SOCK_STREAM, 0)) < 0)
     {
-        return 0;
+        return -1;
     }
     strcpy(ifreq.ifr_name, "eth0");
     if (ioctl(sock, SIOCGIFHWADDR, &ifreq) < 0)
     {
-        return 0;
+        printf("--->get eth0 info err\n");
+    }else{
+        printf("--->get eth0 info success\n");
+    }
+    if(ifreq.ifr_hwaddr.sa_data==NULL){
+        strcpy(ifreq.ifr_name,"wlp3s0");
+        if(ioctl(sock,SIOCGIFHWADDR,&ifreq)<0){
+            printf("--->get wlp3s0 info err\n");
+        }else{
+            printf("--->get wlp3s0 info success\n");
+        }
+    }
+    if(ifreq.ifr_hwaddr.sa_data==NULL){
+        printf("---> get macaddr failed\n");
+        return -1;
     }
     sprintf(mac_addr,"%X%X%X%X%X%X", 
             (unsigned char) ifreq.ifr_hwaddr.sa_data[0], 
@@ -267,16 +295,16 @@ int Pro_GetInitedTime(){
     return btime;
 }
 
-void _get_wifi_ssid(PRO_WIFI_INFO *wf);
-void _get_wifi_signal(PRO_WIFI_INFO *wf);
-void _get_wifi_ssid(PRO_WIFI_INFO *wf){
+int _get_wifi_ssid(PRO_WIFI_INFO *wf);
+int _get_wifi_signal(PRO_WIFI_INFO *wf);
+int _get_wifi_ssid(PRO_WIFI_INFO *wf){
     FILE *fp;
     fp=popen("iwconfig wlan0","r");
     regex_t reg;
     regmatch_t rmatch[20];
     if(regcomp(&reg,"^wlan0.*?ESSID:\"(.*)\".*?\n",REG_EXTENDED)<0){
         printf("reg comp error");
-        return;
+        return -1;
     }
     char buff[1024];
     memset(buff,0,sizeof(buff));
@@ -293,15 +321,16 @@ void _get_wifi_ssid(PRO_WIFI_INFO *wf){
     }
     regfree(&reg);
     pclose(fp);
+    return 0;
 }
-void _get_wifi_signal(PRO_WIFI_INFO *wf){
+int _get_wifi_signal(PRO_WIFI_INFO *wf){
     FILE *fp;
     fp=popen("iwconfig wlan0","r");
     regex_t reg;
     regmatch_t rmatch[20];
     if(regcomp(&reg,"^\\s+.*?Quality=([0-9]{1,}).*?\n",REG_EXTENDED)<0){
         printf("reg comp error");
-        return;
+        return -1;
     }
     char buff[1024];
     memset(buff,0,sizeof(buff));
@@ -318,12 +347,73 @@ void _get_wifi_signal(PRO_WIFI_INFO *wf){
     }
     regfree(&reg);
     pclose(fp);
+    return 0;
 }
+
+int _get_wifi_ssid_other(PRO_WIFI_INFO *wf);
+int _get_wifi_signal_other(PRO_WIFI_INFO *wf);
+int _get_wifi_ssid_other(PRO_WIFI_INFO *wf){
+    FILE *fp;
+    fp=popen("iwconfig wlp3s0","r");
+    regex_t reg;
+    regmatch_t rmatch[20];
+    if(regcomp(&reg,"^wlp3s0.*?ESSID:\"(.*)\".*?\n",REG_EXTENDED)<0){
+        printf("reg comp error");
+        return -1;
+    }
+    char buff[1024];
+    memset(buff,0,sizeof(buff));
+    while(fgets(buff,1024,fp)!=NULL){
+        if(regexec(&reg,buff,20,rmatch,0)==0){
+            char match[50];
+            memset(match,0,sizeof(match));
+            int len=rmatch[1].rm_eo-rmatch[1].rm_so;
+            memcpy(match,buff+rmatch[1].rm_so,len);
+            strcpy(wf->ssid,match);
+            break;
+        }
+        memset(buff,0,sizeof(buff));
+    }
+    regfree(&reg);
+    pclose(fp);
+    return 0;
+}
+int _get_wifi_signal_other(PRO_WIFI_INFO *wf){
+    FILE *fp;
+    fp=popen("iwconfig wlp3s0","r");
+    regex_t reg;
+    regmatch_t rmatch[20];
+    if(regcomp(&reg,"^\\s+.*?Quality=([0-9]{1,}).*?\n",REG_EXTENDED)<0){
+        printf("reg comp error");
+        return -1;
+    }
+    char buff[1024];
+    memset(buff,0,sizeof(buff));
+    while(fgets(buff,1024,fp)!=NULL){
+        if(regexec(&reg,buff,20,rmatch,0)==0){
+            char match[50];
+            memset(match,0,sizeof(match));
+            int len=rmatch[1].rm_eo-rmatch[1].rm_so;
+            memcpy(match,buff+rmatch[1].rm_so,len);
+            wf->signal=atoi(match);
+            break;
+        }
+        memset(buff,0,sizeof(buff));
+    }
+    regfree(&reg);
+    pclose(fp);
+    return 0;
+}
+
 
 PRO_WIFI_INFO *Pro_GetWifiInfo(){
     PRO_WIFI_INFO *wf=(PRO_WIFI_INFO *)malloc(sizeof(PRO_WIFI_INFO));
-    _get_wifi_ssid(wf);
-    _get_wifi_signal(wf);
+    if(_get_wifi_ssid(wf)!=0){
+        _get_wifi_ssid_other(wf);
+    }
+    if(_get_wifi_signal(wf)!=0){
+        _get_wifi_ssid_other(wf);
+    }
     return wf;
 }
 
