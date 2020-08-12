@@ -130,25 +130,30 @@ int h_downloadcsr(char *bridgeToken){
     printf("=====>>>>>DOWNLOAD-CSR Over!!!!!\n");
     return 0;
 }
-int download_ca();
-int download_ca(){
+int download_ca(int tryTimes);
+int download_ca(int tryTimes){
     int ret;
+    int _tt=0;
     char userToken[2048],bridgeToken[2048];
     memset(userToken,0,sizeof(userToken));
     memset(bridgeToken,0,sizeof(bridgeToken));
-    if((ret=h_GetUserToken(userToken))!=0){
+    while((ret=h_GetUserToken(userToken))!=0){
         printf("GetUserTokenError [%d]\n",ret);
-        return -1;
+        if(tryTimes>0) _tt++;
+        else if(_tt>0 && _tt>=tryTimes) return -1;
     }
+    _tt=0;
 
-    if((ret=h_GetBridgeToken(userToken,bridgeToken))!=0){
-        printf("GetBridgeTokenError [%d]\n",ret);
-        return -1;
+    while((ret=h_GetBridgeToken(userToken,bridgeToken))!=0){
+        printf("GetBridgetTokenError [%d]\n",ret);
+        if(tryTimes>0) _tt++;
+        if(_tt>0 && _tt>=tryTimes) return -1;
     }
-    
-    if((ret=h_downloadcsr(bridgeToken))!=0){
-        printf("DownloadCSR Error[%d]\n",ret);
-        return -1;
+    _tt=0;
+    while((ret=h_downloadcsr(bridgeToken))!=0){
+        printf("DownloadCSR Error [%d]\n",ret);
+        if(tryTimes>0) _tt++;
+        if(_tt>0 && _tt>=tryTimes) return -1;
     }
     return 0;
 }
@@ -418,6 +423,7 @@ int Init(void* tn) {
 
     //task_node_t *ptn = (task_node_t*) tn; 
     g_sysif.mqtt_c = util_initClients(HOST, SUBSCRIBE_CLIENT_ID, 60, 1, CA_PATH, TRUST_STORE, PRIVATE_KEY, KEY_STORE);
+
     if(NULL == g_sysif.mqtt_c) {
         //goto GoExit;
         printf("util_initClients err, mqtt_c is NULL.\n");
@@ -735,13 +741,18 @@ int WaitBtn(sysinfo_t *si){
 
 int main() {
     int try_time=0;
-    while(1){
-        int ret=download_ca();
-        try_time++;
-        if(ret==0||try_time>2){
-            break;
-        }
-        sleep(1);
+//    while(1){
+//        int ret=download_ca();
+//        try_time++;
+//        if(ret==0||try_time>2){
+//            break;
+//       }
+//        sleep(1);
+//    }
+    if(download_ca(try_time)!=0){
+        printf("_______DOWNLOAD CSR FAILED\n");
+    }else{
+        printf("_______DOWNLOAD CSR SUCCESS\n");
     }
     serverLog(LL_NOTICE,"Ready to start.");
     //daemon(1, 0);
