@@ -39,7 +39,7 @@ void saveTaskData(task_node_t *ptn) {
         {
             serverLog(LL_NOTICE, "saving ble TASK_BLE_GUEST_UNLOCK data");
             ble_guest_result_t *guest_unlock_result = (ble_guest_result_t *)ble_data->ble_result;
-            int unlock_error = guest_unlock_result->lock_result;
+            int unlock_error = guest_unlock_result->result;
             if (unlock_error)
             {
                 serverLog(LL_ERROR, "lock error");
