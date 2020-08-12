@@ -1,5 +1,6 @@
 #include "bridge/wifi_service/ad.h"
 #include "bridge/bridge_main/log.h"
+#include "bridge/wifi_service/util.h"
 #include "gdbus/gdbus.h"
 #include <stdint.h>
 #include <stdbool.h>
@@ -23,6 +24,11 @@ struct manufacturer_data {
 	struct ad_data data;
 };
 
+struct data {
+	uint8_t type;
+	struct ad_data data;
+};
+
 typedef struct ad {
 	bool registered;
 	char *type;
@@ -30,10 +36,13 @@ typedef struct ad {
 	uint16_t local_appearance;
 	uint16_t duration;
 	uint16_t timeout;
+	uint16_t discoverable_to;
 	char **uuids;
 	size_t uuids_len;
 	struct service_data service;
 	struct manufacturer_data manufacturer;
+	struct data data;
+	bool discoverable;
 	bool tx_power;
 	bool name;
 	bool appearance;
@@ -41,9 +50,6 @@ typedef struct ad {
 
 static AD ad = {
 	.local_appearance = UINT16_MAX,
-	.duration = 1,
-	.timeout = 1,
-	.local_name = "bredpi",
 };
 
 static void register_setup(DBusMessageIter *iter, void *user_data)
@@ -265,7 +271,6 @@ static gboolean get_local_name(const GDBusPropertyTable *property,
 				DBusMessageIter *iter, void *user_data)
 {
 	serverLog(LL_NOTICE, "-------------------------------------- get_local_name");
-	ad.local_name = (char *)g_strdup("bredpi");
 	dbus_message_iter_append_basic(iter, DBUS_TYPE_STRING, &(ad.local_name));
 
 	return TRUE;
@@ -412,7 +417,7 @@ void ad_advertise_name(DBusConnection *conn, bool value)
 	ad.name = value;
 
 	if (!value) {
-		g_free(ad.local_name);
+		free(ad.local_name);
 		ad.local_name = NULL;
 	}
 
@@ -421,6 +426,13 @@ void ad_advertise_name(DBusConnection *conn, bool value)
 
 void ad_advertise_local_name(DBusConnection *conn, const char *name)
 {
+		if (!name) {
+		if (ad.local_name)
+			serverLog(LL_NOTICE, "LocalName: %s\n", ad.local_name);
+		else
+			serverLog(LL_NOTICE, "Name: %s\n", ad.name ? "on" : "off");
+	}
+
 	if (ad.local_name && !strcmp(name, ad.local_name))
 		return;
 
@@ -518,4 +530,211 @@ void ad_unregister(DBusConnection *conn, GDBusProxy *manager)
 		serverLog(LL_ERROR, "Failed to unregister advertisement method\n");
 		return;
 	}
+}
+
+static void print_uuid(const char *uuid)
+{
+	const char *text;
+
+	text = bt_uuidstr_to_str(uuid);
+	if (text) {
+		char str[26];
+		unsigned int n;
+
+		str[sizeof(str) - 1] = '\0';
+
+		n = snprintf(str, sizeof(str), "%s", text);
+		if (n > sizeof(str) - 1) {
+			str[sizeof(str) - 2] = '.';
+			str[sizeof(str) - 3] = '.';
+			if (str[sizeof(str) - 4] == ' ')
+				str[sizeof(str) - 4] = '.';
+
+			n = sizeof(str) - 1;
+		}
+
+		printf("UUID: %s(%s)\n", str, uuid);
+	} else
+		printf("UUID: (%s)\n", uuid ? uuid : "");
+}
+
+static void print_ad_uuids(void)
+{
+	char **uuid;
+
+	for (uuid = ad.uuids; uuid && *uuid; uuid++)
+		print_uuid(*uuid);
+}
+
+static void print_string(const char *str, void *user_data)
+{
+	printf("%s\n", str);
+}
+
+void hexdump(const unsigned char *buf, size_t len)
+{
+	util_hexdump(' ', buf, len, print_string, NULL);
+}
+
+static void print_ad(void)
+{
+	print_ad_uuids();
+
+	// if (ad.service.uuid) {
+	// 	print_uuid(ad.service.uuid);
+	// 	bt_shell_hexdump(ad.service.data.data, ad.service.data.len);
+	// }
+
+	if (ad.manufacturer.data.len) {
+		printf("Manufacturer: %u\n", ad.manufacturer.id);
+		hexdump(ad.manufacturer.data.data,
+						ad.manufacturer.data.len);
+	}
+
+	// if (ad.data.data.len) {
+	// 	bt_shell_printf("Data Type: 0x%02x\n", ad.data.type);
+	// 	bt_shell_hexdump(ad.data.data.data, ad.data.data.len);
+	// }
+
+	// bt_shell_printf("Tx Power: %s\n", ad.tx_power ? "on" : "off");
+
+	// if (ad.local_name)
+	// 	bt_shell_printf("LocalName: %s\n", ad.local_name);
+	// else
+	// 	bt_shell_printf("Name: %s\n", ad.name ? "on" : "off");
+
+	// if (ad.local_appearance != UINT16_MAX)
+	// 	bt_shell_printf("Appearance: %s (0x%04x)\n",
+	// 				bt_appear_to_str(ad.local_appearance),
+	// 				ad.local_appearance);
+	// else
+	// 	bt_shell_printf("Apperance: %s\n",
+	// 				ad.appearance ? "on" : "off");
+
+	// bt_shell_printf("Discoverable: %s\n", ad.discoverable ? "on": "off");
+
+	// if (ad.duration)
+	// 	bt_shell_printf("Duration: %u sec\n", ad.duration);
+
+	// if (ad.timeout)
+	// 	bt_shell_printf("Timeout: %u sec\n", ad.timeout);
+}
+
+static void ad_clear_manufacturer(void)
+{
+	memset(&ad.manufacturer, 0, sizeof(ad.manufacturer));
+}
+
+static bool ad_add_data(struct ad_data *data, int argc, char *argv[])
+{
+	unsigned int i;
+
+	memset(data, 0, sizeof(*data));
+
+	for (i = 0; i < (unsigned int) argc; i++) {
+		long int val;
+		char *endptr = NULL;
+
+		if (i >= G_N_ELEMENTS(data->data)) {
+			serverLog(LL_ERROR, "Too much data\n");
+			return false;
+		}
+
+		val = strtol(argv[i], &endptr, 0);
+		if (!endptr || *endptr != '\0' || val > UINT8_MAX) {
+			serverLog(LL_ERROR, "Invalid value at index %d\n", i);
+			return false;
+		}
+
+		data->data[data->len] = val;
+		data->len++;
+	}
+
+	return true;
+}
+
+void ad_advertise_manufacturer(DBusConnection *conn, int argc, char *argv[])
+{
+	char *endptr = NULL;
+	long int val;
+	struct ad_data data;
+
+	if (argc < 2 || !strlen(argv[1])) {
+		if (ad.manufacturer.data.len) {
+			serverLog(LL_NOTICE, "Manufacturer: %u\n",
+						ad.manufacturer.id);
+			hexdump(ad.manufacturer.data.data,
+						ad.manufacturer.data.len);
+		}
+
+		return; //bt_shell_noninteractive_quit(EXIT_SUCCESS);
+	}
+
+	val = strtol(argv[1], &endptr, 0);
+	if (!endptr || *endptr != '\0' || val > UINT16_MAX) {
+		serverLog(LL_ERROR, "Invalid manufacture id\n");
+		return; //bt_shell_noninteractive_quit(EXIT_FAILURE);
+	}
+
+	if (!ad_add_data(&data, argc - 2, argv + 2))
+		return; //bt_shell_noninteractive_quit(EXIT_FAILURE);
+
+	ad_clear_manufacturer();
+	ad.manufacturer.id = val;
+	ad.manufacturer.data = data;
+
+	g_dbus_emit_property_changed(conn, AD_PATH, AD_IFACE,
+							"ManufacturerData");
+}
+
+void ad_disable_manufacturer(DBusConnection *conn)
+{
+	if (!ad.manufacturer.id && !ad.manufacturer.data.len)
+		return; // bt_shell_noninteractive_quit(EXIT_SUCCESS);
+
+	ad_clear_manufacturer();
+	g_dbus_emit_property_changed(conn, AD_PATH, AD_IFACE,
+							"ManufacturerData");
+
+	return; // bt_shell_noninteractive_quit(EXIT_SUCCESS);
+}
+
+static void ad_clear_data(void)
+{
+	memset(&ad.manufacturer, 0, sizeof(ad.manufacturer));
+
+	return; // bt_shell_noninteractive_quit(EXIT_SUCCESS);
+}
+
+void ad_advertise_data(DBusConnection *conn, int argc, char *argv[])
+{
+	char *endptr = NULL;
+	long int val;
+	struct ad_data data;
+
+	if (argc < 2 || !strlen(argv[1])) {
+		if (ad.manufacturer.data.len) {
+			printf("Type: 0x%02x\n", ad.data.type);
+			hexdump(ad.data.data.data, ad.data.data.len);
+		}
+
+		return; // bt_shell_noninteractive_quit(EXIT_SUCCESS);
+	}
+
+	val = strtol(argv[1], &endptr, 0);
+	if (!endptr || *endptr != '\0' || val > UINT8_MAX) {
+		printf("Invalid type\n");
+		return; // bt_shell_noninteractive_quit(EXIT_FAILURE);
+	}
+
+	if (!ad_add_data(&data, argc - 2, argv + 2))
+		return; // bt_shell_noninteractive_quit(EXIT_FAILURE);
+
+	ad_clear_data();
+	ad.data.type = val;
+	ad.data.data = data;
+
+	g_dbus_emit_property_changed(conn, AD_PATH, AD_IFACE, "Data");
+
+	return; // bt_shell_noninteractive_quit(EXIT_SUCCESS);
 }

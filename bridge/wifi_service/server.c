@@ -80,7 +80,9 @@
 /* Immediate Alert Service UUID */
 // pairing service
 #define PAIRING_SERVICE_UUID	"12345678-0000-1000-8000-00805f9b34fb"
-#define PAIRING_SERVICE_CHR_UUID		"12345678-0000-1000-8000-00805f9b34fb"
+#define PAIRING_SERVICE_CHR_UUID		"12345677-0000-1000-8000-00805f9b34fb"
+// #define PAIRING_SERVICE_UUID	"5C3A1523-897E-45E1-B016-007107C96DF6"
+// #define PAIRING_SERVICE_CHR_UUID		"5C3A659E-897E-45E1-B016-007107C96DF6"
 
 /* Random UUID for testing purpose */
 #define READ_WRITE_DESCRIPTOR_UUID	"8260c653-1a54-426b-9e36-e84c238bc669"
@@ -1708,7 +1710,7 @@ void initAdvertiseSetting()
 	ad_advertise_uuids(connection, uuids);
 	ad_advertise_tx_power(connection, true);
 	ad_advertise_name(connection, true);
-	// ad_advertise_local_name(connection, "BBB");
+	ad_advertise_local_name(connection, "BBB");
 	// ad_advertise_appearance(connection, true);
 	ad_advertise_duration(connection, 1);
 }
@@ -1720,7 +1722,7 @@ void advertise()
 	const char *type;
 	char *argv[2];
 	// on off broadcast peripheral
-	argv[0] = "broadcast";
+	argv[0] = "peripheral";
 	argv[1] = NULL;
 
 	if (!parse_argument(argv, ad_arguments, &enable, &type))
