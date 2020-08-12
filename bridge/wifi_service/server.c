@@ -47,6 +47,10 @@
 #include <glib.h>
 #include <dbus/dbus.h>
 
+#include <bluetooth/bluetooth.h>
+#include <bluetooth/hci.h>
+#include <bluetooth/hci_lib.h>
+#include <sys/time.h>    //struct itimerval, setitimer()
 
 #include "gdbus/gdbus.h"
 
@@ -59,6 +63,8 @@
 #include "bridge/wifi_service/ad.h"
 #include "bridge/wifi_service/crypt.h"
 
+
+
 #define GATT_MGR_IFACE			"org.bluez.GattManager1"
 #define GATT_SERVICE_IFACE		"org.bluez.GattService1"
 #define GATT_CHR_IFACE			"org.bluez.GattCharacteristic1"
@@ -68,6 +74,8 @@
 
 #define SET_CRYPT_PORT 13140
 #define SET_CRYPT_IP "127.0.1.1"
+
+#define AD_LOCAL_NAME "ABCDEFG"
 
 /* Immediate Alert Service UUID */
 // pairing service
@@ -1700,6 +1708,7 @@ void initAdvertiseSetting()
 	ad_advertise_uuids(connection, uuids);
 	ad_advertise_tx_power(connection, true);
 	ad_advertise_name(connection, true);
+	// ad_advertise_local_name(connection, "BBB");
 	// ad_advertise_appearance(connection, true);
 	ad_advertise_duration(connection, 1);
 }
@@ -1722,7 +1731,6 @@ void advertise()
 	{
 		ad_register(connection, ad_proxy, type);
 	}
-		
 	return;
 }
 
@@ -1772,8 +1780,29 @@ void cmd_discoverable()
 	serverLog(LL_NOTICE, "---------------------- get ioctl socket success");
 }
 
+// void printMes(int signo)
+// {
+// 	static int count = 0;
+//   printf("Get a SIGALRM, %d counts!\n", ++count);
+// 	ad_advertise_local_name(connection, "BBB");
+// }
+
+
+
 int main(int argc, char *argv[])
 {
+	// signal(SIGALRM, printMes);
+	// struct itimerval tick;
+	// //Timeout to run first time
+	// tick.it_value.tv_sec = 1;
+	// tick.it_value.tv_usec = 0;
+
+	// //After first, the Interval time for clock
+	// tick.it_interval.tv_sec = 1;
+	// tick.it_interval.tv_usec = 0;
+	// if(setitimer(ITIMER_REAL, &tick, NULL) < 0)
+  //     printf("Set timer failed!\n");
+
 	GDBusClient *client;
 	guint signal;
 	cmd_discoverable();

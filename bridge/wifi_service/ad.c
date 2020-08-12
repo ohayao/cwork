@@ -7,6 +7,7 @@
 #define AD_PATH "/org/bluez/advertising"
 #define AD_IFACE "org.bluez.LEAdvertisement1"
 
+
 struct ad_data {
 	uint8_t data[25];
 	uint8_t len;
@@ -40,6 +41,9 @@ typedef struct ad {
 
 static AD ad = {
 	.local_appearance = UINT16_MAX,
+	.duration = 1,
+	.timeout = 1,
+	.local_name = "bredpi",
 };
 
 static void register_setup(DBusMessageIter *iter, void *user_data)
@@ -66,6 +70,7 @@ static void register_reply(DBusMessage *message, void *user_data)
 	if (dbus_set_error_from_message(&error, message) == FALSE) {
 		ad.registered = true;
 		serverLog(LL_NOTICE, "Advertising object registered\n");
+		serverLog(LL_NOTICE, "Advertising name %s", ad.local_name);
 	} else {
 		serverLog(LL_ERROR, "Failed to register advertisement: %s\n", error.name);
 		dbus_error_free(&error);
@@ -79,6 +84,7 @@ static void register_reply(DBusMessage *message, void *user_data)
 static gboolean get_type(const GDBusPropertyTable *property,
 				DBusMessageIter *iter, void *user_data)
 {
+	serverLog(LL_NOTICE, "-------------------------------- get_type");
 	const char *type = "peripheral";
 
 	if (ad.type && strlen(ad.type) > 0)
@@ -91,12 +97,14 @@ static gboolean get_type(const GDBusPropertyTable *property,
 
 static gboolean uuids_exists(const GDBusPropertyTable *property, void *data)
 {
+	serverLog(LL_NOTICE, "-------------------------------- uuids_exists");
 	return ad.uuids_len != 0;
 }
 
 static gboolean get_uuids(const GDBusPropertyTable *property,
 				DBusMessageIter *iter, void *user_data)
 {
+	serverLog(LL_NOTICE, "-------------------------------- get_uuids");
 	DBusMessageIter array;
 	size_t i;
 
@@ -167,6 +175,7 @@ static void dict_append_array(DBusMessageIter *dict, const char *key, int type,
 static gboolean service_data_exists(const GDBusPropertyTable *property,
 								void *data)
 {
+	serverLog(LL_NOTICE, "-------------------------------- service_data_exists");
 	return ad.service.uuid != NULL;
 }
 
@@ -248,13 +257,16 @@ static gboolean get_includes(const GDBusPropertyTable *property,
 
 static gboolean local_name_exits(const GDBusPropertyTable *property, void *data)
 {
+	serverLog(LL_NOTICE, "----------------- local_name_exits");
 	return ad.local_name ? TRUE : FALSE;
 }
 
 static gboolean get_local_name(const GDBusPropertyTable *property,
 				DBusMessageIter *iter, void *user_data)
 {
-	dbus_message_iter_append_basic(iter, DBUS_TYPE_STRING, &ad.local_name);
+	serverLog(LL_NOTICE, "-------------------------------------- get_local_name");
+	ad.local_name = (char *)g_strdup("bredpi");
+	dbus_message_iter_append_basic(iter, DBUS_TYPE_STRING, &(ad.local_name));
 
 	return TRUE;
 }
@@ -407,6 +419,17 @@ void ad_advertise_name(DBusConnection *conn, bool value)
 	g_dbus_emit_property_changed(conn, AD_PATH, AD_IFACE, "Includes");
 }
 
+void ad_advertise_local_name(DBusConnection *conn, const char *name)
+{
+	if (ad.local_name && !strcmp(name, ad.local_name))
+		return;
+
+	g_free(ad.local_name);
+	ad.local_name = strdup(name);
+
+	g_dbus_emit_property_changed(conn, AD_PATH, AD_IFACE, "LocalName");
+}
+
 void ad_advertise_appearance(DBusConnection *conn, bool value)
 {
 	if (ad.appearance == value)
@@ -449,4 +472,50 @@ void ad_advertise_timeout(DBusConnection *conn, uint16_t value)
 	ad.timeout = value;
 
 	g_dbus_emit_property_changed(conn, AD_PATH, AD_IFACE, "Timeout");
+}
+
+static void unregister_reply(DBusMessage *message, void *user_data)
+{
+	DBusConnection *conn = user_data;
+	DBusError error;
+
+	dbus_error_init(&error);
+
+	if (dbus_set_error_from_message(&error, message) == FALSE) {
+		ad.registered = false;
+		serverLog(LL_NOTICE, "Advertising object unregistered\n");
+		if (g_dbus_unregister_interface(conn, AD_PATH,
+							AD_IFACE) == FALSE)
+			serverLog(LL_ERROR,"Failed to unregister advertising object\n");
+	} else {
+	serverLog(LL_ERROR,"Failed to unregister advertisement: %s\n",
+								error.name);
+		dbus_error_free(&error);
+	}
+}
+
+static void unregister_setup(DBusMessageIter *iter, void *user_data)
+{
+	const char *path = AD_PATH;
+
+	dbus_message_iter_append_basic(iter, DBUS_TYPE_OBJECT_PATH, &path);
+}
+
+void ad_unregister(DBusConnection *conn, GDBusProxy *manager)
+{
+	if (!manager)
+		ad_release(conn);
+
+	if (!ad.registered)
+		return;
+
+	g_free(ad.type);
+	ad.type = NULL;
+
+	if (g_dbus_proxy_method_call(manager, "UnregisterAdvertisement",
+					unregister_setup, unregister_reply,
+					conn, NULL) == FALSE) {
+		serverLog(LL_ERROR, "Failed to unregister advertisement method\n");
+		return;
+	}
 }
