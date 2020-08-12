@@ -3,6 +3,16 @@
 #include "bridge/ble/lock.h"
 #include "bridge/bridge_main/fsm.h"
 
+enum ERR_GUEST_STATE {
+	ERR_LOGIC = -1000,
+	ERR_CONNECTION,
+	ERR_WAITING,
+	ERR_SEND,
+	ERR_GATT,
+	ERR_STEP1,
+	ERR_STEP2,
+	ERR_CMD,
+};
 enum BLE_GUEST_STATE {
   BLE_GUEST_BEGIN = 0,          // 注册一个改变通知
   BLE_GUEST_STEP2 = 1,          // 收听锁的第一步信息
@@ -80,7 +90,7 @@ int bleSetGuestRequest(
 typedef struct BLEGuestResult {
   char addr[MAX_DEVICE_ADDR];
   int result;               // ***_result, 简单判断是否有出错
-  int lock_result;
+/*  int lock_result;
   int unlock_result;
   int unpair_result;
   int getlogs_result;
@@ -89,6 +99,7 @@ typedef struct BLEGuestResult {
   int delete_pin_request_result;
   int get_battery_level_result;
   int set_time_result;
+*/
   size_t cmd_response_size;     // ****_response 就是相关的response的结构体
   void *cmd_response;     // 纯粹用来把相关的结构体,拷贝出去
 }ble_guest_result_t;

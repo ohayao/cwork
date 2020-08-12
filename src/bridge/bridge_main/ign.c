@@ -265,8 +265,8 @@ void saveTaskData(task_node_t* ptn) {
 				{
 					printf( "handle ble get lock status data.\n");
 					ble_guest_result_t *guest_result = (ble_guest_result_t *)ble_data->ble_result;
-					if(guest_result->getlockstatus_result) {
-						printf("get status error[%d].\n", guest_result->getlockstatus_result);
+					if(guest_result->result) {
+						printf("get status error[%d].\n", guest_result->result);
 					} else {
 						printf("@@@get status success. lock_status[%d]\n", ble_data->lock_status);
 						Sync_Status(ptn->lock_id, ble_data->lock_status);
@@ -277,7 +277,7 @@ void saveTaskData(task_node_t* ptn) {
 				{
 					printf( "handle battery data.\n");
 					ble_guest_result_t *guest_unlock_result = (ble_guest_result_t *)ble_data->ble_result;
-					int ret = guest_unlock_result->get_battery_level_result;
+					int ret = guest_unlock_result->result;
 					if (ret) {
 						printf("get battery error[%d].\n", ret);
 					} else {
@@ -291,7 +291,7 @@ void saveTaskData(task_node_t* ptn) {
 				{
 					printf( "get ble response data of TASK_BLE_GUEST_GETLOGS\n");
 					ble_guest_result_t *guest_get_logs_result = (ble_guest_result_t *)ble_data->ble_result;
-					int ret = guest_get_logs_result->getlogs_result;
+					int ret = guest_get_logs_result->result;
 					if (ret) {
 						printf( "get lock logs error\n");
 					} else {
@@ -366,35 +366,39 @@ int HandleLockCMD (sysinfo_t* si, igm_lock_t* lock, int cmd, void* request) {
 	memcpy(tn->lock_id, lock->name, lock->name_len);
 
 	if (ign_DemoLockCommand_LOCK == cmd) {
-		tn->sm_table_len = getGuestLockFsmTableLen();
-		tn->task_sm_table = getGuestLockFsmTable();
+		//tn->sm_table_len = getGuestLockFsmTableLen();
+		//tn->task_sm_table = getGuestLockFsmTable();
 		tn->task_type = TASK_BLE_GUEST_LOCK;
 	} else if (ign_DemoLockCommand_UNLOCK == cmd) {
-		tn->sm_table_len = getGuestUnlockFsmTableLen();
-		tn->task_sm_table = getGuestUnlockFsmTable();
+		//tn->sm_table_len = getGuestUnlockFsmTableLen();
+		//tn->task_sm_table = getGuestUnlockFsmTable();
 		tn->task_type = TASK_BLE_GUEST_UNLOCK;
 	} else if (ign_DemoLockCommand_GET_LOCK_STATUS == cmd) {
-		tn->sm_table_len = getGuestGetLockStatusFsmTableLen();
-		tn->task_sm_table = getGuestGetLockStatusFsmTable();
+		//tn->sm_table_len = getGuestGetLockStatusFsmTableLen();
+		//tn->task_sm_table = getGuestGetLockStatusFsmTable();
 	    tn->task_type = TASK_BLE_GUEST_GETLOCKSTATUS;
 	} else if (ign_DemoLockCommand_GET_BATTERY == cmd) {
-		tn->sm_table_len = getGuestGetBatteryLevelFsmTableLen();
-		tn->task_sm_table = getGuestGetBatteryLevelFsmTable();
+		//tn->sm_table_len = getGuestGetBatteryLevelFsmTableLen();
+		//tn->task_sm_table = getGuestGetBatteryLevelFsmTable();
 		tn->task_type = TASK_BLE_GUEST_GET_BATTERY_LEVEL;
 	} else if (ign_DemoLockCommand_GET_LOGS == cmd) {
-		tn->sm_table_len = getGuestGetLogsFsmTableLen();
-		tn->task_sm_table = getGuestGetLogsFsmTable();
+		//tn->sm_table_len = getGuestGetLogsFsmTableLen();
+		//tn->task_sm_table = getGuestGetLogsFsmTable();
 	    tn->task_type = TASK_BLE_GUEST_GETLOGS;
 	} else if (ign_DemoLockCommand_CREATE_PIN == cmd) {
-		tn->sm_table_len = getGuestCreatePinRequestFsmTableLen();
-		tn->task_sm_table = getGuestCreatePinRequestFsmTable();
-	    tn->task_type = TASK_BLE_GUEST_CREATE_PIN_REQUEST;
+		//tn->sm_table_len = getGuestCreatePinRequestFsmTableLen();
+		//tn->task_sm_table = getGuestCreatePinRequestFsmTable();
+	    tn->task_type = TASK_BLE_GUEST_CREATE_PIN;
 	} else if (ign_DemoLockCommand_DELETE_PIN == cmd) {
-		tn->sm_table_len = getGuestDeletePinRequestFsmTableLen();
-		tn->task_sm_table = getGuestDeletePinRequestFsmTable();
-	    tn->task_type = TASK_BLE_GUEST_CREATE_PIN_REQUEST;
-	} 
+		//tn->sm_table_len = getGuestDeletePinRequestFsmTableLen();
+		//tn->task_sm_table = getGuestDeletePinRequestFsmTable();
+        tn->task_type = TASK_BLE_GUEST_DEL_PIN;
+    } else {
+        serverLog(LL_ERROR, "cmd[%d] err.", cmd);
+        return -1;
+    }
 
+/*
 	int current_state = BLE_GUEST_BEGIN;
     for (int j = 0; j < tn->sm_table_len; j++) {
         if (current_state == tn->task_sm_table[j].cur_state) {
@@ -406,11 +410,16 @@ int HandleLockCMD (sysinfo_t* si, igm_lock_t* lock, int cmd, void* request) {
 				current_state = tn->task_sm_table[j].next_state;
             }
 		}
-    }
+    }*/
 
     saveTaskData(tn);
+    int ret = guest_connection_and_do_cmd(tn);
+    if(ret) {
+        serverLog(LL_ERROR, "guest_connection_and_do_cmd err[%d].", ret);
+        return -1;
+    }
+
     ble_guest_result_t *guest_unlock_result = (ble_guest_result_t *)ble_data->ble_result;
-    //ig_AdminLockResponse_deinit(guest_unlock_result->cmd_response);
     releaseGuestResult(&guest_unlock_result);
     bleReleaseBleResult(ble_data);
     free(ble_data); ble_data = NULL;
@@ -945,7 +954,7 @@ int DealCMD(sysinfo_t *si, ign_MsgInfo imsg) {
 					}
 				}
 
-				//fake lock data
+				/*/fake lock data
 				char lock_id[] = "IGP105cc2684";
 				char device_address[] = "ED:67:F0:CC:26:84";
 				char guest_key[] = "7df6d0dc000873150e94deb03ccd18cb";
@@ -980,7 +989,7 @@ int DealCMD(sysinfo_t *si, ign_MsgInfo imsg) {
 				int ret = AddLockinfo(si, &li);
 				if (ret) {
 					printf("AddLockinfo err, lock_total[%d]\n", si->lock_total);
-				}
+				}*/
 
 				PrintLockinfo(si);
 
@@ -997,6 +1006,7 @@ int DealCMD(sysinfo_t *si, ign_MsgInfo imsg) {
 				for(int i=0; i<imsg.server_data.lock_entries_count; i++){
 					psd->lock_entries[i] = imsg.server_data.lock_entries[i];
 				}
+				/*
 				if(5 > psd->lock_entries_count){
 					memcpy(psd->lock_entries[psd->lock_entries_count].bt_id, li.lock_id, li.lock_id_size); 
 					psd->lock_entries[psd->lock_entries_count].has_ekey = 1;
@@ -1008,7 +1018,7 @@ int DealCMD(sysinfo_t *si, ign_MsgInfo imsg) {
 					memcpy(psd->lock_entries[psd->lock_entries_count].ekey.password.bytes, li.lock_passwd, li.lock_passwd_size); 
 					psd->lock_entries[psd->lock_entries_count].ekey.keyId = psd->lock_entries_count;
 					psd->lock_entries_count++;
-				}
+				}*/
 
 				SendMQTTMsg(&tmsg, SUB_WEBDEMO);
 				return 0;

@@ -256,6 +256,7 @@ void releaseLock(igm_lock_t ** pp_lock) {
 	releaseLockKey(*pp_lock);
 	releaseLockPassword(*pp_lock);
 	releaseLockCmd(*pp_lock);
+	releaseLockToken(*pp_lock);
 	free(*pp_lock);
 	*pp_lock = NULL;
 }

@@ -21,13 +21,13 @@ enum TASK_TYPE {
     TASK_BLE_ADMIN_GET_BATTERY_LEVEL = 10,
 
     TASK_BLE_GUEST_CONNECTION = 11,
-    TASK_BLE_GUEST_UNPAIR = 12,
+    TASK_BLE_GUEST_GET_BATTERY_LEVEL = 12,
     TASK_BLE_GUEST_UNLOCK = 13,
     TASK_BLE_GUEST_LOCK = 14,
     TASK_BLE_GUEST_GETLOGS = 15,
     TASK_BLE_GUEST_GETLOCKSTATUS = 16,
-    TASK_BLE_GUEST_CREATE_PIN_REQUEST = 17,
-    TASK_BLE_GUEST_GET_BATTERY_LEVEL = 18,
+    TASK_BLE_GUEST_CREATE_PIN = 17,
+    TASK_BLE_GUEST_DEL_PIN = 18,
 };
 
 typedef struct TaskNode {
@@ -38,6 +38,7 @@ typedef struct TaskNode {
 	//struct task_node *next;
 	unsigned int msg_id;
 	char* lock_cmd;
+	char op_cmd;
 	unsigned int lock_cmd_size;
     ble_data_t *ble_data; // 外部数据, 外部释放?
     int ble_data_len;
