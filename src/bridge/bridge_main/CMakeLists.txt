@@ -5,9 +5,6 @@ include_directories(${GLIB_INCLUDE_DIRS})
 include_directories(../../../mbedtls)
 
 set(IGN_DEPENDENCIES
-  mbedtls
-  mbedcrypto
-  mbedx509
   pthread
   ble
   mqtt

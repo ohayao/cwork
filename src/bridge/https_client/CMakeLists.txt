@@ -14,3 +14,8 @@ add_library(https_client
   ${ALL_HTTPS_CLIENT_HDRS} ${ALL_HTTPS_CLIENT_SRCS}
 )
 
+target_link_libraries(https_client
+    mbedtls
+    mbedcrypto
+    mbedx509
+)
