@@ -39,7 +39,7 @@ void saveTaskData(task_node_t *ptn) {
 					printf( "saving ble TASK_BLE_ADMIN_UNLOCK data\n");
 					ble_guest_result_t *guest_unlock_result = (ble_guest_result_t *)ble_data->ble_result;
 
-					int unlock_error = guest_unlock_result->unlock_result;
+					int unlock_error = guest_unlock_result->result;
 					if (unlock_error) {
 						printf( "unlock error\n");
 					} else {

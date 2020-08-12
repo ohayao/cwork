@@ -19,6 +19,7 @@ enum BLE_GUEST_STATE {
   BLE_GUEST_STEP3 = 2,          // 写给锁的第二步信息
   BLE_GUEST_STEP4 = 3,     // 此时已经建立
   BLE_GUEST_DONE = 4,    // 完成guest connection标志
+  BLE_GUEST_CMD_RESULT = 5,
 };
 
 enum BLE_GUEST_UNPAIR_STATE {
