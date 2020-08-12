@@ -78,61 +78,89 @@ int h_GetBridgeToken(char *userToken,char *bridgeToken){
 int h_downloadcsr(char *bridgeToken);
 int h_downloadcsr(char *bridgeToken){
     char res[4096],url[200],bridgeID[20];
-    char *localCSR=get_file_content("./local.csr");
+    char *localCSR = get_file_content("./local.csr");
+	if(NULL == localCSR) {
+		printf("get_file_content ./local.csr err.\n");
+		return -1;
+	}
     memset(res,0,sizeof(res));
     memset(url,0,sizeof(url));
     memset(bridgeID,0,sizeof(bridgeID));
     Pro_GetMacAddrs(bridgeID);
     HTTP_INFO hi;
-    sprintf(url,"https://tkm70zar9f.execute-api.ap-southeast-1.amazonaws.com/development/devices/bridge/%s",bridgeID);
+    sprintf(url,"https://tkm70zar9f.execute-api.ap-southeast-1.amazonaws.com/development/devices/bridge/%s", bridgeID);
 
-    printf("h_downloadcsr,request_url=%s\n",url);
+    printf("h_downloadcsr,request_url=[%s]\n",url);
     cJSON *root;
     root=cJSON_CreateObject();
     cJSON_AddStringToObject(root,"csr",localCSR);
+	if(NULL == root) {
+		serverLog(LL_ERROR, "root is NULL err.");
+		return -1;
+	}
     char *sdata=cJSON_PrintUnformatted(root);
+	if(NULL == sdata) {
+		serverLog(LL_ERROR, "sdata is NULL err.");
+		return -1;
+	}
+
     cJSON_Delete(root);
     printf("________________Request BridgeToken\n%s\nBody Content\n%s\n",bridgeToken,sdata);
     int ret=http_post_with_auth(&hi,url,bridgeToken,sdata,res,sizeof(res));
     //printf("----->downloadcsr response[%s]\n",res);
-    if(ret!=200){
+    if(200 != ret) {
         printf("h_downloadcsr error [%d:%s]\n",ret,res);
         return -1;
     }
+	printf("res size[%d] [%s]\n", sizeof(res),res);
     root=cJSON_Parse(res);
-    if(root==NULL) {
-        printf("h_downloadcsr content not json type\n");
+    if(NULL == root) {
+        serverLog(LL_ERROR, "h_downloadcsr content not json type\n");
         cJSON_Delete(root);
         return -1;
     }
-    cJSON *pem=cJSON_GetObjectItem(root,"pem");
-    printf("pem=%s\n",pem->valuestring);
-    write_file_content("./ign_service.csr",pem->valuestring);
-    cJSON_Delete(root);
-    printf("=====>>>>>DOWNLOAD-CSR Over!!!!!\n");
-    return 0;
+	printf("root[%s]\n", root);
+    cJSON *pem = cJSON_GetObjectItem(root,"pem");
+	if (NULL == pem) {
+		serverLog(LL_ERROR, "cJSON_GetObjectItem return pem is NULL err.");
+		return -1;
+	}
+    printf("pem=[%s]\n",pem->valuestring);
+    write_file_content("./ign_service.csr", pem->valuestring);
+	cJSON_Delete(root);
+	printf("=====>>>>>DOWNLOAD-CSR Over!!!!!\n");
+	return 0;
 }
 
-int download_ca();
-int download_ca(){
-    int ret;
-    char userToken[2048],bridgeToken[2048];
-    memset(userToken,0,sizeof(userToken));
-    memset(bridgeToken,0,sizeof(bridgeToken));
-    if((ret=h_GetUserToken(userToken))!=0){
-        printf("GetUserTokenError [%d]\n",ret);
-        return -1;                                    
-    }
-    if((ret=h_GetBridgeToken(userToken,bridgeToken))!=0){
-        printf("GetBridgeTokenError [%d]\n",ret);
-        return -1;                                    
-    }
-                        
-    if((ret=h_downloadcsr(bridgeToken))!=0){
-        printf("DownloadCSR Error[%d]\n",ret);
-        return -1;                        
-    }
-    return 0;
+int download_ca(unsigned int* step){
+	int ret;
+	char userToken[2048],bridgeToken[2048];
+	memset(userToken,0,sizeof(userToken));
+	memset(bridgeToken,0,sizeof(bridgeToken));
+	if(*step < 1) {
+		printf("in download_ca *step[%d]\n", *step);
+		if((ret=h_GetUserToken(userToken))!=0){
+			printf("GetUserTokenError [%d]\n",ret);
+			return -1;                                    
+		}
+		*step = 1;
+	}
+	if (*step < 2) {
+		printf("in download_ca *step[%d]\n", *step);
+		if((ret=h_GetBridgeToken(userToken,bridgeToken))!=0){
+			printf("GetBridgeTokenError [%d]\n",ret);
+			return -1;                                    
+		}
+		*step = 2;
+	}
+	if (*step < 3) {
+		if((ret=h_downloadcsr(bridgeToken))!=0){
+			printf("DownloadCSR Error[%d]\n",ret);
+			return -1;                        
+			*step = 3;
+		}
+	}
+	return 0;
 }
 
 
@@ -822,27 +850,23 @@ int Init(void* tn) {
     } while(0 != ret);
     serverLog(LL_NOTICE, "init Wifi connection success");
 
+//	system("openssl req -new -nodes -newkey rsa:2048 -keyout local.key -out local.csr");
 /*
-	// jason download ca
-    ret = download_ca();
-    if(ret) {
-        serverLog(LL_ERROR, "download_ca err[%d]", ret);
-    }
-*/
-    //下载证书 因为超时等不稳定因素 最多尝试5次
     int try_times=0;
+	unsigned int step = 0;
     while(1){
-        ret=download_ca();
+        ret = download_ca(&step);
         try_times++;
-        if(ret==0||try_times>4){
+        if(0 == ret || try_times>4){
             break;
         }
         sleep(1);
     }
-    if(ret!=0 && try_times>4){
-        serverLog(LL_ERROR,"下载证书出错");
+    if(0!=ret && try_times>4){
+        serverLog(LL_ERROR,"download_ca fail.");
+		return -1;
     }
-
+*/
 	do {
 		ret = Init_MQTT(&g_sysif.mqtt_c);
         sleep(0.5);
