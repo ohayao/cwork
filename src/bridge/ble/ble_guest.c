@@ -223,7 +223,6 @@ static gboolean stop_main_loop_func(gpointer data) {
 	ble_data_t *ble_data = task_node->ble_data;
 	guest_connection_t *guest_connection = (guest_connection_t *)ble_data->ble_connection;
 	guest_connection->waiting_err = 1;
-
 /*
 	int ret = releaseGuestConnection(&guest_connection);
 	if (ret) {
@@ -235,14 +234,6 @@ static gboolean stop_main_loop_func(gpointer data) {
 	return FALSE;
 }
 
-//  ------------------------ Guest step start ------------------------
-
-fsm_table_t guest_fsm_table[GUEST_SM_TABLE_LEN] = {
-  {BLE_GUEST_BEGIN,     guest_connection_and_do_cmd,		BLE_GUEST_STEP2},
-  {BLE_GUEST_STEP2,     waiting_guest_step2,			BLE_GUEST_STEP3},
-  {BLE_GUEST_STEP3,     write_guest_step3,				BLE_GUEST_STEP4},
-  {BLE_GUEST_STEP4,		waiting_guest_step4,		BLE_GUEST_DONE},
-};
 
 void message_handler(const uuid_t* uuid, const uint8_t* data, size_t data_length, void* user_data) {
 	serverLog(LL_NOTICE, "-------------new msg in message_handler---------------");
@@ -266,46 +257,10 @@ void message_handler(const uuid_t* uuid, const uint8_t* data, size_t data_length
 				handle_step4_message(data, data_length, user_data);
 				break;
 			}
-		case BLE_GUEST_UNLOCK_RESULT:
+		case BLE_GUEST_CMD_RESULT:
 			{
-				serverLog(LL_NOTICE,"in message_handler, BLE_GUEST_UNLOCK_REQUEST do handle_unlock_responce.");
-				handle_unlock_responce(data, data_length, user_data);
-				break;
-			}
-		case BLE_GUEST_LOCK_RESULT:
-			{
-				serverLog(LL_NOTICE,"in message_handler, BLE_GUEST_LOCK_REQUEST do handle_lock_responce.");
-				handle_lock_responce(data, data_length, user_data);
-				break;
-			}
-		case BLE_GUEST_GETLOGS_REQUEST:
-			{
-				serverLog(LL_NOTICE, "in message_handler, BLE_GUEST_GETLOGS_REQUEST handleGetLogsResponce");
-				handleGetLogsResponce(data, data_length, user_data);
-				break;
-			}
-		case BLE_GUEST_GETLOCKSTATUS_REQUEST:
-			{
-				serverLog(LL_NOTICE, "in message_handler, BLE_GUEST_GETLOCKSTATUS_REQUEST handleGetLockStatusResponce");
-				handleGetLockStatusResponce(data, data_length, user_data);
-				break;
-			}
-		case BLE_GUEST_CREATEPINREQUEST_REQUEST:
-			{
-				serverLog(LL_NOTICE, "in message_handler, BLE_GUEST_CREATEPINREQUEST_REQUEST handleCreatePinResponce");
-				handleCreatePinResponce(data, data_length, user_data);
-				break;
-			}
-		case BLE_GUEST_DELETEPINREQUEST_REQUEST:
-			{
-				serverLog(LL_NOTICE, "in message_handler, BLE_GUEST_DELETEPINREQUEST_REQUEST handleDeletePinResponce");
-				handleDeletePinResponce(data, data_length, user_data);
-				break;
-			}
-		case BLE_GUEST_GETBATTERYLEVEL_REQUEST:
-			{
-				serverLog(LL_NOTICE, "in message_handler, BLE_GUEST_GETBATTERYLEVEL_REQUEST handleGetBatteryLevelResponce");
-				handleGetBatteryLevelResponce(data, data_length, user_data);
+				serverLog(LL_NOTICE,"in message_handler, BLE_GUEST_CMD_REQUEST do handle_unlock_responce.");
+				handle_cmd_responce(data, data_length, user_data);
 				break;
 			}
 		default:
@@ -780,28 +735,6 @@ STEP4_EXIT:
 	return err;
 }
 
-// ------------------------ lock --------------------------------
-
-
-/*
-fsm_table_t guest_lock_fsm_table[GUEST_LOCK_SM_TABLE_LEN] = {
-  {BLE_GUEST_BEGIN,         guest_connection_and_do_cmd,	BLE_GUEST_STEP2},
-  {BLE_GUEST_STEP2,         waiting_guest_step2,        BLE_GUEST_STEP3},
-  {BLE_GUEST_STEP3,         write_guest_step3,          BLE_GUEST_STEP4},
-  {BLE_GUEST_STEP4,			waiting_guest_step4,        BLE_GUEST_LOCK_REQUEST},
-  {BLE_GUEST_LOCK_REQUEST,	write_lock_request,         BLE_GUEST_LOCK_RESULT},
-  {BLE_GUEST_LOCK_RESULT,   waiting_lock_result,        BLE_GUEST_LOCK_DONE},
-};
-
-fsm_table_t *getGuestLockFsmTable() {
-  return guest_lock_fsm_table;
-}
-
-int getGuestLockFsmTableLen() {
-  return GUEST_LOCK_SM_TABLE_LEN;
-}
-*/
-
 static int write_cmd_request(void *arg) {
 	serverLog(LL_NOTICE, "write_lock_request start --------");
 	int ret = 0, err = 0;
@@ -818,43 +751,159 @@ static int write_cmd_request(void *arg) {
 	uint8_t *encryptPayloadBytes = NULL;
 	size_t encryptPayloadBytes_len;
 
-	IgLockRequest request;
-	ig_LockRequest_init(&request);
-	ig_LockRequest_set_operation_id(&request, requestID);
-	ig_LockRequest_set_password(&request, guest_connection->lock->password, guest_connection->lock->password_size);
-	IgSerializerError IgErr;
 	if(TASK_BLE_GUEST_LOCK == task_node->task_type){
 		//encode without encryption
-		IgErr = ig_LockRequest_encode(&request, buf, buf_size, &encode_size);
+		IgLockRequest lock_request;
+		ig_LockRequest_init(&lock_request);
+		ig_LockRequest_set_operation_id(&lock_request, requestID);
+		ig_LockRequest_set_password(&lock_request, guest_connection->lock->password, guest_connection->lock->password_size);
+		IgSerializerError IgErr = ig_LockRequest_encode(&lock_request, buf, buf_size, &encode_size);
 		if (IgErr) {
 			serverLog(LL_ERROR, "ig_LockRequest_encode err[%d].", IgErr);
 			ERR_EXIT(ERR_CMD, LOCK_REQUEST_ERROR)
 		}
-		guest_connection->guest_step = BLE_GUEST_LOCK_RESULT;
 	} else if(TASK_BLE_GUEST_UNLOCK == task_node->task_type){
-		IgErr = ig_UnlockRequest_encode(&request, buf, buf_size, &encode_size);
+		IgUnlockRequest unlock_request;
+		ig_UnlockRequest_init(&unlock_request);
+		ig_UnlockRequest_set_operation_id(&unlock_request, requestID);
+		ig_UnlockRequest_set_password(&unlock_request, guest_connection->lock->password, guest_connection->lock->password_size);
+		//encode without encryption
+		IgSerializerError IgErr = ig_UnlockRequest_encode(&unlock_request, buf, buf_size, &encode_size);
 		if (IgErr) {
-			serverLog(LL_ERROR, "ig_UnlockRequest_encode err[%d].", IgErr);
+			serverLog(LL_ERROR, "ig_UnpairRequest_encode err[%d].", IgErr);
 			ERR_EXIT(ERR_CMD, LOCK_REQUEST_ERROR)
 		}
 		serverLog(LL_NOTICE, "ig_GuestUnlockRequest_encode success." );
-		guest_connection->guest_step = BLE_GUEST_UNLOCK_RESULT; //BLE_GUEST_UNLOCK_REQUEST;
 	} else if (TASK_BLE_GUEST_GETLOCKSTATUS == task_node->task_type) {
-		ret = writeGetLockStatusRequest(task_node);
+		IgGetLockStatusRequest getlockstatus_request;
+		ig_GetLockStatusRequest_init(&getlockstatus_request);
+		ig_GetLockStatusRequest_set_operation_id(&getlockstatus_request, requestID);
+		ig_GetLockStatusRequest_set_password(&getlockstatus_request, guest_connection->lock->password, guest_connection->lock->password_size);
+
+		IgSerializerError IgErr = ig_GetLockStatusRequest_encode(&getlockstatus_request, buf, buf_size, &encode_size);
+		if (IgErr) {
+			serverLog(LL_ERROR, "ig_GetLockStatusRequest_encode err[%d].", IgErr);
+			ERR_EXIT(ERR_CMD, LOCK_REQUEST_ERROR)
+		}
+		serverLog(LL_NOTICE, "ig_GetLockStatusRequest_encode success size:[%d].", encode_size);
 	} else if (TASK_BLE_GUEST_GET_BATTERY_LEVEL == task_node->task_type) {
-		ret = writeGetBatteryLevelRequest(task_node);
+		IgGetBatteryLevelRequest bl_request;
+		ig_GetBatteryLevelRequest_init(&bl_request);
+		serverLog(LL_NOTICE, "requestID: %d", requestID);
+		ig_GetBatteryLevelRequest_set_operation_id( &bl_request, requestID);
+		ig_GetBatteryLevelRequest_set_password( &bl_request, guest_connection->lock->password, guest_connection->lock->password_size);
+		if (!ig_GetBatteryLevelRequest_is_valid(&bl_request)) {
+			serverLog(LL_ERROR, "bl_request invalid");
+			ERR_EXIT(ERR_CMD, LOCK_REQUEST_ERROR)
+		}
+
+		IgSerializerError IgErr = ig_GetBatteryLevelRequest_encode( &bl_request, buf, buf_size, &encode_size);
+		if (IgErr) {
+			serverLog(LL_ERROR, "ig_GetBatteryLevelRequest_encode err[%d].", IgErr);
+			ERR_EXIT(ERR_CMD, LOCK_REQUEST_ERROR)
+		}
+		serverLog(LL_NOTICE, "ig_GetBatteryLevelRequest_encode success size[%d].", encode_size);
+
 	} else if (TASK_BLE_GUEST_GETLOGS == task_node->task_type) {
-		ret = writeGetLogsRequest(task_node);
+		time_t cur_timestamp = time(NULL);
+		IgGetLogsRequest getlogs_request;
+		ig_GetLogsRequest_init(&getlogs_request);
+		ig_GetLogsRequest_set_operation_id(&getlogs_request, requestID);
+		ig_GetLogsRequest_set_password(&getlogs_request, guest_connection->lock->password, guest_connection->lock->password_size);
+		ig_GetLogsRequest_set_timestamp(&getlogs_request, cur_timestamp);
+		IgSerializerError IgErr = ig_GetLogsRequest_encode(&getlogs_request, buf, buf_size, &encode_size);
+		if (IgErr) {
+			serverLog(LL_ERROR, "ig_GetLogsRequest_encode err.");
+			ERR_EXIT(ERR_CMD, LOCK_REQUEST_ERROR)
+		}
+		serverLog(LL_NOTICE, "ig_UnpairRequest_encode success size:" );
+
 	} else if (TASK_BLE_GUEST_CREATE_PIN == task_node->task_type) {
-		ret = writeCreatePinRequest(task_node);
+		IgCreatePinRequest *cmd_req = guest_connection->cmd_request;
+		IgCreatePinRequest create_pin_request;
+		ig_CreatePinRequest_init(&create_pin_request);
+		ig_CreatePinRequest_set_operation_id( &create_pin_request, requestID);
+		ig_CreatePinRequest_set_password(&create_pin_request, guest_connection->lock->password, guest_connection->lock->password_size);
+		if (!cmd_req ||  !ig_CreatePinRequest_is_valid(cmd_req)) {
+			serverLog(LL_ERROR, "cmd_req NULL or cmd_req don't have pin");
+			ERR_EXIT(ERR_CMD, LOCK_REQUEST_ERROR)
+		}
+
+		ig_CreatePinRequest_set_new_pin(&create_pin_request, cmd_req->new_pin, cmd_req->new_pin_size);
+		//@@@test
+		char xbuf[1024] = {0};
+		ByteToHexStr(create_pin_request.new_pin, xbuf, create_pin_request.new_pin_size);
+		serverLog(LL_NOTICE,"ig_CreatePinRequest_set_new_pin:[%s].", xbuf);
+
+		ig_CreatePinRequest_set_password(&create_pin_request, cmd_req->password, cmd_req->password_size);
+		//@@@test
+		memset(xbuf, 0x0, sizeof(xbuf));
+		ByteToHexStr(create_pin_request.password, xbuf, create_pin_request.password_size);
+		serverLog(LL_NOTICE,"ig_CreatePinRequest_set_password:[%s]", xbuf);
+
+		// optionnal
+		if (cmd_req->has_start_date) {
+			ig_CreatePinRequest_set_start_date( &create_pin_request, cmd_req->start_date);
+			serverLog(LL_NOTICE, "ig_CreatePinRequest_set_start_date [%d].", create_pin_request.start_date);
+		}
+
+		if (cmd_req->has_end_date) {
+			ig_CreatePinRequest_set_end_date( &create_pin_request, cmd_req->end_date);
+			serverLog(LL_NOTICE, "ig_CreatePinRequest_set_end_date [%d].", create_pin_request.end_date);
+		}
+
+		if (cmd_req->has_pin_type) {
+			ig_CreatePinRequest_set_pin_type( &create_pin_request, cmd_req->pin_type);
+			serverLog(LL_NOTICE, "ig_CreatePinRequest_set_pin_type [%d].", create_pin_request.pin_type);
+		}
+
+		if (cmd_req->has_operation_id) {
+			ig_CreatePinRequest_set_operation_id(&create_pin_request, cmd_req->operation_id);
+			serverLog(LL_NOTICE, "ig_CreatePinRequest_set_operation_id [%d].", create_pin_request.operation_id);
+		}
+		//@@test
+		serverLog(LL_NOTICE,"create pin option: start_date[%u], end_date[%u], pin_type[%d], operation_id[%d].", 
+				create_pin_request.start_date,
+				create_pin_request.end_date,
+				create_pin_request.pin_type,
+				create_pin_request.operation_id);
+
+		IgSerializerError IgErr = ig_CreatePinRequest_encode(&create_pin_request, buf, buf_size, &encode_size);
+		if (IgErr) {
+			serverLog(LL_ERROR, "ig_CreatePinRequest_encode err[%d].", IgErr);
+			ERR_EXIT(ERR_CMD, LOCK_REQUEST_ERROR)
+		}
+		serverLog(LL_NOTICE, "ig_CreatePinRequest_encode success size[%d].", encode_size);
 	} else if (TASK_BLE_GUEST_DEL_PIN == task_node->task_type) {
-		ret = writeDeletePinRequest(task_node);
+		IgDeletePinRequest *cmd_req = guest_connection->cmd_request;
+		IgDeletePinRequest delete_pin_request;
+		ig_DeletePinRequest_init(&delete_pin_request);
+		ig_DeletePinRequest_set_operation_id( &delete_pin_request, requestID);
+		ig_DeletePinRequest_set_password( &delete_pin_request, guest_connection->lock->password, guest_connection->lock->password_size);
+		if (!cmd_req||  !ig_DeletePinRequest_is_valid(cmd_req)) {
+			serverLog(LL_ERROR, "cmd_req NULL or cmd_req don't have pin.");
+			ERR_EXIT(ERR_CMD, LOCK_REQUEST_ERROR)
+		}
+
+		ig_DeletePinRequest_set_old_pin( &delete_pin_request, cmd_req->old_pin, cmd_req->old_pin_size);
+
+		if (cmd_req->has_operation_id) {
+			ig_DeletePinRequest_set_operation_id(&delete_pin_request, cmd_req->operation_id);
+		}
+
+		IgSerializerError IgErr = ig_DeletePinRequest_encode( &delete_pin_request, buf, buf_size, &encode_size);
+		if (IgErr) {
+			serverLog(LL_ERROR, "ig_DeletePinRequest_encode err[%d].", IgErr);
+			ERR_EXIT(ERR_CMD, LOCK_REQUEST_ERROR)
+		}
+		serverLog(LL_NOTICE, "ig_DeletePinRequest_encode success size[%d].", encode_size);
 	} else {
 		serverLog(LL_ERROR, "cmd task_type[%d] err.", task_node->task_type);
 		ERR_EXIT(ERR_CMD, LOCK_REQUEST_ERROR)
 	}
+	guest_connection->guest_step = BLE_GUEST_CMD_RESULT;
+	serverLog(LL_NOTICE, "ig cmd[%d] Request_encode success.", task_node->task_type);
 
-	serverLog(LL_NOTICE, "ig_UnpairRequest_encode success.");
 	//@@@test
 	char xbuf[1024] = {0};
 	ByteToHexStr(buf, xbuf, encode_size);
@@ -887,10 +936,6 @@ static int write_cmd_request(void *arg) {
 	}
 	serverLog(LL_NOTICE, "write_char_by_uuid_multi_atts success.");
 
-//	ig_LockRequest_deinit(&lock_request);
-	serverLog(LL_NOTICE, "write lock request success");
-
-
 LOCK_REQUEST_ERROR:
 	setGuestResultErr(ble_data->ble_result, err);
 //	ig_LockRequest_deinit(&lock_request);
@@ -904,6 +949,218 @@ LOCK_REQUEST_ERROR:
 	}
 
 	return err;
+}
+
+int handle_cmd_responce(const uint8_t* data, int data_length, void* user_data) {
+	serverLog(LL_NOTICE,"in handle_lock_responce -------------------------");
+	task_node_t *task_node = (task_node_t *)user_data;
+	ble_data_t *ble_data = task_node->ble_data;
+	guest_connection_t *guest_connection = (guest_connection_t *)ble_data->ble_connection;
+	int err = 0;
+	int responceLen;
+	uint8_t *responceBytes = NULL;
+
+	//guest_connection->guest_step = BLE_GUEST_LOCK_RESULT;
+	save_message_data(data, data_length, user_data);
+
+	if (guest_connection->step_max_size == guest_connection->step_cur_size) {
+		serverLog(LL_NOTICE, "handle_lock_responce RECV step2 data finished");
+
+		size_t messageLen = guest_connection->step_max_size - guest_connection->n_size_byte;
+		uint8_t *data_start = guest_connection->step_data + guest_connection->n_size_byte;
+		uint8_t messageBytes[messageLen];
+		memcpy(messageBytes, data_start, messageLen);
+
+		responceLen = igloohome_ble_lock_crypto_GuestConnection_decryptNative(
+				guest_connection->lock->connectionID, messageBytes, messageLen, &responceBytes);
+		if (!responceLen) { 
+			serverLog(LL_ERROR, "igloohome_ble_lock_crypto_GuestConnection_decryptNative error");
+			guest_connection->receive_err = 1;
+			ERR_EXIT(ERR_CMD, LOCK_RESPONCE_EXIT)
+		}
+		serverLog(LL_NOTICE, "igloohome_ble_lock_crypto_GuestConnection_decryptNative responceLen %d", responceLen);
+
+		if(TASK_BLE_GUEST_LOCK == task_node->task_type){
+			IgLockResponse guest_lock_responce;
+			ig_LockResponse_init(&guest_lock_responce);
+			IgSerializerError err = ig_LockResponse_decode( responceBytes, responceLen, &guest_lock_responce, 0);
+			if (err) {
+				serverLog(LL_ERROR, "ig_GuestLockResponse_decode err [%d].", err);
+				guest_connection->receive_err = 1;
+				ERR_EXIT(ERR_CMD, LOCK_RESPONCE_EXIT)
+			}
+			serverLog(LL_NOTICE, "has lock response [%d] result [%d]", guest_lock_responce.has_result, guest_lock_responce.result);
+
+			if (guest_lock_responce.has_result) {
+				serverLog(LL_NOTICE, "set guest result to success");
+				ble_data->ble_result->result= guest_lock_responce.result;
+			}
+			setGuestResultCMDResponse( ble_data->ble_result, &guest_lock_responce, sizeof(IgLockResponse));
+		} else if (TASK_BLE_GUEST_GETLOCKSTATUS == task_node->task_type) {
+			IgUnlockResponse guest_unlock_responce;
+			ig_UnlockResponse_init(&guest_unlock_responce);
+			IgSerializerError err = ig_UnlockResponse_decode( responceBytes, responceLen, &guest_unlock_responce, 0);
+			if (err) {
+				serverLog(LL_NOTICE, "ig_GuestUnlockResponse_decode err %d", err);
+				guest_connection->receive_err = 1;
+				ERR_EXIT(ERR_CMD, LOCK_RESPONCE_EXIT)
+			}
+			serverLog(LL_NOTICE, "has unlock response [%d] error [%d].", guest_unlock_responce.has_result, guest_unlock_responce.result);
+
+			if (guest_unlock_responce.has_result) {
+				serverLog(LL_NOTICE, "set guest result to success.");
+				ble_data->ble_result->result = guest_unlock_responce.result;
+			}
+			setGuestResultCMDResponse( ble_data->ble_result, &guest_unlock_responce, sizeof(IgUnlockResponse));
+		} else if (TASK_BLE_GUEST_GETLOCKSTATUS == task_node->task_type) {
+			IgGetLockStatusResponse status_resp;
+			ig_GetLockStatusResponse_init(&status_resp);
+			IgSerializerError err = ig_GetLockStatusResponse_decode(responceBytes, responceLen, &status_resp, 0);
+			if (err) {
+				serverLog(LL_NOTICE, "ig_GetLockStatusResponse_decode err[%d]", err);
+				guest_connection->receive_err = 1;
+				ERR_EXIT(ERR_CMD, LOCK_RESPONCE_EXIT)
+			}
+
+			serverLog(LL_NOTICE, "get status resp: has_result[%d],error[%d],has_lock_open[%d],lock_open[%d],has_cell_network_status[%d],cell_network_status[%d], has_door_open[%d], door_open[%d], has_operation_id[%d], operation_id[%d].",
+					status_resp.has_result, 
+					status_resp.result,
+					status_resp.has_lock_open,
+					status_resp.lock_open,
+					status_resp.has_cell_network_status,
+					status_resp.cell_network_status,
+					status_resp.has_door_open,
+					status_resp.door_open,
+					status_resp.has_operation_id,
+					status_resp.operation_id);
+			if (status_resp.has_result) {
+				serverLog(LL_NOTICE, "set guest result to success");
+				ble_data->ble_result->result = status_resp.result;
+			}
+
+			if (status_resp.has_lock_open) {
+				BleSetStatusRes(ble_data, status_resp.lock_open); 
+			}
+		} else if (TASK_BLE_GUEST_GET_BATTERY_LEVEL == task_node->task_type) {
+			IgGetBatteryLevelResponse responce;
+			ig_GetBatteryLevelResponse_init(&responce);
+			IgSerializerError err = ig_GetBatteryLevelResponse_decode( responceBytes, responceLen, &responce, 0);
+			if (err) {
+				serverLog(LL_NOTICE, "ig_GetLockStatusResponse_decode err %d", err);
+				guest_connection->receive_err = 1;
+				ERR_EXIT(ERR_CMD, LOCK_RESPONCE_EXIT)
+			}
+
+			serverLog(LL_NOTICE, "has get battery level response %d error %d", responce.has_result, responce.result);
+			if (responce.has_result) {
+				serverLog(LL_NOTICE, "get battery result[%d]", responce.result);
+				ble_data->ble_result->result = responce.result;
+			}
+			if (responce.has_battery_level){
+				serverLog(LL_NOTICE, "get battery level[%d]", responce.battery_level);
+				BleSetBatteryLRes(ble_data, responce.battery_level); 
+			}
+
+			serverLog(LL_NOTICE, "handle_step4_message //bleSetBleResult to ble data");
+			setGuestResultCMDResponse( ble_data->ble_result, &responce, sizeof(IgDeletePinResponse));
+		} else if (TASK_BLE_GUEST_GETLOGS == task_node->task_type) {
+			IgGetLogsResponse guest_getlogs_responce;
+			ig_GetLogsResponse_init(&guest_getlogs_responce);
+			IgSerializerError err = ig_GetLogsResponse_decode(responceBytes, responceLen, &guest_getlogs_responce, 0);
+			if (err) {
+				serverLog(LL_NOTICE, "ig_GetLogsResponse_decode err [%d].", err);
+				guest_connection->receive_err = 1;
+				ERR_EXIT(ERR_CMD, LOCK_RESPONCE_EXIT)
+			}
+			serverLog(LL_NOTICE, "get log info has_result[%d], result[%d], has_data[%d], data_size[%d].", guest_getlogs_responce.has_result, guest_getlogs_responce.result, guest_getlogs_responce.has_data, guest_getlogs_responce.data_size);
+
+			if (guest_getlogs_responce.has_result) {
+				serverLog(LL_NOTICE, "set guest result to success.");
+				ble_data->ble_result->result= guest_getlogs_responce.result;
+			}
+			setGuestResultCMDResponse( ble_data->ble_result, &guest_getlogs_responce, sizeof(IgGetLogsResponse));
+
+		} else if (TASK_BLE_GUEST_CREATE_PIN == task_node->task_type) {
+			IgCreatePinResponse guest_create_pin_responce;
+			ig_CreatePinResponse_init(&guest_create_pin_responce);
+			IgSerializerError err = ig_CreatePinResponse_decode( responceBytes, responceLen, &guest_create_pin_responce, 0);
+			if (err) {
+				serverLog(LL_NOTICE, "ig_GetLockStatusResponse_decode err[%d].", err);
+				guest_connection->receive_err = 1;
+				ERR_EXIT(ERR_CMD, LOCK_RESPONCE_EXIT)
+			}
+
+			serverLog(LL_NOTICE, "has create pin result[%d], result[%d].", guest_create_pin_responce.has_result, guest_create_pin_responce.result);
+			if (guest_create_pin_responce.has_result) {
+				serverLog(LL_NOTICE, "set guest result to success");
+				ble_data->ble_result->result = guest_create_pin_responce.result;
+			}
+			setGuestResultCMDResponse( ble_data->ble_result, &guest_create_pin_responce, sizeof(IgCreatePinResponse));
+		} else if (TASK_BLE_GUEST_DEL_PIN == task_node->task_type) {
+			IgDeletePinResponse responce;
+			ig_DeletePinResponse_init(&responce);
+			IgSerializerError err = ig_DeletePinResponse_decode( responceBytes, responceLen, &responce, 0);
+			if (err) {
+				serverLog(LL_NOTICE, "ig_DeletePinResponse_decode err[%d].", err);
+				guest_connection->receive_err = 1;
+				ERR_EXIT(ERR_CMD, LOCK_RESPONCE_EXIT)
+			}
+
+			serverLog(LL_NOTICE, "has delete pin has result[%d], result[%d].", responce.has_result, responce.result);
+			if (responce.has_result) {
+				ble_data->ble_result->result = responce.result;
+			}
+			setGuestResultCMDResponse( ble_data->ble_result, &responce, sizeof(IgDeletePinResponse));
+		} else {
+			serverLog(LL_ERROR, "cmd task_type[%d] err.", task_node->task_type);
+			ERR_EXIT(ERR_CMD, LOCK_RESPONCE_EXIT)
+		}
+
+		igloohome_ble_lock_crypto_GuestConnection_endConnection((guest_connection->lock)->connectionID);
+		serverLog(LL_NOTICE, "igloohome_ble_lock_crypto_GuestConnection_endConnection success");
+	} else {
+		serverLog(LL_ERROR, "step_max_size[%d], step_cur_size[%d], do recv again.", guest_connection->step_max_size, guest_connection->step_cur_size);
+	}
+
+LOCK_RESPONCE_EXIT:
+	setGuestResultErr(ble_data->ble_result, err);
+	if (responceBytes) {
+		free(responceBytes);
+		responceBytes = NULL;
+	}
+	serverLog(LL_NOTICE,"@@@ in handle_lock_responce EXIT do g_main_loop_quit, should no time out!");
+	g_main_loop_quit(task_node->loop);
+
+	return err;
+}
+
+/*
+//  ------------------------ Guest step start ------------------------
+
+fsm_table_t guest_fsm_table[GUEST_SM_TABLE_LEN] = {
+  {BLE_GUEST_BEGIN,     guest_connection_and_do_cmd,		BLE_GUEST_STEP2},
+  {BLE_GUEST_STEP2,     waiting_guest_step2,			BLE_GUEST_STEP3},
+  {BLE_GUEST_STEP3,     write_guest_step3,				BLE_GUEST_STEP4},
+  {BLE_GUEST_STEP4,		waiting_guest_step4,		BLE_GUEST_DONE},
+};
+
+// ------------------------ lock --------------------------------
+
+fsm_table_t guest_lock_fsm_table[GUEST_LOCK_SM_TABLE_LEN] = {
+  {BLE_GUEST_BEGIN,         guest_connection_and_do_cmd,	BLE_GUEST_STEP2},
+  {BLE_GUEST_STEP2,         waiting_guest_step2,        BLE_GUEST_STEP3},
+  {BLE_GUEST_STEP3,         write_guest_step3,          BLE_GUEST_STEP4},
+  {BLE_GUEST_STEP4,			waiting_guest_step4,        BLE_GUEST_LOCK_REQUEST},
+  {BLE_GUEST_LOCK_REQUEST,	write_lock_request,         BLE_GUEST_LOCK_RESULT},
+  {BLE_GUEST_LOCK_RESULT,   waiting_lock_result,        BLE_GUEST_LOCK_DONE},
+};
+
+fsm_table_t *getGuestLockFsmTable() {
+  return guest_lock_fsm_table;
+}
+
+int getGuestLockFsmTableLen() {
+  return GUEST_LOCK_SM_TABLE_LEN;
 }
 
 static int waiting_lock_result(void *arg) {
@@ -930,16 +1187,6 @@ static int waiting_lock_result(void *arg) {
 		serverLog(LL_ERROR, "waiting_unlock_result releaseGuestConnection error");
 		return ret;
 	}
-
-/*
-	ret = gattlib_adapter_close(ble_data->adapter);
-	if (ret)
-	{
-		serverLog(LL_ERROR, "gattlib_adapter_close error ");
-		return ret;
-	}
-	ble_data->adapter = NULL;
-*/
 	return 0;
 
 WAITING_LOCK_ERROR:
@@ -958,85 +1205,9 @@ WAITING_LOCK_ERROR:
 		return ret;
 	}
 	serverLog(LL_NOTICE, "guest_connection_and_do_cmd releaseGuestConnection success");
-/*
-	ret = gattlib_adapter_close(ble_data->adapter);
-	if (ret) {
-		serverLog(LL_ERROR, "gattlib_adapter_close error ");
-		return ret;
-	}
-*/
 	return 1;
 }
 
-static int handle_lock_responce(const uint8_t* data, int data_length,void* user_data) {
-	serverLog(LL_NOTICE,"in handle_lock_responce -------------------------");
-	task_node_t *task_node = (task_node_t *)user_data;
-	ble_data_t *ble_data = task_node->ble_data;
-	guest_connection_t *guest_connection = (guest_connection_t *)ble_data->ble_connection;
-	int err = 0;
-	int responceLen;
-	uint8_t *responceBytes = NULL;
-
-	//guest_connection->guest_step = BLE_GUEST_LOCK_RESULT;
-	save_message_data(data, data_length, user_data);
-
-	if (guest_connection->step_max_size == guest_connection->step_cur_size) {
-		serverLog(LL_NOTICE,"@@@ in handle_lock_responce do g_main_loop_quit, should no time out!");
-		serverLog(LL_NOTICE, "handle_lock_responce RECV step2 data finished");
-
-		size_t messageLen = guest_connection->step_max_size - guest_connection->n_size_byte;
-		uint8_t *data_start = guest_connection->step_data + guest_connection->n_size_byte;
-		uint8_t messageBytes[messageLen];
-		memcpy(messageBytes, data_start, messageLen);
-
-		responceLen = igloohome_ble_lock_crypto_GuestConnection_decryptNative(
-				guest_connection->lock->connectionID, messageBytes, messageLen, &responceBytes);
-		if (!responceLen) { 
-			serverLog(LL_ERROR, "igloohome_ble_lock_crypto_GuestConnection_decryptNative error");
-			guest_connection->receive_err = 1;
-			ERR_EXIT(ERR_CMD, LOCK_RESPONCE_EXIT)
-		}
-		serverLog(LL_NOTICE, "igloohome_ble_lock_crypto_GuestConnection_decryptNative responceLen %d", responceLen);
-
-		IgLockResponse guest_lock_responce;
-		ig_LockResponse_init(&guest_lock_responce);
-		IgSerializerError err = ig_LockResponse_decode( responceBytes, responceLen, &guest_lock_responce, 0);
-		if (err) {
-			serverLog(LL_ERROR, "ig_GuestLockResponse_decode err %d", err);
-			guest_connection->receive_err = 1;
-			ERR_EXIT(ERR_CMD, LOCK_RESPONCE_EXIT)
-		}
-
-		serverLog(LL_NOTICE, "has lock response %d error %d",
-				guest_lock_responce.has_result, guest_lock_responce.result);
-
-		if (guest_lock_responce.has_result) {
-			serverLog(LL_NOTICE, "set guest result to success");
-			ble_data->ble_result->result= guest_lock_responce.result;
-		}
-		setGuestResultCMDResponse( ble_data->ble_result, &guest_lock_responce, sizeof(IgLockResponse));
-
-		serverLog(LL_NOTICE, "handle_step4_message //bleSetBleResult to ble data");
-		//bleSetBleResult( ble_data, ble_data->ble_result);
-		igloohome_ble_lock_crypto_GuestConnection_endConnection((guest_connection->lock)->connectionID);
-		serverLog(LL_NOTICE, "igloohome_ble_lock_crypto_GuestConnection_endConnection success");
-		serverLog(LL_NOTICE, "LOCK_RESULT_EXIT--------------------------------");
-
-	} else {
-		serverLog(LL_ERROR, "Recv ERR, step_max_size[%d], step_cur_size[%d].", guest_connection->step_max_size, guest_connection->step_cur_size);
-	}
-
-LOCK_RESPONCE_EXIT:
-	setGuestResultErr(ble_data->ble_result, err);
-	if (responceBytes) {
-		free(responceBytes);
-		responceBytes = NULL;
-	}
-	g_main_loop_quit(task_node->loop);
-	serverLog(LL_NOTICE,"in handle_lock_responce will g_main_loop_quit.");
-
-	return err;
-}
 
 // -------------------------------- unlock --------------------------------
 fsm_table_t guest_unlock_fsm_table[GUEST_UNLOCK_SM_TABLE_LEN] = {
@@ -1152,13 +1323,12 @@ UNLOCK_REQUEST_ERROR:
 		return ret;
 	}
 	serverLog(LL_NOTICE, "guest_connection_and_do_cmd releaseGuestConnection success");
-/*
-	ret = gattlib_adapter_close(ble_data->adapter);
-	if (ret) {
-		serverLog(LL_ERROR, "gattlib_adapter_close error ");
-		return ret;
-	}
-*/
+
+	//ret = gattlib_adapter_close(ble_data->adapter);
+	//if (ret) {
+//		serverLog(LL_ERROR, "gattlib_adapter_close error ");
+//		return ret;
+//	}
 	return 1;
 }
 
@@ -1185,15 +1355,7 @@ static int waiting_unlock_result(void *arg) {
 		serverLog(LL_ERROR, "waiting_unlock_result releaseGuestConnection error");
 		return ret;
 	}
-/*
-	ret = gattlib_adapter_close(ble_data->adapter);
-	if (ret)
-	{
-		serverLog(LL_ERROR, "gattlib_adapter_close error ");
-		return ret;
-	}
-	ble_data->adapter = NULL;
-*/
+
 	return 0;
 
 WAITING_UNLOCK_ERROR:
@@ -1209,13 +1371,6 @@ WAITING_UNLOCK_ERROR:
 		return ret;
 	}
 	serverLog(LL_NOTICE, "guest_connection_and_do_cmd releaseGuestConnection success");
-/*
-	ret = gattlib_adapter_close(ble_data->adapter);
-	if (ret) {
-		serverLog(LL_ERROR, "gattlib_adapter_close error ");
-		return ret;
-	}
-*/
 	return 1;
 }
 
@@ -1398,13 +1553,6 @@ GETLOGS_REQUEST_ERROR:
 	}
 	serverLog(LL_NOTICE, 
 			"guest_connection_and_do_cmd releaseGuestConnection success");
-/*
-	ret = gattlib_adapter_close(ble_data->adapter);
-	if (ret) {
-		serverLog(LL_ERROR, "gattlib_adapter_close error ");
-		return ret;
-	}
-*/
 	return 1;
 }
 
@@ -1430,14 +1578,6 @@ static int waitingGetLogsResult(void *arg) {
 		serverLog(LL_ERROR, "waiting_unlock_result releaseGuestConnection error");
 		return ret;
 	}
-/*
-	ret = gattlib_adapter_close(ble_data->adapter);
-	if (ret) {
-		serverLog(LL_ERROR, "gattlib_adapter_close error ");
-		return ret;
-	}
-	ble_data->adapter = NULL;
-*/
 	return 0;
 
 WAITING_GETLOGS_ERROR:
@@ -1453,13 +1593,6 @@ WAITING_GETLOGS_ERROR:
 		return ret;
 	}
 	serverLog(LL_NOTICE, "guest_connection_and_do_cmd releaseGuestConnection success");
-/*
-	ret = gattlib_adapter_close(ble_data->adapter);
-	if (ret) {
-		serverLog(LL_ERROR, "gattlib_adapter_close error ");
-		return ret;
-	}
-*/
 	return 0;
 }
 
@@ -1629,13 +1762,6 @@ GETLOCKSTATUS_REQUEST_ERROR:
 		return ret;
 	}
 	serverLog(LL_NOTICE, "guest_connection_and_do_cmd releaseGuestConnection success");
-/*
-	ret = gattlib_adapter_close(ble_data->adapter);
-	if (ret) {
-		serverLog(LL_ERROR, "gattlib_adapter_close error[%d]", ret);
-		return ret;
-	}
-*/
 	return 1;
 }
 
@@ -1662,14 +1788,6 @@ static int waitingGetLockStatusResult(void *arg) {
 		serverLog(LL_ERROR, "waiting_unlock_result releaseGuestConnection error[%d]", ret);
 		return ret;
 	}
-/*
-	ret = gattlib_adapter_close(ble_data->adapter);
-	if (ret) {
-		serverLog(LL_ERROR, "gattlib_adapter_close error[%d]", ret);
-		return ret;
-	}
-	ble_data->adapter = NULL;
-*/
 	return 0;
 
 WAITING_GETLOCKSTATUS_ERROR:
@@ -1685,13 +1803,6 @@ WAITING_GETLOCKSTATUS_ERROR:
 		return ret;
 	}
 	serverLog(LL_NOTICE, "guest_connection_and_do_cmd releaseGuestConnection success");
-/*
-	ret = gattlib_adapter_close(ble_data->adapter);
-	if (ret) {
-		serverLog(LL_ERROR, "gattlib_adapter_close error ");
-		return ret;
-	}
-*/
 	return 0;
 }
 
@@ -1811,8 +1922,7 @@ static int writeCreatePinRequest(void *arg) {
 	ig_CreatePinRequest_init(&create_pin_request);
 	serverLog(LL_NOTICE, "requestID: %d", requestID);
 	ig_CreatePinRequest_set_operation_id( &create_pin_request, requestID);
-	ig_CreatePinRequest_set_password(
-			&create_pin_request, guest_connection->lock->password, guest_connection->lock->password_size);
+	ig_CreatePinRequest_set_password(&create_pin_request, guest_connection->lock->password, guest_connection->lock->password_size);
 	if (!request ||  !ig_CreatePinRequest_is_valid(request)) {
 		serverLog(LL_ERROR, "request NULL or request don't have pin");
 		goto PIN_REQUEST_ERROR;
@@ -1935,14 +2045,6 @@ PIN_REQUEST_ERROR:
 	}
 	serverLog(LL_NOTICE, 
 			"releaseGuestConnection success");
-/*
-	ret = gattlib_adapter_close(ble_data->adapter);
-	if (ret)
-	{
-		serverLog(LL_ERROR, "gattlib_adapter_close error ");
-		return ret;
-	}
-*/
 	serverLog(LL_NOTICE, "gattlib_adapter_close success");
 	return 1;
 }
@@ -1973,15 +2075,6 @@ static int waitingCreatePinRequestResult(void *arg)
 		serverLog(LL_ERROR, "waiting_unlock_result releaseGuestConnection error");
 		return ret;
 	}
-/*
-	ret = gattlib_adapter_close(ble_data->adapter);
-	if (ret)
-	{
-		serverLog(LL_ERROR, "gattlib_adapter_close error ");
-		return ret;
-	}
-	ble_data->adapter = NULL;
-*/
 	return 0;
 
 WAITING_CREATE_PIN_ERROR:
@@ -2002,14 +2095,6 @@ WAITING_CREATE_PIN_ERROR:
 	}
 	serverLog(LL_NOTICE, 
 			"guest_connection_and_do_cmd releaseGuestConnection success");
-/*
-	ret = gattlib_adapter_close(ble_data->adapter);
-	if (ret)
-	{
-		serverLog(LL_ERROR, "gattlib_adapter_close error ");
-		return ret;
-	}
-*/
 
 }
 
@@ -2220,13 +2305,6 @@ DELETE_PIN_ERROR:
 		return ret;
 	}
 	serverLog(LL_NOTICE, "releaseGuestConnection success");
-/*
-	ret = gattlib_adapter_close(ble_data->adapter);
-	if (ret) {
-		serverLog(LL_ERROR, "gattlib_adapter_close error ");
-		return ret;
-	}
-*/
 	serverLog(LL_NOTICE, "gattlib_adapter_close success");
 	return 1;
 }
@@ -2257,15 +2335,6 @@ static int waitingDeletePinRequestResult(void *arg)
 		serverLog(LL_ERROR, "waitingGetLockStatusResult releaseGuestConnection error");
 		return ret;
 	}
-/*
-	ret = gattlib_adapter_close(ble_data->adapter);
-	if (ret)
-	{
-		serverLog(LL_ERROR, "gattlib_adapter_close error ");
-		return ret;
-	}
-	ble_data->adapter = NULL;
-*/
 	return 0;
 
 WAITING_DELETE_PIN_ERROR:
@@ -2290,14 +2359,6 @@ WAITING_DELETE_PIN_ERROR:
 	}
 	serverLog(LL_NOTICE, "guest_connection_and_do_cmd releaseGuestConnection success");
 	serverLog(LL_ERROR, "gattlib_adapter_close ");
-/*
-	ret = gattlib_adapter_close(ble_data->adapter);
-	if (ret)
-	{
-		serverLog(LL_ERROR, "gattlib_adapter_close error ");
-		return ret;
-	}*/
-
 }
 
 static int handleDeletePinResponce(const uint8_t* data, int data_length,void* user_data)
@@ -2484,12 +2545,6 @@ GET_BATTERY_ERROR:
 		return ret;
 	}
 	serverLog(LL_NOTICE, "releaseGuestConnection success");
-/*
-	ret = gattlib_adapter_close(ble_data->adapter);
-	if (ret) {
-		serverLog(LL_ERROR, "gattlib_adapter_close error ");
-		return ret;
-	}*/
 	serverLog(LL_NOTICE, "gattlib_adapter_close success");
 	return 1;
 }
@@ -2517,14 +2572,6 @@ static int waitingGetBatteryLevelResult(void *arg) {
 		serverLog(LL_ERROR, "waitingGetLockStatusResult releaseGuestConnection error");
 		return ret;
 	}
-/*
-	ret = gattlib_adapter_close(ble_data->adapter);
-	if (ret) {
-		serverLog(LL_ERROR, "gattlib_adapter_close error ");
-		return ret;
-	}
-	ble_data->adapter = NULL;
-*/
 	return 0;
 
 WAITING_BATTERY_ERROR:
@@ -2548,12 +2595,6 @@ WAITING_BATTERY_ERROR:
 	}
 	serverLog(LL_NOTICE, "guest_connection_and_do_cmd releaseGuestConnection success");
 	serverLog(LL_ERROR, "gattlib_adapter_close ");
-/*
-	ret = gattlib_adapter_close(ble_data->adapter);
-	if (ret) {
-		serverLog(LL_ERROR, "gattlib_adapter_close error ");
-		return ret;
-	}*/
 	return -1;
 
 }
@@ -2624,8 +2665,7 @@ DELETE_PINREQUEST_RESPONCE_EXIT:
 		g_main_loop_quit(task_node->loop);
 	}
 }
-
-
+*/
 
 //-------------------------- param
 int bleInitGuestParam(ble_guest_param_t *guest_param)
@@ -2664,9 +2704,7 @@ int bleSetGuestParam(ble_guest_param_t *guest_param, igm_lock_t *lock)
   return 0;
 }
 
-int bleSetGuestRequest(
-        ble_guest_param_t *guest_param, void *cmd_request, size_t cmd_request_size)
-{
+int bleSetGuestRequest( ble_guest_param_t *guest_param, void *cmd_request, size_t cmd_request_size) {
     if (!cmd_request) return 1;
     if (guest_param->cmd_request)
     {
@@ -2742,16 +2780,4 @@ void releaseGuestResult(ble_guest_result_t **pp_result) {
 	releaseGuestResultCMDResponse(*pp_result);
 }
 
-
-// -----------------------------------------------
-
-fsm_table_t *getGuestFsmTable()
-{
-  return guest_fsm_table;
-}
-
-int getGuestFsmTableLen()
-{
-  return GUEST_SM_TABLE_LEN;
-}
 

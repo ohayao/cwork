@@ -12,6 +12,7 @@ set(TEST_DEPENDENCIES
   mqtt
   ign_proto
   ign_lib
+  ign_wifi_service
 )
 
 add_executable(decode_base64 ./decode_base64.c)
@@ -20,11 +21,11 @@ target_link_libraries(decode_base64 ${TEST_DEPENDENCIES})
 add_executable(scan ./scan.c)
 target_link_libraries(scan ${TEST_DEPENDENCIES})
 
-add_executable(guest_unlock ./guest_unlock.c)
-target_link_libraries(guest_unlock ${TEST_DEPENDENCIES})
+#add_executable(guest_unlock ./guest_unlock.c)
+#target_link_libraries(guest_unlock ${TEST_DEPENDENCIES})
 
-add_executable(guest_lock ./guest_lock.c)
-target_link_libraries(guest_lock ${TEST_DEPENDENCIES})
+#add_executable(guest_lock ./guest_lock.c)
+#target_link_libraries(guest_lock ${TEST_DEPENDENCIES})
 
 
 #add_executable(pair ./pair.c)
@@ -77,4 +78,15 @@ target_link_libraries(guest_lock ${TEST_DEPENDENCIES})
 #  ${TEST_DEPENDENCIES}
 #)
 
+# 测试 wifi_pairing 功能
+add_executable(wifi_pairing ./wifi_pairing.c)
+target_link_libraries(wifi_pairing
+  ${TEST_DEPENDENCIES}
+)
 
+
+# 测试 wifi_pairing 功能
+add_executable(wifi_setting ./wifi_setting.c)
+target_link_libraries(wifi_setting
+  ${TEST_DEPENDENCIES}
+)

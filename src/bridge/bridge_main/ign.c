@@ -78,7 +78,7 @@ int h_GetBridgeToken(char *userToken,char *bridgeToken){
 int h_downloadcsr(char *bridgeToken);
 int h_downloadcsr(char *bridgeToken){
     char res[4096],url[200],bridgeID[20];
-    char *localCSR=get_file_content("../../../igkey/domain.csr");
+    char *localCSR=get_file_content("./local.csr");
     memset(res,0,sizeof(res));
     memset(url,0,sizeof(url));
     memset(bridgeID,0,sizeof(bridgeID));
@@ -107,7 +107,7 @@ int h_downloadcsr(char *bridgeToken){
     }
     cJSON *pem=cJSON_GetObjectItem(root,"pem");
     printf("pem=%s\n",pem->valuestring);
-    write_file_content("../../../igkey/test_test_test_test.csr",pem->valuestring);
+    write_file_content("./ign_service.csr",pem->valuestring);
     cJSON_Delete(root);
     printf("=====>>>>>DOWNLOAD-CSR Over!!!!!\n");
     return 0;
@@ -133,7 +133,6 @@ int download_ca(){
         return -1;                        
     }
     return 0;
-                        
 }
 
 
