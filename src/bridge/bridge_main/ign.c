@@ -23,6 +23,12 @@
 #include "bridge/lock/messages/DeletePinRequest.h"
 #include "bridge/lock/messages/GetLogsResponse.h"
 //#include "bridge/https_client/https.h"
+#include <stdio.h>                                                             
+#include <linux/input.h>                                                       
+#include <stdlib.h>                                                            
+#include <sys/types.h>                                                          
+#include <sys/stat.h>                                            
+#include <fcntl.h>   
 
 static sysinfo_t g_sysif;
 static ble_addr_t g_ble_addr;
@@ -132,33 +138,20 @@ int h_downloadcsr(char *bridgeToken){
 	return 0;
 }
 
-int download_ca(unsigned int* step){
-	int ret;
+int download_ca(){
+	int ret=0, t=0;
 	char userToken[2048],bridgeToken[2048];
 	memset(userToken,0,sizeof(userToken));
 	memset(bridgeToken,0,sizeof(bridgeToken));
-	if(*step < 1) {
-		printf("in download_ca *step[%d]\n", *step);
-		if((ret=h_GetUserToken(userToken))!=0){
-			printf("GetUserTokenError [%d]\n",ret);
-			return -1;                                    
-		}
-		*step = 1;
+
+	while ((ret=h_GetUserToken(userToken))!=0){
+		printf("GetUserTokenError [%d]\n",ret);
 	}
-	if (*step < 2) {
-		printf("in download_ca *step[%d]\n", *step);
-		if((ret=h_GetBridgeToken(userToken,bridgeToken))!=0){
-			printf("GetBridgeTokenError [%d]\n",ret);
-			return -1;                                    
-		}
-		*step = 2;
+	while((ret=h_GetBridgeToken(userToken,bridgeToken))!=0){
+		printf("GetBridgeTokenError [%d]\n",ret);
 	}
-	if (*step < 3) {
-		if((ret=h_downloadcsr(bridgeToken))!=0){
-			printf("DownloadCSR Error[%d]\n",ret);
-			return -1;                        
-			*step = 3;
-		}
+	while((ret=h_downloadcsr(bridgeToken))!=0){
+		printf("DownloadCSR Error[%d]\n",ret);
 	}
 	return 0;
 }
@@ -288,10 +281,14 @@ void saveTaskData(task_node_t* ptn) {
 	if(ptn->ble_data) {
 		ble_data_t *ble_data = ptn->ble_data;
 		switch (ptn->task_type) {
-			case TASK_BLE_ADMIN_GETLOCKSTATUS:
+			case TASK_BLE_GUEST_GETLOCKSTATUS:
 				{
 					printf( "handle ble get lock status data.\n");
 					ble_guest_result_t *guest_result = (ble_guest_result_t *)ble_data->ble_result;
+					if(NULL == guest_result) {
+						serverLog(LL_ERROR, "guest_result is NULL err.");
+						return;
+					}
 					if(guest_result->result) {
 						printf("get status error[%d].\n", guest_result->result);
 					} else {
@@ -303,8 +300,12 @@ void saveTaskData(task_node_t* ptn) {
 			case TASK_BLE_GUEST_GET_BATTERY_LEVEL:
 				{
 					printf( "handle battery data.\n");
-					ble_guest_result_t *guest_unlock_result = (ble_guest_result_t *)ble_data->ble_result;
-					int ret = guest_unlock_result->result;
+					ble_guest_result_t* guest_result = (ble_guest_result_t *)ble_data->ble_result;
+					if(NULL == guest_result) {
+						serverLog(LL_ERROR, "guest_result is NULL err.");
+						return;
+					}
+					int ret = guest_result->result;
 					if (ret) {
 						printf("get battery error[%d].\n", ret);
 					} else {
@@ -318,6 +319,10 @@ void saveTaskData(task_node_t* ptn) {
 				{
 					printf( "get ble response data of TASK_BLE_GUEST_GETLOGS\n");
 					ble_guest_result_t *guest_get_logs_result = (ble_guest_result_t *)ble_data->ble_result;
+					if(NULL == guest_get_logs_result) {
+						serverLog(LL_ERROR, "guest_result is NULL err.");
+						return;
+					}
 					int ret = guest_get_logs_result->result;
 					if (ret) {
 						printf( "get lock logs error\n");
@@ -328,29 +333,6 @@ void saveTaskData(task_node_t* ptn) {
 						Sync_Activities(ptn->lock_id, get_logs_response->data, get_logs_response->data_size);
 					}   
 					break;
-				}
-			case TASK_BLE_DISCOVER:
-				{
-					serverLog(LL_NOTICE, "saving ble TASK_BLE_DISCOVER data");
-					int num_of_result = bleGetNumsOfResult(ble_data);
-					void *result = ble_data->ble_result;
-					for (int j=0; j < num_of_result; j++)
-					{
-						igm_lock_t *lock = bleGetNResult(ble_data, j, sizeof(igm_lock_t));
-						serverLog(LL_NOTICE, "name %s  addr: %s", lock->name, lock->addr);
-						insertLock(lock);
-						// test éè¦, 
-						// if (!lock->paired)
-						// {
-						//     serverLog(LL_NOTICE, "try to pair name %s  addr: %s", lock->name, lock->addr);
-						//     addPairingTask(lock);
-						// }              
-					}
-					break;
-				}
-			case TASK_BLE_GUEST_CONNECTION:
-				{
-					serverLog(LL_NOTICE, "saving ble TASK_BLE_GUEST_CONNECTION data");
 				}
 			case TASK_BLE_GUEST_UNLOCK:
 				{
@@ -387,6 +369,7 @@ int HandleLockCMD (sysinfo_t* si, igm_lock_t* lock, int cmd, void* request) {
     bleSetBleParam(ble_data, guest_param, sizeof(ble_guest_param_t));
 
 	task_node_t *tn = (task_node_t *)malloc(sizeof(task_node_t));
+    tn->ble_data_len = sizeof(task_node_t);
 	tn->sysif = si;
 	tn->ble_data = ble_data;
 	memset(tn->lock_id, 0x0, sizeof(tn->lock_id));
@@ -439,12 +422,13 @@ int HandleLockCMD (sysinfo_t* si, igm_lock_t* lock, int cmd, void* request) {
 		}
     }*/
 
-    saveTaskData(tn);
     int ret = guest_connection_and_do_cmd(tn);
     if(ret) {
         serverLog(LL_ERROR, "guest_connection_and_do_cmd err[%d].", ret);
         return -1;
     }
+
+    saveTaskData(tn);
 
     ble_guest_result_t *guest_unlock_result = (ble_guest_result_t *)ble_data->ble_result;
     releaseGuestResult(&guest_unlock_result);
@@ -850,23 +834,10 @@ int Init(void* tn) {
     } while(0 != ret);
     serverLog(LL_NOTICE, "init Wifi connection success");
 
-//	system("openssl req -new -nodes -newkey rsa:2048 -keyout local.key -out local.csr");
-/*
-    int try_times=0;
-	unsigned int step = 0;
-    while(1){
-        ret = download_ca(&step);
-        try_times++;
-        if(0 == ret || try_times>4){
-            break;
-        }
-        sleep(1);
-    }
-    if(0!=ret && try_times>4){
-        serverLog(LL_ERROR,"download_ca fail.");
-		return -1;
-    }
-*/
+	//system("openssl req -new -nodes -newkey rsa:2048 -keyout local.key -out local.csr");
+	//if no pem, do it;  if there is pem, pass this
+    //ret = download_ca();
+
 	do {
 		ret = Init_MQTT(&g_sysif.mqtt_c);
         sleep(0.5);
@@ -893,6 +864,7 @@ int Init(void* tn) {
     GetUserInfo();
 
 	printf("Init Finish!\n");
+	system("echo default-on > /sys/class/leds/g/trigger");
     return 0;
 }
 
@@ -1209,13 +1181,32 @@ void WaitMQTT(sysinfo_t *si) {
 	}
 }
 
+#define DEV_PATH "/dev/input/event0"
 int WaitBtn(void *arg){
 	//if btn
 	//add Init into doing_list
-	for(;;) {
-		sleep(5);
-		serverLog(LL_NOTICE, "waiting for Btn...");
+	serverLog(LL_NOTICE, "waiting for Btn...");
+	int keys_fd;
+	struct input_event t;
+	keys_fd=open(DEV_PATH, O_RDONLY);
+	if(keys_fd <= 0) {
+		serverLog(LL_ERROR, "open /dev/input/event0 device error!\n");
+		return -1;
 	}
+
+	while(1) {                                               
+		if(read(keys_fd, &t, sizeof(t)) == sizeof(t)) {  
+			if(t.type==EV_KEY) {                     
+				if(t.value==0 || t.value==1) {   
+					printf("key %d %s\n", t.code, (t.value) ? "Pressed" : "Released");
+					system("echo 100 > /sys/class/leds/g/trigger");
+					sleep(2);
+					system("echo default-on > /sys/class/leds/g/trigger");
+				}                                              
+			}                                                      
+		}                                                              
+	}                                                                      
+	close(keys_fd);                                                        
 
 	return 0;
 }

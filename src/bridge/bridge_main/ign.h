@@ -40,7 +40,7 @@ int GetMacAddr(char * mac, int len_limit) {
     if ((sock = socket (AF_INET, SOCK_STREAM, 0)) < 0) {
         return -1;
     }
-    strcpy (ifreq.ifr_name, "eth0");    //Currently, only get eth0
+    strcpy (ifreq.ifr_name, "wlan0");    //Currently, only get eth0
     ret = ioctl (sock, SIOCGIFHWADDR, &ifreq);
     if (ret) {
         printf("get eth0 err[%d]\n", ret);

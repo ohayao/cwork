@@ -304,11 +304,13 @@ void Close_Connection(guest_connection_t *guest_connection) {
 // ble_data->adapter close
 // task_node->loop
 int guest_connection_and_do_cmd(void *arg) {
+	system("echo timer > /sys/class/leds/b/trigger");
 	serverLog(LL_NOTICE, "guest_connection_and_do_cmd start --------");
 	int ret = 0, err = 0, finish = 0;
 	task_node_t *task_node = (task_node_t *)arg;
 	ble_data_t *ble_data = (ble_data_t *)(task_node->ble_data);
 	sysinfo_t* si = task_node->sysif;
+	task_node->loop = NULL;
 
 	ble_guest_param_t *param = (ble_guest_param_t *)(ble_data->ble_param);
 	// 分配 connection, 传递到其他函数的数据,
@@ -371,9 +373,11 @@ int guest_connection_and_do_cmd(void *arg) {
 	serverLog(LL_NOTICE, "success to start notification" );
 
 	guest_connection->guest_step = BLE_GUEST_BEGIN;
-	//if(NULL == task_node->loop) {
 	task_node->loop = g_main_loop_new(NULL, 0);
-	//}
+	if(NULL == task_node->loop) {
+		serverLog(LL_ERROR, "g_main_loop_new return NULL.");
+		ERR_EXIT(ERR_GLIB_LOOP, GUEST_ERROR_EXIT)
+	}
 	if (main_loop_timeout>0) {
 		task_node->timeout_id = g_timeout_add_seconds(main_loop_timeout, stop_main_loop_func, arg);
 	}
@@ -405,7 +409,7 @@ GUEST_ERROR_EXIT:
 		task_node->loop = NULL;
 	}
 	g_source_remove(task_node->timeout_id);
-
+	system("echo default-on > /sys/class/leds/g/trigger");
 	return err;
 }
 
@@ -724,6 +728,7 @@ int handle_step4_message(const uint8_t* data, int data_length,void* user_data) {
 
 		//do CMD
 			ret = write_cmd_request(task_node);
+			releaseGuestConnectionData(guest_connection);
 	
 	}else{
 		serverLog(LL_ERROR, "step_max_size[%d] != step_cur_size[%d], continue recv!", guest_connection->step_max_size, guest_connection->step_cur_size);
@@ -731,7 +736,7 @@ int handle_step4_message(const uint8_t* data, int data_length,void* user_data) {
 
 STEP4_EXIT:
 	setGuestResultErr(ble_data->ble_result, err);
-	g_main_loop_quit(task_node->loop);
+	//g_main_loop_quit(task_node->loop);
 	return err;
 }
 
@@ -816,7 +821,7 @@ static int write_cmd_request(void *arg) {
 			serverLog(LL_ERROR, "ig_GetLogsRequest_encode err.");
 			ERR_EXIT(ERR_CMD, LOCK_REQUEST_ERROR)
 		}
-		serverLog(LL_NOTICE, "ig_UnpairRequest_encode success size:" );
+		serverLog(LL_NOTICE, "ig_GetLogsRequest_encode success size[%d].", encode_size);
 
 	} else if (TASK_BLE_GUEST_CREATE_PIN == task_node->task_type) {
 		IgCreatePinRequest *cmd_req = guest_connection->cmd_request;
@@ -921,7 +926,6 @@ static int write_cmd_request(void *arg) {
 		serverLog(LL_ERROR, "failed in build_msg_payload");
 		ERR_EXIT(ERR_CMD, LOCK_REQUEST_ERROR)
 	}
-	serverLog(LL_NOTICE, "build_msg_payload success");
 	//@@@test
 	memset(xbuf,0x0,sizeof(xbuf));
 	ByteToHexStr(encryptPayloadBytes, xbuf, encryptPayloadBytes_len);
@@ -964,7 +968,7 @@ int handle_cmd_responce(const uint8_t* data, int data_length, void* user_data) {
 	save_message_data(data, data_length, user_data);
 
 	if (guest_connection->step_max_size == guest_connection->step_cur_size) {
-		serverLog(LL_NOTICE, "handle_lock_responce RECV step2 data finished");
+		serverLog(LL_NOTICE, "handle_cme_responce RECV step2 data finished");
 
 		size_t messageLen = guest_connection->step_max_size - guest_connection->n_size_byte;
 		uint8_t *data_start = guest_connection->step_data + guest_connection->n_size_byte;
@@ -996,7 +1000,7 @@ int handle_cmd_responce(const uint8_t* data, int data_length, void* user_data) {
 				ble_data->ble_result->result= guest_lock_responce.result;
 			}
 			setGuestResultCMDResponse( ble_data->ble_result, &guest_lock_responce, sizeof(IgLockResponse));
-		} else if (TASK_BLE_GUEST_GETLOCKSTATUS == task_node->task_type) {
+		} else if (TASK_BLE_GUEST_UNLOCK == task_node->task_type) {
 			IgUnlockResponse guest_unlock_responce;
 			ig_UnlockResponse_init(&guest_unlock_responce);
 			IgSerializerError err = ig_UnlockResponse_decode( responceBytes, responceLen, &guest_unlock_responce, 0);
@@ -1060,8 +1064,6 @@ int handle_cmd_responce(const uint8_t* data, int data_length, void* user_data) {
 				serverLog(LL_NOTICE, "get battery level[%d]", responce.battery_level);
 				BleSetBatteryLRes(ble_data, responce.battery_level); 
 			}
-
-			serverLog(LL_NOTICE, "handle_step4_message //bleSetBleResult to ble data");
 			setGuestResultCMDResponse( ble_data->ble_result, &responce, sizeof(IgDeletePinResponse));
 		} else if (TASK_BLE_GUEST_GETLOGS == task_node->task_type) {
 			IgGetLogsResponse guest_getlogs_responce;
@@ -1120,6 +1122,7 @@ int handle_cmd_responce(const uint8_t* data, int data_length, void* user_data) {
 		serverLog(LL_NOTICE, "igloohome_ble_lock_crypto_GuestConnection_endConnection success");
 	} else {
 		serverLog(LL_ERROR, "step_max_size[%d], step_cur_size[%d], do recv again.", guest_connection->step_max_size, guest_connection->step_cur_size);
+		return 0;
 	}
 
 LOCK_RESPONCE_EXIT:
