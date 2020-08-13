@@ -84,9 +84,9 @@ int h_GetBridgeToken(char *userToken,char *bridgeToken){
 int h_downloadcsr(char *bridgeToken);
 int h_downloadcsr(char *bridgeToken){
     char res[4096],url[200],bridgeID[20];
-    char *localCSR = get_file_content("./local.csr");
+    char *localCSR = get_file_content("./certificate/local.csr");
 	if(NULL == localCSR) {
-		printf("get_file_content ./local.csr err.\n");
+		printf("get_file_content ./certificate/local.csr err.\n");
 		return -1;
 	}
     memset(res,0,sizeof(res));
@@ -132,28 +132,37 @@ int h_downloadcsr(char *bridgeToken){
 		return -1;
 	}
     printf("pem=[%s]\n",pem->valuestring);
-    write_file_content("./ign_service.csr", pem->valuestring);
+    write_file_content("./certificate/ign_service.csr", pem->valuestring);
 	cJSON_Delete(root);
 	printf("=====>>>>>DOWNLOAD-CSR Over!!!!!\n");
 	return 0;
 }
+int download_ca(int tryTimes);
+int download_ca(int tryTimes){
+    int ret;
+    int _tt=0;
+    char userToken[2048],bridgeToken[2048];
+    memset(userToken,0,sizeof(userToken));
+    memset(bridgeToken,0,sizeof(bridgeToken));
+    while((ret=h_GetUserToken(userToken))!=0){
+        printf("GetUserTokenError [%d]\n",ret);
+        if(tryTimes>0) _tt++;
+        else if(_tt>0 && _tt>=tryTimes) return -1;
+    }
+    _tt=0;
 
-int download_ca(){
-	int ret=0, t=0;
-	char userToken[2048],bridgeToken[2048];
-	memset(userToken,0,sizeof(userToken));
-	memset(bridgeToken,0,sizeof(bridgeToken));
-
-	while ((ret=h_GetUserToken(userToken))!=0){
-		printf("GetUserTokenError [%d]\n",ret);
-	}
-	while((ret=h_GetBridgeToken(userToken,bridgeToken))!=0){
-		printf("GetBridgeTokenError [%d]\n",ret);
-	}
-	while((ret=h_downloadcsr(bridgeToken))!=0){
-		printf("DownloadCSR Error[%d]\n",ret);
-	}
-	return 0;
+    while((ret=h_GetBridgeToken(userToken,bridgeToken))!=0){
+        printf("GetBridgetTokenError [%d]\n",ret);
+        if(tryTimes>0) _tt++;
+        if(_tt>0 && _tt>=tryTimes) return -1;
+    }
+    _tt=0;
+    while((ret=h_downloadcsr(bridgeToken))!=0){
+        printf("DownloadCSR Error [%d]\n",ret);
+        if(tryTimes>0) _tt++;
+        if(_tt>0 && _tt>=tryTimes) return -1;
+    }
+    return 0;
 }
 
 
@@ -612,6 +621,7 @@ int GetUserInfo() {
 }
 
 int Init_MQTT(MQTTClient* p_mqtt){
+    printf("====>CAPATH=%s;TRUST_STORE=%s;PRIVATE_KEY=%s;KEY_STORE=%s\n",CA_PATH,TRUST_STORE,PRIVATE_KEY,KEY_STORE);
     *p_mqtt = MQTT_initClients(HOST, g_sysif.mac, 60, 1, CA_PATH, TRUST_STORE, PRIVATE_KEY, KEY_STORE);
     if(NULL == *p_mqtt) {
         serverLog(LL_ERROR, "MQTT_initClients err, mqtt_c is NULL.");
@@ -837,6 +847,14 @@ int Init(void* tn) {
 	//system("openssl req -new -nodes -newkey rsa:2048 -keyout local.key -out local.csr");
 	//if no pem, do it;  if there is pem, pass this
     //ret = download_ca();
+
+    //尝试下载证书的次数 默认0 直到下载成功停止
+    int try_time=0;
+    if(download_ca(try_time)!=0){
+        printf("_______DOWNLOAD CSR FAILED\n");
+    }else{
+        printf("_______DOWNLOAD CSR SUCCESS\n");
+    }
 
 	do {
 		ret = Init_MQTT(&g_sysif.mqtt_c);

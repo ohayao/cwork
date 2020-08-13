@@ -13,9 +13,14 @@
 #define HOST "ssl://aa85fsnk5qn58-ats.iot.ap-southeast-1.amazonaws.com:8883"
 #define SUBSCRIBE_CLIENT_ID "JasonSubscribeID_0001"
 
-#define CA_PATH "../../../igkey/"
-#define TRUST_STORE "../../../igkey/ca.pem"
-#define PRIVATE_KEY "../../../igkey/key.pem"
-#define KEY_STORE "../../../igkey/cert.pem"
+//#define CA_PATH "../../../igkey/"
+//#define TRUST_STORE "../../../igkey/ca.pem"
+//#define PRIVATE_KEY "../../../igkey/key.pem"
+//#define KEY_STORE "../../../igkey/cert.pem"
+
+#define CA_PATH "./certificate/"
+#define TRUST_STORE "./certificate/ca.pem"
+#define PRIVATE_KEY "./certificate/ign_service.csr"
+#define KEY_STORE "./certificate/local.key"
 
 #endif
