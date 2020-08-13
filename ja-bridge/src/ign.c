@@ -21,8 +21,8 @@
 #include "../../src/bridge/https_client/https.h"
 
 //临时定义发布和订阅的TOPIC
-#define PUB_TOPIC "igh/dev/DCA63210C7DA"
-#define SUB_TOPIC "igh/srv/DCA63210C7DA"
+#define PUB_TOPIC "igh/ign1/dev/DCA63228FB73"
+#define SUB_TOPIC "igh/ign1/srv/DCA63228FB73"
 
 //定义订阅和发布web端TOPIC
 #define SUB_WEBDEMO "/WEBSOCKET_DEMO_SUB"

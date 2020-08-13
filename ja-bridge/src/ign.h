@@ -16,11 +16,15 @@
 atomic_int g_msg_id = 0;
 
 #define HOST "ssl://aa85fsnk5qn58-ats.iot.ap-southeast-1.amazonaws.com:8883"
-#define SUBSCRIBE_CLIENT_ID "JasonSubscribeID"
-#define CA_PATH "../../igkey/"
-#define TRUST_STORE "../../igkey/ca.pem"
-#define PRIVATE_KEY "../../igkey/key.pem"
-#define KEY_STORE "../../igkey/cert.pem"
+#define SUBSCRIBE_CLIENT_ID "DCA63228FB73"
+//#define CA_PATH "../../igkey/"
+#define CA_PATH "./"
+//#define TRUST_STORE "../../igkey/ca.pem"
+#define TRUST_STORE "./ca.pem"
+//#define PRIVATE_KEY "./key.pem"
+#define PRIVATE_KEY "./domain.key"
+//#define KEY_STORE "../../igkey/cert.pem"
+#define KEY_STORE "./test_test_test_test.csr"
 static char LOG_FILE[] = "./log_ign";
 
 #define thread_type pthread_t
