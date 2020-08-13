@@ -304,6 +304,7 @@ void Close_Connection(guest_connection_t *guest_connection) {
 // ble_data->adapter close
 // task_node->loop
 int guest_connection_and_do_cmd(void *arg) {
+	system("echo none > /sys/class/leds/g/trigger");
 	system("echo timer > /sys/class/leds/b/trigger");
 	serverLog(LL_NOTICE, "guest_connection_and_do_cmd start --------");
 	int ret = 0, err = 0, finish = 0;
@@ -350,6 +351,10 @@ int guest_connection_and_do_cmd(void *arg) {
 
 	serverLog(LL_NOTICE,"in guest_connection_and_do_cmd ready to connection adapter[%d], lockaddr[%s].", si->ble_adapter, guest_connection->lock->addr);
 	//optimise this short connection to long!
+	if(NULL == guest_connection->lock->addr){
+		serverLog(LL_ERROR, "lock addr is NULL err." );
+		ERR_EXIT(ERR_GATT, GUEST_ERROR_EXIT)
+	}
 	guest_connection->gatt_connection = gattlib_connect(si->ble_adapter, guest_connection->lock->addr, GATTLIB_CONNECTION_OPTIONS_LEGACY_DEFAULT);
 	if (NULL == guest_connection->gatt_connection) {
 		serverLog(LL_ERROR, "Fail to connect to the bluetooth device." );
@@ -409,6 +414,7 @@ GUEST_ERROR_EXIT:
 		task_node->loop = NULL;
 	}
 	g_source_remove(task_node->timeout_id);
+	system("echo none > /sys/class/leds/b/trigger");
 	system("echo default-on > /sys/class/leds/g/trigger");
 	return err;
 }

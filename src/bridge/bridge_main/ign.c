@@ -709,19 +709,19 @@ void InitLockinfo(sysinfo_t* si) {
 int AddLockinfo(sysinfo_t* si, LockInfo_t* li) {
 	if(si->lock_total < MAX_LOCK_COUNT-1) {
 		LockInfo_t* p = si->lockinfo + (si->lock_total);
-		memcpy(p, li, sizeof(LockInfo_t)); 
 		//get addr
 		char* lock_addr = GetAddrBle(si, li->lock_id);
 		if(NULL != lock_addr) {
+			memcpy(p, li, sizeof(LockInfo_t)); 
 			p->lock_addr_size = strlen(lock_addr);
 			if(32 > p->lock_addr_size){
 				memcpy(p->lock_addr, lock_addr, p->lock_addr_size);
 			}
+			si->lock_total++;
 		}else{
 			printf("GetAddrBle get NULL.\n");
 			p->lock_addr_size = 0;
 		}
-		si->lock_total++;
 		return 0;
 	}
 	return -1;
@@ -751,7 +751,7 @@ void ble_discovered_cb(void *adapter, const char* addr, const char* name, void* 
 	ble_addr_t* bl = ((sysinfo_t*)si)->ble_list;
 	unsigned char ble_total = ((sysinfo_t*)si)->ble_list_n; 
     if (name) {
-        printf("Discovered %s - '%s'\n", addr, name);
+        printf("Discovered [%s] - [%s]\n", addr, name);
 		((sysinfo_t*)si)->ble_list = realloc(bl, sizeof(ble_addr_t)*(ble_total+1));
 		ble_addr_t* nbl = ((sysinfo_t*)si)->ble_list + ble_total;
 		memset(nbl, 0x0, sizeof(ble_addr_t));
@@ -759,7 +759,7 @@ void ble_discovered_cb(void *adapter, const char* addr, const char* name, void* 
 		memcpy(nbl->addr, addr, strlen(addr));
 		((sysinfo_t*)si)->ble_list_n++;
     } else {
-        printf("Discovered %s\n", addr);
+        printf("Discovered [%s]\n", addr);
     }
 	
 	//g_ble_addr.insert(name, addr);
@@ -808,6 +808,11 @@ int WifiConnection(){
 }
 
 int Init(void* tn) {
+
+	system("echo default-on > /sys/class/leds/r/trigger");
+	system("echo default-on > /sys/class/leds/b/trigger");
+	system("echo default-on > /sys/class/leds/g/trigger");
+
 	int ret = 0;
 
     ret = GetMacAddr(g_sysif.mac, sizeof(g_sysif.mac));
@@ -880,6 +885,8 @@ int Init(void* tn) {
     GetUserInfo();
 
 	printf("Init Finish!\n");
+	system("echo none > /sys/class/leds/r/trigger");
+	system("echo none > /sys/class/leds/b/trigger");
 	system("echo default-on > /sys/class/leds/g/trigger");
     return 0;
 }
@@ -1070,7 +1077,8 @@ int DealCMD(sysinfo_t *si, ign_MsgInfo imsg) {
 					return -1;
 				}
 
-				printf("@@@ demo_job.bt_id[%s], op_cmd[%d], pin[", 
+				printf("@@@ si->lock_total[%d], pli[%x][%s][%s],demo_job.bt_id[%s], op_cmd[%d], pin[",
+						si->lock_total, pli, pli->lock_id, pli->lock_addr,
 						imsg.server_data.demo_job.bt_id, imsg.server_data.demo_job.op_cmd);
 				for(int n=0;n<imsg.server_data.demo_job.pin.size; n++) {
 					printf("%x", imsg.server_data.demo_job.pin.bytes[n]);
