@@ -652,6 +652,7 @@ static gboolean g_dbus_args_have_signature(const GDBusArgInfo *args,
 
 static void add_pending(struct generic_data *data)
 {
+	printf("------------------------------------- process_property_changes\n");
 	guint old_id = data->process_id;
 
 	data->process_id = g_idle_add(process_changes, data);
@@ -1705,7 +1706,8 @@ fail:
 static void process_properties_from_interface(struct generic_data *data,
 						struct interface_data *iface)
 {
-	// printf("process_properties_from_interface\n");
+	printf("----------------- process_properties_from_interface\n");
+	printf("----------------- name : %s\n", iface->name);
 	GSList *l;
 	DBusMessage *signal;
 	DBusMessageIter iter, dict, array;
@@ -1774,6 +1776,7 @@ static void process_properties_from_interface(struct generic_data *data,
 
 static void process_property_changes(struct generic_data *data)
 {
+	printf("------------------------------------- process_property_changes\n");
 	GSList *l;
 
 	data->pending_prop = FALSE;

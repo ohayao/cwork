@@ -29,7 +29,4 @@ int encodeWifiInfoRequest(SetWIFIInfoRequest * obj, uint8_t *retval,size_t lengt
 int decodeWifiInfoRequest(uint8_t *buf,size_t buf_size, SetWIFIInfoRequest *retval,size_t index);
 int isWifiInfoRequestValid(SetWIFIInfoRequest * obj);
 
-
-
-
 #endif

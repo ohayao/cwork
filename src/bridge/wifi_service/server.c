@@ -134,7 +134,8 @@ struct sockaddr_in server_addr;
  * properties are defined at doc/gatt-api.txt. See "Flags"
  * property of the GattCharacteristic1.
  */
-static const char *pairing_info_props[] = { "write-without-response", "notify", NULL };
+// write-without-response
+static const char *pairing_info_props[] = { "read", "write", "notify", NULL };
 static const char *pairing_desc_props[] = { "read", "write", NULL };
 
 // functions
@@ -1083,9 +1084,11 @@ static void chr_write(struct characteristic *chr, const uint8_t *value, int len)
 	g_free(chr->value);
 	chr->value = g_memdup(value, len);
 	chr->vlen = len;
-	printf("-------------g_dbus_emit_property_changed\n");
+	printf("-------------g_dbus_emit_property_changed %d\n");
+	// 发送返回得逻辑, 要有 一个 Connection, 特征得地址, 接口地址, name
 	g_dbus_emit_property_changed(connection, chr->path, GATT_CHR_IFACE,
-								"Value");
+									"Value");
+	
 }
 
 // 根据 FSM的当前状态, 给出现在应该发送的时间
@@ -1435,6 +1438,7 @@ static gboolean register_characteristic(const char *chr_uuid,
 	chr->props = props;
 	chr->service = g_strdup(service_path);
 	chr->path = g_strdup_printf("%s/characteristic%d", service_path, id++);
+	chr->mtu = 23;
 	// 初始化自己的数据结构
 	getRecvData(&chr->recv_pairing_data);
 	initRecvData(chr->recv_pairing_data);
@@ -1598,7 +1602,7 @@ static void proxy_added_cb(GDBusProxy *proxy, void *user_data)
 	{
 		adapter_proxy = proxy;
 		// 仅仅是开启几秒
-		// cmd_discoverable();
+		cmd_discoverable();
 	}	
 
 	if (g_strcmp0(iface, GATT_MGR_IFACE))
@@ -1704,7 +1708,7 @@ static gboolean parse_argument(char *argv[], const char **arg_table, dbus_bool_t
 void initAdvertiseSetting()
 {
 	char *uuids[] = {
-		"12345678-0000-1000-8000-00805f9b34fb",
+		PAIRING_SERVICE_UUID,
 		NULL //别删,会错, ok?
 	};
 	ad_advertise_uuids(connection, uuids);

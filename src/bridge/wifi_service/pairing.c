@@ -57,10 +57,11 @@ void printRecvData(RecvData *recv_data)
 uint32_t getDataLength(uint8_t data[], uint32_t *n_size_byte, uint32_t *pkg_len)
 {
 	uint32_t temp_result = 0;
-	if(data[2] == 0xff)
+	if(data[0] == 0xff)
 	{
     *n_size_byte = 3;
-    temp_result = data[0] * (0xfe) + data[1] + *n_size_byte;
+    // temp_result = data[0] * (0xfe) + data[1] + *n_size_byte;
+    temp_result = (data[1] << 8 | data[2] ) + *n_size_byte; 
     *pkg_len = temp_result - *n_size_byte;
 		return temp_result;
 	}
@@ -94,7 +95,7 @@ int freeRecvAllocData(RecvData *recv_pairing_data)
   return 0;
 }
 
-int allocRecvData(RecvData *recv_pairing_data, int data_len)
+int allocRecvData(RecvData *recv_pairing_data, size_t data_len)
 {
   if (!recv_pairing_data) {
     serverLog(LL_ERROR, "allocRecvData recv_pairing_data NULL");
@@ -104,7 +105,7 @@ int allocRecvData(RecvData *recv_pairing_data, int data_len)
     serverLog(LL_ERROR, "recv_pairing_data data not be free");
     return 1;
   }
-    
+  printf("allocRecvData %lu\n", data_len);
   recv_pairing_data->data_len = data_len;
   recv_pairing_data->recv_len = 0;
   recv_pairing_data->data = malloc(data_len);
@@ -183,7 +184,7 @@ void recvData(RecvData *recv_pairing_data, uint8_t * data, uint16_t data_length)
   // }
   // printf("\n");
   int err = 0;
-  uint16_t pkg_len = 0;
+  size_t pkg_len = 0;
   switch (recv_pairing_data->recv_status)
   {
     case NONE:
@@ -338,11 +339,12 @@ int getPkgFromRecvData(RecvData *recv_pairing_data, uint8_t *step_pkg_data)
     serverLog(LL_ERROR, "getPkgFromRecvData step_pkg_data is null");
     return 1;
   }
-  printf("n byte: %u\n", recv_pairing_data->n_size_byte);
+  printf("n byte: %u, data_len: %lu, pkg_len: %lu\n", recv_pairing_data->n_size_byte, recv_pairing_data->data_len, recv_pairing_data->pkg_len);
   memcpy(step_pkg_data,
     recv_pairing_data->data + recv_pairing_data->n_size_byte,
-    recv_pairing_data->data_len
+    recv_pairing_data->pkg_len
   );
+  printf("getPkgFromRecvData end\n");
   return 0;
 }
 

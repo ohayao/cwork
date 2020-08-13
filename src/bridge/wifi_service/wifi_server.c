@@ -39,9 +39,14 @@
 #include <fcntl.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <sys/ioctl.h>
 
 #include <glib.h>
 #include <dbus/dbus.h>
+
+#include <bluetooth/bluetooth.h>
+#include <bluetooth/hci.h>
+#include <bluetooth/hci_lib.h>
 
 #include "gdbus/gdbus.h"
 
@@ -53,6 +58,7 @@
 #include "bridge/ble/ble_operation.h"
 #include "bridge/wifi_service/ad.h"
 #include "bridge/lock/connection/encryption.h"
+#include "bridge/lock/messages/SetBridgeConfigurationRequest.h"
 
 #define GATT_MGR_IFACE			"org.bluez.GattManager1"
 #define GATT_SERVICE_IFACE		"org.bluez.GattService1"
@@ -66,8 +72,11 @@
 
 /* Immediate Alert Service UUID */
 // wifi request service
-#define WIFI_SERVICE_UUID	"87654321-0000-1000-8000-00805f9b34fb"
-#define WIFI_SERVICE_CHR_UUID		"87654321-0000-1000-8000-00805f9b34fb"
+#define WIFI_SERVICE_UUID	"5C3A1523-897E-45E1-B016-007107C96DF6"
+#define WIFI_SERVICE_CHR_UUID		"5C3A659E-897E-45E1-B016-007107C96DF6"
+
+// #define PAIRING_SERVICE_UUID	"5C3A1523-897E-45E1-B016-007107C96DF6"
+// #define PAIRING_SERVICE_CHR_UUID		"5C3A659E-897E-45E1-B016-007107C96DF6"
 
 /* Random UUID for testing purpose */
 #define READ_WRITE_DESCRIPTOR_UUID	"8260c653-1a54-426b-9e36-e84c238bc669"
@@ -129,13 +138,15 @@ int conn_amount; //当前的连接数
  * properties are defined at doc/gatt-api.txt. See "Flags"
  * property of the GattCharacteristic1.
  */
-static const char *pairing_info_props[] = { "write-without-response", "notify", NULL };
+// write-without-response
+static const char *pairing_info_props[] = { "read", "write", "notify", NULL };
 static const char *pairing_desc_props[] = { "read", "write", NULL };
 
 // functions
 static void chr_write(struct characteristic *chr, const uint8_t *value, int len);
-void cmd_advertise();
+void advertise();
 void cmd_discoverable();
+void initAdvertiseSetting();
 static int parse_options(DBusMessageIter *iter, const char **device);
 static bool chr_read(struct characteristic *chr, DBusMessageIter *iter);
 static int parse_value(DBusMessageIter *iter, const uint8_t **value, int *len);
@@ -378,36 +389,53 @@ int handleSetWifiRequest(void *arg)
 	encrypted_request_bytes = malloc(encrypted_request_len);
 	memset(encrypted_request_bytes, 0, encrypted_request_len);
 
+
 	if (getPkgFromRecvData(recv_pairing_data, encrypted_request_bytes))
 	{
 		serverLog(LL_ERROR, "getPkgFromRecvData error");
 		return 1;
 	}
-	serverLog(LL_NOTICE, "getPkgFromRecvData success: ");
 
-	for (int i = 0; i < encrypted_request_len; ++i)
-	{
-		printf(" %x", encrypted_request_bytes[i]);
-	}
-	printf("\n");
-
-	size_t max_decrypt_data_len = 1048;
+	serverLog(LL_NOTICE, "getPkgFromRecvData success: %lu", encrypted_request_len);
+	// serverLog(LL_NOTICE, "begin print ");
+	// for (int i = 0; i < encrypted_request_len; ++i)
+	// {
+	// 	printf(" %x", encrypted_request_bytes[i]);
+	// }
+	// printf("\n");
+	// serverLog(LL_NOTICE, "after print ");
+	size_t max_decrypt_data_len = 70000;
 	uint8_t decrypted_data[max_decrypt_data_len];
 	size_t decrypted_bytes_written = 0;
+	
+	// decrypted_bytes_written = decryptData(
+	// 	encrypted_request_bytes, encrypted_request_len,
+	// 	decrypted_data, max_decrypt_data_len, 
+	// 	set_wifi_crypt->server_pairing_admin_key, 16,
+	// 	set_wifi_crypt->client_nonce, 12
+	// );
 
-	decrypted_bytes_written = decryptData(
-		encrypted_request_bytes, encrypted_request_len,
-		decrypted_data, max_decrypt_data_len, 
-		set_wifi_crypt->server_pairing_admin_key, 16,
-		set_wifi_crypt->client_nonce, 12
-	);
+	// if (decrypted_bytes_written == UINT32_MAX)
+	// {
+	// 	serverLog(LL_ERROR, "decryptData error");
+	// 	return 1;
+	// }
+	// serverLog(LL_NOTICE, "decryptData success");
 
-	if (decrypted_bytes_written == UINT32_MAX)
-	{
-		serverLog(LL_ERROR, "decryptData error");
-		return 1;
-	}
-	serverLog(LL_NOTICE, "decryptData success");
+	// 绕过, 直接拷贝元数据, 当成已经解密
+	serverLog(LL_NOTICE, "encrypted_request_len: %lu", encrypted_request_len);
+	decrypted_bytes_written = encrypted_request_len;
+	memcpy(decrypted_data, encrypted_request_bytes, decrypted_bytes_written);
+
+	// IgSetBridgeConfigurationRequest request;
+	// int decode_res = ig_SetBridgeConfigurationRequest_decode(
+	// 	decrypted_data, decrypted_bytes_written, &request, 0);
+	// if (decode_res)
+	// {
+	// 	serverLog(LL_ERROR, "ig_SetBridgeConfigurationRequest_decode error");
+	// 	return 1;
+	// }
+	// serverLog(LL_NOTICE, "ig_SetBridgeConfigurationRequest_decode success");
 
 	SetWIFIInfoRequest request;
 	int decode_res = decodeWifiInfoRequest(
@@ -438,7 +466,17 @@ int handleSetWifiRequest(void *arg)
 		}
 		printf("\n");
 	}
-	
+
+	// if (request.has_network_password)
+	// {
+	// 	serverLog(LL_NOTICE, "request network_password:");
+	// 	for (int i = 0; i < request.network_password_size; ++i)
+	// 	{
+	// 		printf("%c", request.network_password[i]);
+	// 	}
+	// 	printf("\n");
+	// }
+
 	if (request.has_token)
 	{
 		serverLog(LL_NOTICE, "request token:");
@@ -448,6 +486,24 @@ int handleSetWifiRequest(void *arg)
 		}
 		printf("\n");
 	}
+	
+	// if (request.has_mqtt_jwt_token)
+	// {
+	// 	serverLog(LL_NOTICE, "request mqtt_jwt_token:");
+	// 	for (int i = 0; i < request.mqtt_jwt_token_size; ++i)
+	// 	{
+	// 		printf("%c", request.mqtt_jwt_token[i]);
+	// 	}
+	// 	printf("\n");
+	// }
+
+	// if (request.has_operation_id)
+	// {
+	// 	serverLog(LL_NOTICE, "request has_operation_id:");
+	// 	printf("%lu", request.operation_id);
+	// 	printf("\n");
+	// }
+
 
 	return 0;
 }
@@ -1068,13 +1124,13 @@ static DBusMessage *chr_write_value(DBusConnection *conn, DBusMessage *msg,
 	// want't to shut the warming up
 	serverLog(LL_NOTICE, " chr_write_value recv data");
 	recvData(chr->recv_pairing_data, (uint8_t *)value, len);
-	// printf("value len %d----------\n", len);
-	// printf("------------------- write value: \n");
-	// for (int i = 0; i < len; ++i)
-	// {
-	// 	printf(" %x", value[i]);
-	// }
-	// printf("\n");
+	printf("value len %d----------\n", len);
+	printf("------------------- write value: \n");
+	for (int i = 0; i < len; ++i)
+	{
+		printf(" %x", value[i]);
+	}
+	printf("\n");
 
 	//确实在这儿写状态机, 上面是不断的接受写过来的值,
 	// 会分开几个包, 
@@ -1084,12 +1140,12 @@ static DBusMessage *chr_write_value(DBusConnection *conn, DBusMessage *msg,
 	{
 		// 这样就只会返回一个恢复,所以要弄好
 		// 如果没有和 Paired server pair, 是不会进行下面的一步
-		if (seted_wifi_crypt)
-		{
+		// if (seted_wifi_crypt)
+		// {
 			serverLog(LL_NOTICE, "-------- get full pkg and ");
 			decideEvent(user_data);
 			handleClientEvent(user_data);
-		}
+		// }
 		
 		
 		// chr_write(chr, value, len);
@@ -1432,7 +1488,8 @@ static void proxy_added_cb(GDBusProxy *proxy, void *user_data)
 	if (!g_strcmp0(iface, LE_AD_MGR_IFACE))
 	{
 		ad_proxy = proxy;
-		cmd_advertise();
+		advertise();
+		initAdvertiseSetting();
 	}
 	else if (!g_strcmp0(iface, ADPTER_IFACE))
 	{
@@ -1542,7 +1599,7 @@ static gboolean parse_argument(char *argv[], const char **arg_table, dbus_bool_t
 }
 
 
-void cmd_advertise()
+void advertise()
 {
 	serverLog(LL_NOTICE, "--------------- cmd_advertise()");
 	dbus_bool_t enable;
@@ -1572,22 +1629,53 @@ static void generic_callback(const DBusError *error, void *user_data)
 		serverLog(LL_NOTICE, "Changing %s succeeded\n", str);
 }
 
+void initAdvertiseSetting()
+{
+	char *uuids[] = {
+		WIFI_SERVICE_UUID,
+		NULL //别删,会错, ok?
+	};
+	ad_advertise_uuids(connection, uuids);
+	ad_advertise_tx_power(connection, true);
+	ad_advertise_name(connection, true);
+	// ad_advertise_local_name(connection, "BBB");
+	// ad_advertise_appearance(connection, true);
+	ad_advertise_duration(connection, 1);
+}
+
 // discoverble
 void cmd_discoverable()
 {
-	dbus_bool_t discoverable = true;
-	char *str = NULL;
+	// dbus_bool_t discoverable = true;
+	// char *str = NULL;
 
-	// 很有可能内存泄漏
-	str = g_strdup_printf("discoverable %s",
-				discoverable == TRUE ? "on" : "off");
+	// // 很有可能内存泄漏
+	// str = g_strdup_printf("discoverable %s",
+	// 			discoverable == TRUE ? "on" : "off");
 
-	if (g_dbus_proxy_set_property_basic(adapter_proxy, "Discoverable",
-					DBUS_TYPE_BOOLEAN, &discoverable,
-					generic_callback, str, g_free) == TRUE)
-		return;
+	// if (g_dbus_proxy_set_property_basic(adapter_proxy, "Discoverable",
+	// 				DBUS_TYPE_BOOLEAN, &discoverable,
+	// 				generic_callback, str, g_free) == TRUE)
+	// 	return;
 	
-	g_free(str);
+	// g_free(str);
+	int opt, ctl, i, cmd = 0;
+	int hdev = hci_get_route(NULL);
+	
+	if ((ctl = socket(AF_BLUETOOTH, SOCK_RAW, BTPROTO_HCI)) < 0) {
+		perror("Can't open HCI socket.");
+		exit(1);
+	}
+	serverLog(LL_NOTICE, "---------------------- get BLUETOOTHCTL socket success");
+	
+	struct hci_dev_req dr;
+	dr.dev_id  = hdev;
+	dr.dev_opt = SCAN_PAGE | SCAN_INQUIRY;
+	if (ioctl(ctl, HCISETSCAN, (unsigned long) &dr) < 0) {
+		serverLog(LL_ERROR, "ioctl error");
+		exit(1);
+	}
+	serverLog(LL_NOTICE, "---------------------- get ioctl socket success");
 }
 
 int main(int argc, char *argv[])

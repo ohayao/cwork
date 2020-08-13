@@ -141,7 +141,7 @@ int decodeWifiInfoRequest(uint8_t *buf,size_t buf_size, SetWIFIInfoRequest *retv
   CborValue it;
   CborValue content;
   CborError err;
-
+  printf("--------------------------------- 1\n");
   err = cbor_parser_init(buf, buf_size, 0, &parser, &it);
   if(err) return err;
 
@@ -164,7 +164,7 @@ int decodeWifiInfoRequest(uint8_t *buf,size_t buf_size, SetWIFIInfoRequest *retv
   }else{
     //error
   }
-
+  printf("--------------------------------- 2\n");
   int64_t tag_id;
   while (!cbor_value_at_end(&content)) {
   
@@ -184,20 +184,25 @@ int decodeWifiInfoRequest(uint8_t *buf,size_t buf_size, SetWIFIInfoRequest *retv
             int64_t val;
             cbor_value_get_int64(&content, &val);
             //msgId value
-            if(val != 51) return 2003;
+            // printf("--------------------------------- 3\n");
+            if(val != 0x51) return 2003;
             err = cbor_value_advance_fixed(&content);
             break;
+          
           }
         // ssid
         case 11:
             if(value_type == CborByteStringType){
                 size_t size;
                 err = cbor_value_get_string_length(&content, &size);
+                // printf("--------------------------------- 7\n");
                 if(err) return err;
                 uint8_t data_arr[size];
                 err = cbor_value_copy_byte_string(&content, data_arr, &size, &content);
+                printf("--------------------------------- 4\n");
                 if(err) return  err;
                 setWifiInfoRequestSSID(retval, data_arr, size);
+                
                 break;
             }
 
@@ -206,9 +211,11 @@ int decodeWifiInfoRequest(uint8_t *buf,size_t buf_size, SetWIFIInfoRequest *retv
             if(value_type == CborByteStringType){
                 size_t size;
                 err = cbor_value_get_string_length(&content, &size);
+                printf("--------------------------------- 5\n");
                 if(err) return err;
                 uint8_t data_arr[size];
                 err = cbor_value_copy_byte_string(&content, data_arr, &size, &content);
+                printf("--------------------------------- 6\n");
                 if(err) return  err;
                 setWifiInfoRequestPassword(retval, data_arr, size);
                 break;
@@ -217,9 +224,11 @@ int decodeWifiInfoRequest(uint8_t *buf,size_t buf_size, SetWIFIInfoRequest *retv
             if(value_type == CborByteStringType){
                 size_t size;
                 err = cbor_value_get_string_length(&content, &size);
+                printf("--------------------------------- 8\n");
                 if(err) return err;
                 uint8_t data_arr[size];
                 err = cbor_value_copy_byte_string(&content, data_arr, &size, &content);
+                printf("--------------------------------- 8\n");
                 if(err) return  err;
                 setWifiInfoRequestToken(retval, data_arr, size);
                 break;
