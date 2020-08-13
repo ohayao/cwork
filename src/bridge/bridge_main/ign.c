@@ -39,13 +39,12 @@ static char TOPIC_PUB[32];
 //LIST_HEAD(doing_task_head);
 
 extern int WaitBtn(void *arg);
-ign_BridgeProfile Create_IgnBridgeProfile(sysinfo_t* ps);
+ign_BridgeProfile Create_IgnBridgeProfile(sysinfo_t* si);
 void addDiscoverTask(int msg_id);
 void addAdminDoLockTask(igm_lock_t *lock);
 int Init_MQTT(MQTTClient* p_mqtt);
 
 
-int h_GetUserToken(char *userToken);
 int h_GetUserToken(char *userToken){
     char data[1024],res[4096];
     memset(data,0,sizeof(data));
@@ -81,20 +80,17 @@ int h_GetBridgeToken(char *userToken,char *bridgeToken){
     return 0;
 }
 
-int h_downloadcsr(char *bridgeToken);
-int h_downloadcsr(char *bridgeToken){
-    char res[4096],url[200],bridgeID[20];
-    char *localCSR = get_file_content("./certificate/local.csr");
+int h_downloadcsr(sysinfo_t* si, char *bridgeToken){
+    char res[4096],url[200];
+    char *localCSR = get_file_content(LOCAL_CSR);
 	if(NULL == localCSR) {
 		printf("get_file_content ./certificate/local.csr err.\n");
 		return -1;
 	}
     memset(res,0,sizeof(res));
     memset(url,0,sizeof(url));
-    memset(bridgeID,0,sizeof(bridgeID));
-    Pro_GetMacAddrs(bridgeID);
     HTTP_INFO hi;
-    sprintf(url,"https://tkm70zar9f.execute-api.ap-southeast-1.amazonaws.com/development/devices/bridge/%s", bridgeID);
+    sprintf(url,"https://tkm70zar9f.execute-api.ap-southeast-1.amazonaws.com/development/devices/bridge/%s", si->mac);
 
     printf("h_downloadcsr,request_url=[%s]\n",url);
     cJSON *root;
@@ -132,13 +128,18 @@ int h_downloadcsr(char *bridgeToken){
 		return -1;
 	}
     printf("pem=[%s]\n",pem->valuestring);
-    write_file_content("./certificate/ign_service.csr", pem->valuestring);
+    write_file_content(SERVICE_PEM, pem->valuestring);
 	cJSON_Delete(root);
 	printf("=====>>>>>DOWNLOAD-CSR Over!!!!!\n");
 	return 0;
 }
-int download_ca(int tryTimes);
-int download_ca(int tryTimes){
+
+int download_ca(sysinfo_t* si, int tryTimes){
+	if(-1 != (access(SERVICE_PEM, F_OK))){   
+        printf("file mytest.c exist.\n");   
+		return 0;
+    }   
+
     int ret;
     int _tt=0;
     char userToken[2048],bridgeToken[2048];
@@ -150,14 +151,13 @@ int download_ca(int tryTimes){
         else if(_tt>0 && _tt>=tryTimes) return -1;
     }
     _tt=0;
-
     while((ret=h_GetBridgeToken(userToken,bridgeToken))!=0){
         printf("GetBridgetTokenError [%d]\n",ret);
         if(tryTimes>0) _tt++;
         if(_tt>0 && _tt>=tryTimes) return -1;
     }
     _tt=0;
-    while((ret=h_downloadcsr(bridgeToken))!=0){
+    while((ret=h_downloadcsr(si,bridgeToken))!=0){
         printf("DownloadCSR Error [%d]\n",ret);
         if(tryTimes>0) _tt++;
         if(_tt>0 && _tt>=tryTimes) return -1;
@@ -544,20 +544,19 @@ int FSMHandle(task_node_t* tn) {
 	return 0;
 }
 
-ign_BridgeProfile Create_IgnBridgeProfile(sysinfo_t* ps){
+ign_BridgeProfile Create_IgnBridgeProfile(sysinfo_t* si){
     ign_BridgeProfile bp = {};
     bp.os_info = ign_OSType_LINUX;
     char temp[100];
     memset(temp,0,sizeof(temp));
-    bp.bt_id.size = snprintf(temp, sizeof(temp), "%s", ps->mac);
+    bp.bt_id.size = snprintf(temp, sizeof(temp), "%s", si->mac);
     bp.mac_addr.size = bp.bt_id.size;
     memcpy(bp.bt_id.bytes, temp, strlen(temp));
     memcpy(bp.mac_addr.bytes, temp, strlen(temp));
     
-    char localip[20],publicip[20],ma[20];                                                                                                                                                                                         
+    char localip[20],publicip[20];                                                                                                                                                                                         
     memset(localip,0,sizeof(localip));
     memset(publicip,0,sizeof(publicip));
-    memset(ma,0,sizeof(ma));
     Pro_GetLocalIP(localip);
     Pro_GetPublicIP(publicip);
 
@@ -583,9 +582,8 @@ ign_BridgeProfile Create_IgnBridgeProfile(sysinfo_t* ps){
     memcpy(bp.wifi_ssid.bytes,wf->ssid,strlen(wf->ssid));
     bp.wifi_signal = wf->signal;
     bp.inited_time = Pro_GetInitedTime();
-    Pro_GetMacAddrs(ma);
     bp.name.size = strlen(temp);
-    memcpy(bp.name.bytes, ma, strlen(ma));
+    memcpy(bp.name.bytes, si->mac, strlen(si->mac));
     printf("[DEVICEINFO]LocalIP=%s PublicIP=%s Name=%s Sys_statics=%s Wifi_ssid=%s Wifi_signal=%d inited_time=%d\n",
             bp.local_ip.bytes,bp.public_ip.bytes,bp.name.bytes,bp.sys_statics.bytes,bp.wifi_ssid.bytes,bp.wifi_signal,bp.inited_time);
     return bp;
@@ -850,10 +848,10 @@ int Init(void* tn) {
 
     //尝试下载证书的次数 默认0 直到下载成功停止
     int try_time=0;
-    if(download_ca(try_time)!=0){
-        printf("_______DOWNLOAD CSR FAILED\n");
-    }else{
+    if(0 == download_ca(&g_sysif, try_time)){
         printf("_______DOWNLOAD CSR SUCCESS\n");
+    }else{
+        printf("_______DOWNLOAD CSR FAILED\n");
     }
 
 	do {
