@@ -25,6 +25,8 @@
 
 // #include "MQTTClient.h"
 
+#define LOCAL_CSR		"./certificate/local.csr"
+#define SERVICE_PEM		"./certificate/ign_service.pem"
 #define MAX_LOCK_COUNT		5
 #define BLE_SCAN_TIMEOUT	6
 
@@ -63,7 +65,7 @@ int GetMacAddr(char * mac, int len_limit) {
         }
     }
 
-    return snprintf (mac, len_limit, "%X%X%X%X%X%X", 
+    return snprintf (mac, len_limit, "%02X%02X%02X%02X%02X%02X", 
         (unsigned char) ifreq.ifr_hwaddr.sa_data[0], 
         (unsigned char) ifreq.ifr_hwaddr.sa_data[1], 
         (unsigned char) ifreq.ifr_hwaddr.sa_data[2], 
