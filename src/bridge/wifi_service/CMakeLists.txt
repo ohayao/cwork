@@ -4,6 +4,7 @@ set(WIFI_DEPENDENCIES
   lock
   ign_lib
   ble
+  bluetooth
 )
 
 set(CMAKE_BUILD_TYPE Debug)
