@@ -21,8 +21,8 @@
 
 #define CA_PATH "./certificate/"
 #define TRUST_STORE "./certificate/ca.pem"
-//#define PRIVATE_KEY "./certificate/ign_service.pem"
+//#define PRIVATE_KEY "./certificate/local.key"
 #define PRIVATE_KEY "./certificate/key.pem"
-//#define KEY_STORE "./certificate/local.key"
+//#define KEY_STORE "./certificate/ign_service.pem"
 #define KEY_STORE "./certificate/cert.pem"
 #endif

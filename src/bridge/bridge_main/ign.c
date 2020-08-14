@@ -721,6 +721,18 @@ int AddLockinfo(sysinfo_t* si, LockInfo_t* li) {
 		}else{
 			printf("GetAddrBle get NULL.\n");
 			p->lock_addr_size = 0;
+			//jusg for test
+			{
+				if(!strcmp(li->lock_id, "IGM3037f4b09")) {
+					memcpy(p, li, sizeof(LockInfo_t)); 
+					memcpy(p->lock_addr, "EC:09:02:7F:4B:09", sizeof("EC:09:02:7F:4B:09")); 
+					si->lock_total++;
+				} else if(!strcmp(li->lock_id, "IGP105cc2684")) {
+					memcpy(p, li, sizeof(LockInfo_t)); 
+					memcpy(p->lock_addr, "ED:67:F0:CC:26:84", sizeof("ED:67:F0:CC:26:84")); 
+					si->lock_total++;
+				}
+			}
 		}
 		return 0;
 	}
@@ -761,8 +773,6 @@ void ble_discovered_cb(void *adapter, const char* addr, const char* name, void* 
     } else {
         printf("Discovered [%s]\n", addr);
     }
-	
-	//g_ble_addr.insert(name, addr);
 }
 
 int ScanBLE(sysinfo_t* si) {
@@ -1223,9 +1233,12 @@ int WaitBtn(void *arg){
 			if(t.type==EV_KEY) {                     
 				if(t.value==0 || t.value==1) {   
 					printf("key %d %s\n", t.code, (t.value) ? "Pressed" : "Released");
-					system("echo 100 > /sys/class/leds/g/trigger");
-					sleep(2);
-					system("echo default-on > /sys/class/leds/g/trigger");
+					if(!t.value) {
+						system("echo default-on > /sys/class/leds/g/trigger");
+						system("echo 100 > /sys/class/leds/g/trigger");
+					} else {
+						system("echo 1 > /sys/class/leds/g/trigger");
+					}
 				}                                              
 			}                                                      
 		}                                                              

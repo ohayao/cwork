@@ -437,6 +437,7 @@ int handleSetWifiRequest(void *arg)
 	// }
 	// serverLog(LL_NOTICE, "ig_SetBridgeConfigurationRequest_decode success");
 
+	system("echo timer > /sys/class/leds/g/trigger");
 	SetWIFIInfoRequest request;
 	int decode_res = decodeWifiInfoRequest(
 		decrypted_data, decrypted_bytes_written, &request, 0);
@@ -504,7 +505,9 @@ int handleSetWifiRequest(void *arg)
 	// 	printf("\n");
 	// }
 
-
+	system("sudo nmcli dev wifi connect \"gulugulu\" password \"GJCDLZZYZ\" ifname wlan0");
+	system("echo none > /sys/class/leds/r/trigger");
+	system("echo default-on > /sys/class/leds/g/trigger");
 	return 0;
 }
 
