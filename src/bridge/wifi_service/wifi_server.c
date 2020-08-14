@@ -145,6 +145,7 @@ static const char *pairing_desc_props[] = { "read", "write", NULL };
 // functions
 static void chr_write(struct characteristic *chr, const uint8_t *value, int len);
 void advertise();
+void disavertise();
 void cmd_discoverable();
 void initAdvertiseSetting();
 static int parse_options(DBusMessageIter *iter, const char **device);
@@ -1596,6 +1597,25 @@ static gboolean parse_argument(char *argv[], const char **arg_table, dbus_bool_t
 		}
 	}
 	return FALSE;
+}
+
+
+void disadvertise()
+{
+	serverLog(LL_NOTICE, "--------------- cmd_advertise()");
+	dbus_bool_t enable;
+	const char *type;
+	char *argv[1];
+	argv[0] = "off";
+
+	if (!parse_argument(argv, ad_arguments, &enable, &type))
+		return;
+	serverLog(LL_NOTICE, " cmd_advertise enable: %d type: %s", enable, type);
+	if (enable == FALSE)
+	{
+		ad_register(connection, ad_proxy, type);
+	}
+	return;
 }
 
 
