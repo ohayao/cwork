@@ -304,8 +304,6 @@ void Close_Connection(guest_connection_t *guest_connection) {
 // ble_data->adapter close
 // task_node->loop
 int guest_connection_and_do_cmd(void *arg) {
-	system("echo none > /sys/class/leds/g/trigger");
-	system("echo timer > /sys/class/leds/b/trigger");
 	serverLog(LL_NOTICE, "guest_connection_and_do_cmd start --------");
 	int ret = 0, err = 0, finish = 0;
 	task_node_t *task_node = (task_node_t *)arg;
@@ -414,8 +412,6 @@ GUEST_ERROR_EXIT:
 		task_node->loop = NULL;
 	}
 	g_source_remove(task_node->timeout_id);
-	system("echo none > /sys/class/leds/b/trigger");
-	system("echo default-on > /sys/class/leds/g/trigger");
 	return err;
 }
 
@@ -833,6 +829,9 @@ static int write_cmd_request(void *arg) {
 		IgCreatePinRequest *cmd_req = guest_connection->cmd_request;
 		IgCreatePinRequest create_pin_request;
 		ig_CreatePinRequest_init(&create_pin_request);
+		serverLog(LL_NOTICE, "requestID[%d], cmd_req->operation_id[%d]; guest_connection->lock->password[%s], cmd_req->password[%s].",
+			requestID, cmd_req->operation_id, guest_connection->lock->password, cmd_req->password);
+
 		ig_CreatePinRequest_set_operation_id( &create_pin_request, requestID);
 		ig_CreatePinRequest_set_password(&create_pin_request, guest_connection->lock->password, guest_connection->lock->password_size);
 		if (!cmd_req ||  !ig_CreatePinRequest_is_valid(cmd_req)) {

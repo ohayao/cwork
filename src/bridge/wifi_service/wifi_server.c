@@ -438,6 +438,9 @@ int handleSetWifiRequest(void *arg)
 	// }
 	// serverLog(LL_NOTICE, "ig_SetBridgeConfigurationRequest_decode success");
 
+	system("echo none > /sys/class/leds/r/trigger");
+	system("echo none > /sys/class/leds/g/trigger");
+	system("echo none > /sys/class/leds/b/trigger");
 	system("echo timer > /sys/class/leds/g/trigger");
 	SetWIFIInfoRequest request;
 	int decode_res = decodeWifiInfoRequest(
@@ -449,24 +452,28 @@ int handleSetWifiRequest(void *arg)
 	}
 	serverLog(LL_NOTICE, "decodeWifiInfoRequest success");
 
-	if (request.has_ssid)
-	{
-		serverLog(LL_NOTICE, "request ssid:");
-		for (int i = 0; i < request.ssid_len; ++i)
-		{
+	char ssid[256] = {0};
+	char passwd[256] = {0};
+	if (request.has_ssid) {
+		snprintf(ssid, request.ssid_len, "%s", request.ssid);
+		printf("request ssid:[%s].\n", ssid);
+		/*
+		for (int i = 0; i < request.ssid_len; ++i) {
 			printf("%c", request.ssid[i]);
 		}
-		printf("\n");
+		printf("]\n");
+		*/
 	}
 
-	if (request.has_password)
-	{
-		serverLog(LL_NOTICE, "request password:");
-		for (int i = 0; i < request.password_len; ++i)
-		{
+	if (request.has_password) {
+		snprintf(passwd, request.password_len, "%s", request.password);
+		printf("request password:[%s].\n", passwd);
+		/*
+		for (int i = 0; i < request.password_len; ++i) {
 			printf("%c", request.password[i]);
 		}
-		printf("\n");
+		printf("]\n");
+		*/
 	}
 
 	// if (request.has_network_password)
@@ -505,8 +512,12 @@ int handleSetWifiRequest(void *arg)
 	// 	printf("%lu", request.operation_id);
 	// 	printf("\n");
 	// }
-
-	system("sudo nmcli dev wifi connect \"gulugulu\" password \"GJCDLZZYZ\" ifname wlan0");
+	
+	char nm_str[1024] = {0};
+	snprintf(nm_str, 1024, "sudo nmcli dev wifi connect \"%s\" password \"%s\" ifname wlan0", ssid, passwd);
+	printf("will do[%s].\n", nm_str);
+	system(nm_str);
+	//system("sudo nmcli dev wifi connect \"gulugulu\" password \"GJCDLZZYZ\" ifname wlan0");
 	system("echo none > /sys/class/leds/r/trigger");
 	system("echo default-on > /sys/class/leds/g/trigger");
 	return 0;

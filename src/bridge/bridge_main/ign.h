@@ -29,11 +29,33 @@
 #define SERVICE_PEM		"./certificate/ign_service.pem"
 #define MAX_LOCK_COUNT		5
 #define BLE_SCAN_TIMEOUT	6
+#define DEV_PATH "/dev/input/event0"
 
 atomic_int g_msg_id;
 
 //LIST_HEAD(task_head);
 //INIT_LIST_HEAD(task_head);
+
+#define LIGHT_ON(color) \
+system("echo none > /sys/class/leds/r/trigger");\
+system("echo none > /sys/class/leds/g/trigger");\
+system("echo none > /sys/class/leds/b/trigger");\
+if('b' == 'color' ||'w' == 'color') { system("echo default-on > /sys/class/leds/b/trigger");}\
+if('g' == 'color' ||'w' == 'color') { system("echo default-on > /sys/class/leds/g/trigger");}\
+if('r' == 'color' ||'w' == 'color') { system("echo default-on > /sys/class/leds/r/trigger");}
+
+#define LIGHT_BLINK(color) \
+system("echo none > /sys/class/leds/r/trigger");\
+system("echo none > /sys/class/leds/g/trigger");\
+system("echo none > /sys/class/leds/b/trigger");\
+if('b' == 'color' ||'w' == 'color') { system("echo timer > /sys/class/leds/b/trigger");}\
+if('g' == 'color' ||'w' == 'color') { system("echo timer > /sys/class/leds/g/trigger");}\
+if('r' == 'color' ||'w' == 'color') { system("echo timer > /sys/class/leds/r/trigger");}
+
+#define LIGHT_OFF \
+system("echo none > /sys/class/leds/r/trigger");\
+system("echo none > /sys/class/leds/g/trigger");\
+system("echo none > /sys/class/leds/b/trigger");
 
 int GetMacAddr(char * mac, int len_limit) {
     struct ifreq ifreq;

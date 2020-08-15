@@ -46,89 +46,89 @@ int Init_MQTT(MQTTClient* p_mqtt);
 
 
 int h_GetUserToken(char *userToken){
-	char data[1024],res[4096];
-	memset(data,0,sizeof(data));
-	memset(res,0,sizeof(res));
-	HTTP_INFO hi;
-	http_init(&hi, TRUE);
-	char *url = "https://tkm70zar9f.execute-api.ap-southeast-1.amazonaws.com/development/login";
-	sprintf(data,"{\"email\":\"cs.lim+bridge@igloohome.co\",\"password\":\"igloohome\"}");
-	int ret = http_post(&hi, url, data, res, sizeof(res));
-	http_close(&hi);
-	if(ret!=200){ 
-		printf("h_GetUserToken error [%d:%s]\n",ret,res);
-		return -1;                                                            
-	}
-	strncpy(userToken,res+16,strlen(res)-18);
-	return 0;                                            
+    char data[1024],res[4096];
+    memset(data,0,sizeof(data));
+    memset(res,0,sizeof(res));
+    HTTP_INFO hi;
+    http_init(&hi, TRUE);
+    char *url = "https://tkm70zar9f.execute-api.ap-southeast-1.amazonaws.com/development/login";
+    sprintf(data,"{\"email\":\"cs.lim+bridge@igloohome.co\",\"password\":\"igloohome\"}");
+    int ret = http_post(&hi, url, data, res, sizeof(res));
+    http_close(&hi);
+    if(ret!=200){ 
+        printf("h_GetUserToken error [%d:%s]\n",ret,res);
+        return -1;                                                            
+    }
+    strncpy(userToken,res+16,strlen(res)-18);
+    return 0;                                            
 }
 
 int h_GetBridgeToken(char *userToken,char *bridgeToken);
 int h_GetBridgeToken(char *userToken,char *bridgeToken){
-	char res[4096];
-	memset(res,0,sizeof(res));
-	HTTP_INFO hi;
-	http_init(&hi,TRUE);
-	char *url="https://tkm70zar9f.execute-api.ap-southeast-1.amazonaws.com/development/token";
-	int ret=http_get_with_auth(&hi,url,userToken,res,4096);
-	//printf("----->> res=%s\n",res);
-	if(ret!=200) {
-		printf("h_GetBridgeToken error [%d:%s]\n",ret,res);
-		return -1;
-	}
-	strncpy(bridgeToken,res+18,strlen(res)-20);
-	return 0;
+    char res[4096];
+    memset(res,0,sizeof(res));
+    HTTP_INFO hi;
+    http_init(&hi,TRUE);
+    char *url="https://tkm70zar9f.execute-api.ap-southeast-1.amazonaws.com/development/token";
+    int ret=http_get_with_auth(&hi,url,userToken,res,4096);
+    //printf("----->> res=%s\n",res);
+    if(ret!=200) {
+        printf("h_GetBridgeToken error [%d:%s]\n",ret,res);
+        return -1;
+    }
+    strncpy(bridgeToken,res+18,strlen(res)-20);
+    return 0;
 }
 
 int h_downloadcsr(sysinfo_t* si, char *bridgeToken){
-	char res[4096],url[200];
-	char *localCSR = get_file_content(LOCAL_CSR);
+    char res[4096],url[200];
+    char *localCSR = get_file_content(LOCAL_CSR);
 	if(NULL == localCSR) {
 		printf("get_file_content ./certificate/local.csr err.\n");
 		return -1;
 	}
-	memset(res,0,sizeof(res));
-	memset(url,0,sizeof(url));
-	HTTP_INFO hi;
-	sprintf(url,"https://tkm70zar9f.execute-api.ap-southeast-1.amazonaws.com/development/devices/bridge/%s", si->mac);
+    memset(res,0,sizeof(res));
+    memset(url,0,sizeof(url));
+    HTTP_INFO hi;
+    sprintf(url,"https://tkm70zar9f.execute-api.ap-southeast-1.amazonaws.com/development/devices/bridge/%s", si->mac);
 
-	printf("h_downloadcsr,request_url=[%s]\n",url);
-	cJSON *root;
-	root=cJSON_CreateObject();
-	cJSON_AddStringToObject(root,"csr",localCSR);
+    printf("h_downloadcsr,request_url=[%s]\n",url);
+    cJSON *root;
+    root=cJSON_CreateObject();
+    cJSON_AddStringToObject(root,"csr",localCSR);
 	if(NULL == root) {
 		serverLog(LL_ERROR, "root is NULL err.");
 		return -1;
 	}
-	char *sdata=cJSON_PrintUnformatted(root);
+    char *sdata=cJSON_PrintUnformatted(root);
 	if(NULL == sdata) {
 		serverLog(LL_ERROR, "sdata is NULL err.");
 		return -1;
 	}
 
-	cJSON_Delete(root);
-	printf("________________Request BridgeToken\n%s\nBody Content\n%s\n",bridgeToken,sdata);
-	int ret=http_post_with_auth(&hi,url,bridgeToken,sdata,res,sizeof(res));
-	//printf("----->downloadcsr response[%s]\n",res);
-	if(200 != ret) {
-		printf("h_downloadcsr error [%d:%s]\n",ret,res);
-		return -1;
-	}
+    cJSON_Delete(root);
+    printf("________________Request BridgeToken\n%s\nBody Content\n%s\n",bridgeToken,sdata);
+    int ret=http_post_with_auth(&hi,url,bridgeToken,sdata,res,sizeof(res));
+    //printf("----->downloadcsr response[%s]\n",res);
+    if(200 != ret) {
+        printf("h_downloadcsr error [%d:%s]\n",ret,res);
+        return -1;
+    }
 	printf("res size[%d] [%s]\n", sizeof(res),res);
-	root=cJSON_Parse(res);
-	if(NULL == root) {
-		serverLog(LL_ERROR, "h_downloadcsr content not json type\n");
-		cJSON_Delete(root);
-		return -1;
-	}
+    root=cJSON_Parse(res);
+    if(NULL == root) {
+        serverLog(LL_ERROR, "h_downloadcsr content not json type\n");
+        cJSON_Delete(root);
+        return -1;
+    }
 	printf("root[%s]\n", root);
-	cJSON *pem = cJSON_GetObjectItem(root,"pem");
+    cJSON *pem = cJSON_GetObjectItem(root,"pem");
 	if (NULL == pem) {
 		serverLog(LL_ERROR, "cJSON_GetObjectItem return pem is NULL err.");
 		return -1;
 	}
-	printf("pem=[%s]\n",pem->valuestring);
-	write_file_content(SERVICE_PEM, pem->valuestring);
+    printf("pem=[%s]\n",pem->valuestring);
+    write_file_content(SERVICE_PEM, pem->valuestring);
 	cJSON_Delete(root);
 	printf("=====>>>>>DOWNLOAD-CSR Over!!!!!\n");
 	return 0;
@@ -136,33 +136,33 @@ int h_downloadcsr(sysinfo_t* si, char *bridgeToken){
 
 int download_ca(sysinfo_t* si, int tryTimes){
 	if(-1 != (access(SERVICE_PEM, F_OK))){   
-		printf("file %s exist.\n", SERVICE_PEM);   
+        printf("file mytest.c exist.\n");   
 		return 0;
-	}   
+    }   
 
-	int ret;
-	int _tt=0;
-	char userToken[2048],bridgeToken[2048];
-	memset(userToken,0,sizeof(userToken));
-	memset(bridgeToken,0,sizeof(bridgeToken));
-	while((ret=h_GetUserToken(userToken))!=0){
-		printf("GetUserTokenError [%d]\n",ret);
-		if(tryTimes>0) _tt++;
-		else if(_tt>0 && _tt>=tryTimes) return -1;
-	}
-	_tt=0;
-	while((ret=h_GetBridgeToken(userToken,bridgeToken))!=0){
-		printf("GetBridgetTokenError [%d]\n",ret);
-		if(tryTimes>0) _tt++;
-		if(_tt>0 && _tt>=tryTimes) return -1;
-	}
-	_tt=0;
-	while((ret=h_downloadcsr(si,bridgeToken))!=0){
-		printf("DownloadCSR Error [%d]\n",ret);
-		if(tryTimes>0) _tt++;
-		if(_tt>0 && _tt>=tryTimes) return -1;
-	}
-	return 0;
+    int ret;
+    int _tt=0;
+    char userToken[2048],bridgeToken[2048];
+    memset(userToken,0,sizeof(userToken));
+    memset(bridgeToken,0,sizeof(bridgeToken));
+    while((ret=h_GetUserToken(userToken))!=0){
+        printf("GetUserTokenError [%d]\n",ret);
+        if(tryTimes>0) _tt++;
+        else if(_tt>0 && _tt>=tryTimes) return -1;
+    }
+    _tt=0;
+    while((ret=h_GetBridgeToken(userToken,bridgeToken))!=0){
+        printf("GetBridgetTokenError [%d]\n",ret);
+        if(tryTimes>0) _tt++;
+        if(_tt>0 && _tt>=tryTimes) return -1;
+    }
+    _tt=0;
+    while((ret=h_downloadcsr(si,bridgeToken))!=0){
+        printf("DownloadCSR Error [%d]\n",ret);
+        if(tryTimes>0) _tt++;
+        if(_tt>0 && _tt>=tryTimes) return -1;
+    }
+    return 0;
 }
 
 
@@ -172,17 +172,17 @@ int SendMQTTMsg(ign_MsgInfo* msg, char* topic) {
 		printf("mqtt is NULL, no available connection.\n");
 		return -1;
 	}
-	int ret = 0;
-	uint8_t buf[1024];
-	memset(buf, 0, sizeof(buf));
-	pb_ostream_t out = pb_ostream_from_buffer(buf,sizeof(buf));
-	if(pb_encode(&out, ign_MsgInfo_fields, msg)){
-		size_t len=out.bytes_written;
-		if(MQTTCLIENT_SUCCESS != (ret = MQTT_sendMessage(g_sysif.mqtt_c, topic, 1, buf, (int)len))){
-			serverLog(LL_ERROR, "MQTT_sendMessage err[%d], do reconnection.", ret);
-			do {
-				ret = Init_MQTT(&g_sysif.mqtt_c);
-			} while (NULL == g_sysif.mqtt_c); //0 != ret);
+    int ret = 0;
+    uint8_t buf[1024];
+    memset(buf, 0, sizeof(buf));
+    pb_ostream_t out = pb_ostream_from_buffer(buf,sizeof(buf));
+    if(pb_encode(&out, ign_MsgInfo_fields, msg)){
+        size_t len=out.bytes_written;
+        if(MQTTCLIENT_SUCCESS != (ret = MQTT_sendMessage(g_sysif.mqtt_c, topic, 1, buf, (int)len))){
+            serverLog(LL_ERROR, "MQTT_sendMessage err[%d], do reconnection.", ret);
+            do {
+                ret = Init_MQTT(&g_sysif.mqtt_c);
+            } while (NULL == g_sysif.mqtt_c); //0 != ret);
 
 			ret = MQTTClient_subscribe(g_sysif.mqtt_c, TOPIC_SUB, 1);
 			if(MQTTCLIENT_SUCCESS != ret){
@@ -198,88 +198,88 @@ int SendMQTTMsg(ign_MsgInfo* msg, char* topic) {
 			printf("<<<< Send MQTT to[%s] len[%d]\n", topic, len);
 		}
 
-	}else{
-		serverLog(LL_ERROR, "pb_encode failed.");
-		printf("ENCODE UPDATEUSERINFO ERROR\n");
-	}
-	return 0;
+    }else{
+        serverLog(LL_ERROR, "pb_encode failed.");
+        printf("ENCODE UPDATEUSERINFO ERROR\n");
+    }
+    return 0;
 }
 
 static int hbInterval=0;
 int HeartBeat(){
-	hbInterval++;
-	hbInterval = hbInterval%10;
-	if(hbInterval>0)
-		return 0;
-	ign_MsgInfo hb={};
-	hb.event_type=ign_EventType_HEARTBEAT;
-	hb.time=get_ustime();
-	hb.msg_id=GetMsgID();
-	hb.has_bridge_data=true;
-	hb.bridge_data.has_profile=true;
-	hb.bridge_data.profile=Create_IgnBridgeProfile(&g_sysif);
+    hbInterval++;
+    hbInterval = hbInterval%10;
+    if(hbInterval>0)
+		 return 0;
+    ign_MsgInfo hb={};
+    hb.event_type=ign_EventType_HEARTBEAT;
+    hb.time=get_ustime();
+    hb.msg_id=GetMsgID();
+    hb.has_bridge_data=true;
+    hb.bridge_data.has_profile=true;
+    hb.bridge_data.profile=Create_IgnBridgeProfile(&g_sysif);
 
-	SendMQTTMsg(&hb, TOPIC_PUB);
-	return 0;
+    SendMQTTMsg(&hb, TOPIC_PUB);
+    return 0;
 }
 
 int Sync_Battery(char* lock_id, int battery_l){
-	ign_MsgInfo battery={};
-	battery.event_type=ign_EventType_DEMO_UPDATE_LOCK_BATTERY;
-	battery.time=get_ustime();
-	battery.msg_id=GetMsgID();
+    ign_MsgInfo battery={};
+    battery.event_type=ign_EventType_DEMO_UPDATE_LOCK_BATTERY;
+    battery.time=get_ustime();
+    battery.msg_id=GetMsgID();
 
-	battery.has_bridge_data=true;
-	ign_BridgeEventData *pbed= &battery.bridge_data;
-	strncpy(pbed->demo_lockId, lock_id, sizeof(pbed->demo_lockId));
-	pbed->has_profile=true;
+    battery.has_bridge_data=true;
+    ign_BridgeEventData *pbed= &battery.bridge_data;
+    strncpy(pbed->demo_lockId, lock_id, sizeof(pbed->demo_lockId));
+    pbed->has_profile=true;
 	pbed->profile = Create_IgnBridgeProfile(&g_sysif);
 
-	pbed->has_demo_update_lock_battery = true;
-	pbed->demo_update_lock_battery.battery = battery_l;
-
-	SendMQTTMsg(&battery, TOPIC_PUB);
-	return 0;
+    pbed->has_demo_update_lock_battery = true;
+    pbed->demo_update_lock_battery.battery = battery_l;
+   
+    SendMQTTMsg(&battery, TOPIC_PUB);
+    return 0;
 }
 
 int Sync_Status(char* lock_id, int lock_status){
 	ign_MsgInfo status={};
-	status.event_type=ign_EventType_DEMO_UPDATE_LOCK_STATUS;
-	status.time=get_ustime();
-	status.msg_id=GetMsgID();
-
-	status.has_bridge_data=true;
-	ign_BridgeEventData *pbed = &status.bridge_data;
-	strncpy(pbed->demo_lockId, lock_id, sizeof(pbed->demo_lockId));
-	pbed->has_profile=true;
+    status.event_type=ign_EventType_DEMO_UPDATE_LOCK_STATUS;
+    status.time=get_ustime();
+    status.msg_id=GetMsgID();
+    
+    status.has_bridge_data=true;
+    ign_BridgeEventData *pbed = &status.bridge_data;
+    strncpy(pbed->demo_lockId, lock_id, sizeof(pbed->demo_lockId));
+    pbed->has_profile=true;
 	pbed->profile=Create_IgnBridgeProfile(&g_sysif);
-	pbed->has_demo_update_lock_status=true;
-	pbed->demo_update_lock_status.status = lock_status;
+    pbed->has_demo_update_lock_status=true;
+    pbed->demo_update_lock_status.status = lock_status;
 
-	SendMQTTMsg(&status, TOPIC_PUB);
-	return 0;
+    SendMQTTMsg(&status, TOPIC_PUB);
+    return 0;
 }
 
 int Sync_Activities(char* lock_id, char* logs, unsigned int logs_size){
-	ign_MsgInfo log_msg = {};
-	log_msg.event_type=ign_EventType_DEMO_UPDATE_LOCK_ACTIVITIES;
-	log_msg.time=get_ustime();
-	log_msg.msg_id=GetMsgID();
+    ign_MsgInfo log_msg = {};
+    log_msg.event_type=ign_EventType_DEMO_UPDATE_LOCK_ACTIVITIES;
+    log_msg.time=get_ustime();
+    log_msg.msg_id=GetMsgID();
 
-	log_msg.has_bridge_data=true;
-	ign_BridgeEventData *pbed = &log_msg.bridge_data;
-	strncpy(pbed->demo_lockId, lock_id, sizeof(pbed->demo_lockId));
-	pbed->has_profile=true;
-	pbed->profile=Create_IgnBridgeProfile(&g_sysif);
+    log_msg.has_bridge_data=true;
+    ign_BridgeEventData *pbed = &log_msg.bridge_data;
+    strncpy(pbed->demo_lockId, lock_id, sizeof(pbed->demo_lockId));
+    pbed->has_profile=true;
+    pbed->profile=Create_IgnBridgeProfile(&g_sysif);
 
-	pbed->has_demo_update_lock_activities=true;
-	ign_DemoUpdateLockActivities dula={};
-	dula.log.size = logs_size;//strlen(logs);
-	memcpy(dula.log.bytes, logs, logs_size);
-	pbed->demo_update_lock_activities = dula;
+    pbed->has_demo_update_lock_activities=true;
+    ign_DemoUpdateLockActivities dula={};
+    dula.log.size = logs_size;//strlen(logs);
+    memcpy(dula.log.bytes, logs, logs_size);
+    pbed->demo_update_lock_activities = dula;
 
-	SendMQTTMsg(&log_msg, TOPIC_PUB);
-	return 0;
+    SendMQTTMsg(&log_msg, TOPIC_PUB);
+    return 0;
 }
 
 
@@ -362,10 +362,11 @@ void saveTaskData(task_node_t* ptn) {
 }
 
 int HandleLockCMD (sysinfo_t* si, igm_lock_t* lock, int cmd, void* request) {
-	serverLog(LL_NOTICE, "in HandleLockCMD.");
-	ble_guest_param_t *guest_param = (ble_guest_param_t *)malloc(sizeof(ble_guest_param_t));
-	bleInitGuestParam(guest_param);
-	bleSetGuestParam(guest_param, lock);
+    serverLog(LL_NOTICE, "in HandleLockCMD.");
+	LIGHT_BLINK(b)
+    ble_guest_param_t *guest_param = (ble_guest_param_t *)malloc(sizeof(ble_guest_param_t));
+    bleInitGuestParam(guest_param);
+    bleSetGuestParam(guest_param, lock);
 
 	if (ign_DemoLockCommand_CREATE_PIN == cmd && NULL != request) {
 		bleSetGuestRequest(guest_param, request, sizeof(IgCreatePinRequest));
@@ -373,12 +374,12 @@ int HandleLockCMD (sysinfo_t* si, igm_lock_t* lock, int cmd, void* request) {
 		bleSetGuestRequest(guest_param, request, sizeof(IgDeletePinRequest));
 	}
 
-	ble_data_t *ble_data = malloc(sizeof(ble_data_t));
-	bleInitData(ble_data);
-	bleSetBleParam(ble_data, guest_param, sizeof(ble_guest_param_t));
+    ble_data_t *ble_data = malloc(sizeof(ble_data_t));
+    bleInitData(ble_data);
+    bleSetBleParam(ble_data, guest_param, sizeof(ble_guest_param_t));
 
 	task_node_t *tn = (task_node_t *)malloc(sizeof(task_node_t));
-	tn->ble_data_len = sizeof(task_node_t);
+    tn->ble_data_len = sizeof(task_node_t);
 	tn->sysif = si;
 	tn->ble_data = ble_data;
 	memset(tn->lock_id, 0x0, sizeof(tn->lock_id));
@@ -395,7 +396,7 @@ int HandleLockCMD (sysinfo_t* si, igm_lock_t* lock, int cmd, void* request) {
 	} else if (ign_DemoLockCommand_GET_LOCK_STATUS == cmd) {
 		//tn->sm_table_len = getGuestGetLockStatusFsmTableLen();
 		//tn->task_sm_table = getGuestGetLockStatusFsmTable();
-		tn->task_type = TASK_BLE_GUEST_GETLOCKSTATUS;
+	    tn->task_type = TASK_BLE_GUEST_GETLOCKSTATUS;
 	} else if (ign_DemoLockCommand_GET_BATTERY == cmd) {
 		//tn->sm_table_len = getGuestGetBatteryLevelFsmTableLen();
 		//tn->task_sm_table = getGuestGetBatteryLevelFsmTable();
@@ -403,129 +404,130 @@ int HandleLockCMD (sysinfo_t* si, igm_lock_t* lock, int cmd, void* request) {
 	} else if (ign_DemoLockCommand_GET_LOGS == cmd) {
 		//tn->sm_table_len = getGuestGetLogsFsmTableLen();
 		//tn->task_sm_table = getGuestGetLogsFsmTable();
-		tn->task_type = TASK_BLE_GUEST_GETLOGS;
+	    tn->task_type = TASK_BLE_GUEST_GETLOGS;
 	} else if (ign_DemoLockCommand_CREATE_PIN == cmd) {
 		//tn->sm_table_len = getGuestCreatePinRequestFsmTableLen();
 		//tn->task_sm_table = getGuestCreatePinRequestFsmTable();
-		tn->task_type = TASK_BLE_GUEST_CREATE_PIN;
+	    tn->task_type = TASK_BLE_GUEST_CREATE_PIN;
 	} else if (ign_DemoLockCommand_DELETE_PIN == cmd) {
 		//tn->sm_table_len = getGuestDeletePinRequestFsmTableLen();
 		//tn->task_sm_table = getGuestDeletePinRequestFsmTable();
-		tn->task_type = TASK_BLE_GUEST_DEL_PIN;
-	} else {
-		serverLog(LL_ERROR, "cmd[%d] err.", cmd);
-		return -1;
-	}
+        tn->task_type = TASK_BLE_GUEST_DEL_PIN;
+    } else {
+        serverLog(LL_ERROR, "cmd[%d] err.", cmd);
+        return -1;
+    }
 
-	/*
-	   int current_state = BLE_GUEST_BEGIN;
-	   for (int j = 0; j < tn->sm_table_len; j++) {
-	   if (current_state == tn->task_sm_table[j].cur_state) {
-	   int event_result = tn->task_sm_table[j].eventActFun(tn);
-	   if (event_result) {
-	   serverLog(LL_ERROR, "ign sm err, step[%d] event_result[%d].", j, event_result);
-	   return -1;
-	   } else {
-	   current_state = tn->task_sm_table[j].next_state;
-	   }
-	   }
-	   }*/
+/*
+	int current_state = BLE_GUEST_BEGIN;
+    for (int j = 0; j < tn->sm_table_len; j++) {
+        if (current_state == tn->task_sm_table[j].cur_state) {
+			int event_result = tn->task_sm_table[j].eventActFun(tn);
+            if (event_result) {
+                serverLog(LL_ERROR, "ign sm err, step[%d] event_result[%d].", j, event_result);
+                return -1;
+            } else {
+				current_state = tn->task_sm_table[j].next_state;
+            }
+		}
+    }*/
 
-	int ret = guest_connection_and_do_cmd(tn);
-	if(ret) {
-		serverLog(LL_ERROR, "guest_connection_and_do_cmd err[%d].", ret);
-		return -1;
-	}
+    int ret = guest_connection_and_do_cmd(tn);
+    if(ret) {
+        serverLog(LL_ERROR, "guest_connection_and_do_cmd err[%d].", ret);
+        return -1;
+    }
 
-	saveTaskData(tn);
+    saveTaskData(tn);
 
-	ble_guest_result_t *guest_unlock_result = (ble_guest_result_t *)ble_data->ble_result;
-	releaseGuestResult(&guest_unlock_result);
-	bleReleaseBleResult(ble_data);
-	free(ble_data); ble_data = NULL;
-	free(tn); tn = NULL;
-	free(guest_param); guest_param = NULL;
-	serverLog(LL_NOTICE, "HandleLockCMD end-------");
-	return 0;
+    ble_guest_result_t *guest_unlock_result = (ble_guest_result_t *)ble_data->ble_result;
+    releaseGuestResult(&guest_unlock_result);
+    bleReleaseBleResult(ble_data);
+    free(ble_data); ble_data = NULL;
+    free(tn); tn = NULL;
+    free(guest_param); guest_param = NULL;
+    serverLog(LL_NOTICE, "HandleLockCMD end-------");
+	LIGHT_ON(g)
+    return 0;
 }
 
 
 /*
-   int download_ca(){
-   char *url;
-   char data[1024], response[4096];
-   int  i, ret, size;
+int download_ca(){
+    char *url;
+    char data[1024], response[4096];
+    int  i, ret, size;
 
-   printf("=====>>>>>Step1. Get User login token\n");
-   HTTP_INFO hi1;
-   http_init(&hi1, TRUE);
-   url = "https://tkm70zar9f.execute-api.ap-southeast-1.amazonaws.com/development/login";
-   sprintf(data,"{\"email\":\"cs.lim+bridge@igloohome.co\",\"password\":\"igloohome\"}");
-   ret = http_post(&hi1, url, data, response, sizeof(response));
-   http_close(&hi1);
-   if(ret!=200) return -1;
-   char userToken[2048];
-   memset(userToken,0,sizeof(userToken));
-   strncpy(userToken,response+16,strlen(response)-18);
-   printf("UserToken=[%s]\n",userToken);
-   printf("=====>>>>>Step2. Get Bridge token\n");
-   memset(data,0,sizeof(data));
-   memset(response,0,sizeof(response));
-   HTTP_INFO hi2;
-   url="https://tkm70zar9f.execute-api.ap-southeast-1.amazonaws.com/development/token";
-   ret=http_get_with_auth(&hi2,url,userToken,response,sizeof(response));
-   http_close(&hi2);
-   if(ret!=200) return -2;
-   char biridgeToken[2048];
-   memset(biridgeToken,0,sizeof(biridgeToken));
-   strncpy(biridgeToken,response+18,strlen(response)-20);
-   printf("BirdgeTOken=[%s]\n",biridgeToken);
-   printf("=====>>>>>Step3. Download CA \n");
-   char* localCSR=get_file_content("/root/project/gomvc_blog/ign/webign.csr");
-   memset(data,0,sizeof(data));
-   memset(response,0,sizeof(response));
-   HTTP_INFO hi3;
-   url="https://tkm70zar9f.execute-api.ap-southeast-1.amazonaws.com/development/devices/bridge/DCA63210C7DA";
-   cJSON *root;
-   root=cJSON_CreateObject();
-   cJSON_AddStringToObject(root,"csr",localCSR);
-   char *sdata=cJSON_PrintUnformatted(root);
-   cJSON_Delete(root);
-   printf("________________Request Body Content\n%s\n",sdata);
-   ret=http_post_with_auth(&hi3,url,biridgeToken,sdata,response,sizeof(response));
-   if(ret!=200) return -3;
-   root=cJSON_Parse(response);
-   if(root==NULL) return -4;
-   cJSON *pem=cJSON_GetObjectItem(root,"pem");
-   printf("pem=%s\n",pem->valuestring);
-   write_file_content("./test_test_test_test.csr",pem->valuestring);
-   cJSON_Delete(root);
-   printf("=====>>>>>DOWNLOAD-CSR Over!!!!!\n");
-   return 0;
-   }
- */
+    printf("=====>>>>>Step1. Get User login token\n");
+    HTTP_INFO hi1;
+    http_init(&hi1, TRUE);
+    url = "https://tkm70zar9f.execute-api.ap-southeast-1.amazonaws.com/development/login";
+    sprintf(data,"{\"email\":\"cs.lim+bridge@igloohome.co\",\"password\":\"igloohome\"}");
+    ret = http_post(&hi1, url, data, response, sizeof(response));
+    http_close(&hi1);
+    if(ret!=200) return -1;
+    char userToken[2048];
+    memset(userToken,0,sizeof(userToken));
+    strncpy(userToken,response+16,strlen(response)-18);
+    printf("UserToken=[%s]\n",userToken);
+    printf("=====>>>>>Step2. Get Bridge token\n");
+    memset(data,0,sizeof(data));
+    memset(response,0,sizeof(response));
+    HTTP_INFO hi2;
+    url="https://tkm70zar9f.execute-api.ap-southeast-1.amazonaws.com/development/token";
+    ret=http_get_with_auth(&hi2,url,userToken,response,sizeof(response));
+    http_close(&hi2);
+    if(ret!=200) return -2;
+    char biridgeToken[2048];
+    memset(biridgeToken,0,sizeof(biridgeToken));
+    strncpy(biridgeToken,response+18,strlen(response)-20);
+    printf("BirdgeTOken=[%s]\n",biridgeToken);
+    printf("=====>>>>>Step3. Download CA \n");
+    char* localCSR=get_file_content("/root/project/gomvc_blog/ign/webign.csr");
+    memset(data,0,sizeof(data));
+    memset(response,0,sizeof(response));
+    HTTP_INFO hi3;
+    url="https://tkm70zar9f.execute-api.ap-southeast-1.amazonaws.com/development/devices/bridge/DCA63210C7DA";
+    cJSON *root;
+    root=cJSON_CreateObject();
+    cJSON_AddStringToObject(root,"csr",localCSR);
+    char *sdata=cJSON_PrintUnformatted(root);
+    cJSON_Delete(root);
+    printf("________________Request Body Content\n%s\n",sdata);
+    ret=http_post_with_auth(&hi3,url,biridgeToken,sdata,response,sizeof(response));
+    if(ret!=200) return -3;
+    root=cJSON_Parse(response);
+    if(root==NULL) return -4;
+    cJSON *pem=cJSON_GetObjectItem(root,"pem");
+    printf("pem=%s\n",pem->valuestring);
+    write_file_content("./test_test_test_test.csr",pem->valuestring);
+    cJSON_Delete(root);
+    printf("=====>>>>>DOWNLOAD-CSR Over!!!!!\n");
+    return 0;
+}
+*/
 int FSMHandle(task_node_t* tn) {
-	if(NULL == tn->task_sm_table) {
-		serverLog(LL_ERROR, "sm_table is NULL.");
-		return -1;
-	}
-	// sizeof å¨å®ä¹ææ°ç»çæ¶å, sizeof æé è¿åæ´ä¸ªæ°ç»çå­èæ°
-	// sizeof å¯¹æéçæ¶å, åªè½è¿åæéå¤§å°
-	// sizeof å¯¹æéæç¥æ°ç»çæä¸ªåå®¹çæ¶å, åªè½è¿åè¯¥é¡¹å¤§å°, 
-	// ä¹å°±æ¯åªä¼è¿å sm_table å½ä¸­æä¸é¡¹çå¤§å°
-	// æä»¥ææå¨è¿åäºé¿åº¦.
+    if(NULL == tn->task_sm_table) {
+        serverLog(LL_ERROR, "sm_table is NULL.");
+        return -1;
+    }
+    // sizeof å¨å®ä¹ææ°ç»çæ¶å, sizeof æé è¿åæ´ä¸ªæ°ç»çå­èæ°
+    // sizeof å¯¹æéçæ¶å, åªè½è¿åæéå¤§å°
+    // sizeof å¯¹æéæç¥æ°ç»çæä¸ªåå®¹çæ¶å, åªè½è¿åè¯¥é¡¹å¤§å°, 
+    // ä¹å°±æ¯åªä¼è¿å sm_table å½ä¸­æä¸é¡¹çå¤§å°
+    // æä»¥ææå¨è¿åäºé¿åº¦.
 	unsigned int table_max_num = tn->sm_table_len;
-	serverLog(LL_NOTICE, "table_max_num %d", table_max_num);
+    serverLog(LL_NOTICE, "table_max_num %d", table_max_num);
 	int flag = 0;
-	// è¿å¿æ¯éåææçç¶æ.
+    // è¿å¿æ¯éåææçç¶æ.
 	for (int i = 0; i<table_max_num; i++) {
-		serverLog(LL_NOTICE, "FSMHandle state[%d].", i);
+        serverLog(LL_NOTICE, "FSMHandle state[%d].", i);
 		if (tn->cur_state == tn->task_sm_table[i].cur_state) {
 			serverLog(LL_NOTICE, "eventActFun begin---------------, tn->task_sm_table[%d].cur_state[%d].", i, tn->task_sm_table[i].cur_state);
-			// å¢å ä¸ä¸ªå¤æ­å½åå½æ°, æ¯å¦å½åå½æ°åºé. 0 è¡¨ç¤ºæ²¡é®é¢
+            // å¢å ä¸ä¸ªå¤æ­å½åå½æ°, æ¯å¦å½åå½æ°åºé. 0 è¡¨ç¤ºæ²¡é®é¢
 			int event_result = tn->task_sm_table[i].eventActFun(tn);
-			if (event_result)
-			{
+            if (event_result)
+            {
 				serverLog(LL_ERROR, "tn->task_sm_table[%d].cur_state[%d] err[%d].", i, tn->task_sm_table[i].cur_state, event_result);
 				//flag = 0;
 				//break;
@@ -545,61 +547,61 @@ int FSMHandle(task_node_t* tn) {
 }
 
 ign_BridgeProfile Create_IgnBridgeProfile(sysinfo_t* si){
-	ign_BridgeProfile bp = {};
-	bp.os_info = ign_OSType_LINUX;
-	char temp[100];
-	memset(temp,0,sizeof(temp));
-	bp.bt_id.size = snprintf(temp, sizeof(temp), "%s", si->mac);
-	bp.mac_addr.size = bp.bt_id.size;
-	memcpy(bp.bt_id.bytes, temp, strlen(temp));
-	memcpy(bp.mac_addr.bytes, temp, strlen(temp));
+    ign_BridgeProfile bp = {};
+    bp.os_info = ign_OSType_LINUX;
+    char temp[100];
+    memset(temp,0,sizeof(temp));
+    bp.bt_id.size = snprintf(temp, sizeof(temp), "%s", si->mac);
+    bp.mac_addr.size = bp.bt_id.size;
+    memcpy(bp.bt_id.bytes, temp, strlen(temp));
+    memcpy(bp.mac_addr.bytes, temp, strlen(temp));
+    
+    char localip[20],publicip[20];                                                                                                                                                                                         
+    memset(localip,0,sizeof(localip));
+    memset(publicip,0,sizeof(publicip));
+    Pro_GetLocalIP(localip);
+    Pro_GetPublicIP(publicip);
 
-	char localip[20],publicip[20];                                                                                                                                                                                         
-	memset(localip,0,sizeof(localip));
-	memset(publicip,0,sizeof(publicip));
-	Pro_GetLocalIP(localip);
-	Pro_GetPublicIP(publicip);
+    bp.local_ip.size = strlen(localip);
+    memcpy(bp.local_ip.bytes, localip, strlen(localip));
 
-	bp.local_ip.size = strlen(localip);
-	memcpy(bp.local_ip.bytes, localip, strlen(localip));
-
-	bp.public_ip.size=strlen(publicip);
-	memcpy(bp.public_ip.bytes,publicip,strlen(publicip));
-
-	PRO_DISK_INFO *di=Pro_GetDiskInfo();
-	PRO_MEMORY_INFO *mi=Pro_GetMemoryInfo();
-	char cpu[200];
-	memset(cpu,0,sizeof(cpu));
-	sprintf(cpu,"CR:%.4f;MT:%d,MF:%d,MUR:%.4f;DT:%d,DU:%d,DUR:%.4f",
-			Pro_GetCpuRate(),
-			mi->total,mi->free,mi->used_rate,
-			di->total,di->used,di->used_rate);
-	bp.sys_statics.size=strlen(cpu);
-	memcpy(bp.sys_statics.bytes,cpu,strlen(cpu));
-
-	PRO_WIFI_INFO *wf=Pro_GetWifiInfo();
-	bp.wifi_ssid.size = strlen(wf->ssid);
-	memcpy(bp.wifi_ssid.bytes,wf->ssid,strlen(wf->ssid));
-	bp.wifi_signal = wf->signal;
-	bp.inited_time = Pro_GetInitedTime();
-	bp.name.size = strlen(temp);
-	memcpy(bp.name.bytes, si->mac, strlen(si->mac));
-	printf("[DEVICEINFO]LocalIP=%s PublicIP=%s Name=%s Sys_statics=%s Wifi_ssid=%s Wifi_signal=%d inited_time=%d\n",
-			bp.local_ip.bytes,bp.public_ip.bytes,bp.name.bytes,bp.sys_statics.bytes,bp.wifi_ssid.bytes,bp.wifi_signal,bp.inited_time);
-	return bp;
+    bp.public_ip.size=strlen(publicip);
+    memcpy(bp.public_ip.bytes,publicip,strlen(publicip));
+                                                 
+    PRO_DISK_INFO *di=Pro_GetDiskInfo();
+    PRO_MEMORY_INFO *mi=Pro_GetMemoryInfo();
+    char cpu[200];
+    memset(cpu,0,sizeof(cpu));
+    sprintf(cpu,"CR:%.4f;MT:%d,MF:%d,MUR:%.4f;DT:%d,DU:%d,DUR:%.4f",
+            Pro_GetCpuRate(),
+            mi->total,mi->free,mi->used_rate,
+            di->total,di->used,di->used_rate);
+    bp.sys_statics.size=strlen(cpu);
+    memcpy(bp.sys_statics.bytes,cpu,strlen(cpu));
+    
+    PRO_WIFI_INFO *wf=Pro_GetWifiInfo();
+    bp.wifi_ssid.size = strlen(wf->ssid);
+    memcpy(bp.wifi_ssid.bytes,wf->ssid,strlen(wf->ssid));
+    bp.wifi_signal = wf->signal;
+    bp.inited_time = Pro_GetInitedTime();
+    bp.name.size = strlen(temp);
+    memcpy(bp.name.bytes, si->mac, strlen(si->mac));
+    printf("[DEVICEINFO]LocalIP=%s PublicIP=%s Name=%s Sys_statics=%s Wifi_ssid=%s Wifi_signal=%d inited_time=%d\n",
+            bp.local_ip.bytes,bp.public_ip.bytes,bp.name.bytes,bp.sys_statics.bytes,bp.wifi_ssid.bytes,bp.wifi_signal,bp.inited_time);
+    return bp;
 }
 
 static ign_LockEntry glocks[5];
 static int glock_index=0;
 
 bool get_server_event_data(pb_istream_t *stream,const pb_field_t *field,void **arg){
-	ign_LockEntry lock={};
-	if(pb_decode(stream,ign_LockEntry_fields,&lock)){
-		glocks[glock_index]=lock;
-		glock_index++;
-		return true;
-	}    
-	return false;
+    ign_LockEntry lock={};
+    if(pb_decode(stream,ign_LockEntry_fields,&lock)){
+        glocks[glock_index]=lock;
+        glock_index++;
+        return true;
+    }    
+    return false;
 }
 
 int GetUserInfo() {
@@ -614,22 +616,17 @@ int GetUserInfo() {
 	msg.has_bridge_data = true;
 	msg.bridge_data.has_profile = true;
 	msg.bridge_data.profile = Create_IgnBridgeProfile(&g_sysif);
-	SendMQTTMsg(&msg, TOPIC_PUB);
+    SendMQTTMsg(&msg, TOPIC_PUB);
 	return 0;
 }
 
 int Init_MQTT(MQTTClient* p_mqtt){
-	if(-1 == (access(TRUST_STORE, F_OK)) ||  -1 == (access(PRIVATE_KEY, F_OK)) ||  -1 == (access(KEY_STORE, F_OK)) ){
-		printf("PEM file err.\n");
-		return -1;
-	}   
-
-	printf("====>CAPATH=%s;TRUST_STORE=%s;PRIVATE_KEY=%s;KEY_STORE=%s\n",CA_PATH,TRUST_STORE,PRIVATE_KEY,KEY_STORE);
-	*p_mqtt = MQTT_initClients(HOST, g_sysif.mac, 60, 1, CA_PATH, TRUST_STORE, PRIVATE_KEY, KEY_STORE);
-	if(NULL == *p_mqtt) {
-		serverLog(LL_ERROR, "MQTT_initClients err, mqtt_c is NULL.");
-		return -1;
-	}
+    printf("====>CAPATH=%s;TRUST_STORE=%s;PRIVATE_KEY=%s;KEY_STORE=%s\n",CA_PATH,TRUST_STORE,PRIVATE_KEY,KEY_STORE);
+    *p_mqtt = MQTT_initClients(HOST, g_sysif.mac, 60, 1, CA_PATH, TRUST_STORE, PRIVATE_KEY, KEY_STORE);
+    if(NULL == *p_mqtt) {
+        serverLog(LL_ERROR, "MQTT_initClients err, mqtt_c is NULL.");
+        return -1;
+    }
 	serverLog(LL_DEBUG, "MQTT_initClients succ, mqtt_c[%x], addr[%x]\n", p_mqtt, &p_mqtt);
 	return 0;
 }
@@ -640,61 +637,61 @@ int Init_Ble(sysinfo_t* si) {
 	//memset(si->lockinfo, 0, sizeof(LockInfo_t)*MAX_LOCK_COUNT);
 	//si->lock_total = 0;
 
-	int ret = gattlib_adapter_open(NULL, &si->ble_adapter);
-	if (ret) {
-		serverLog(LL_ERROR, "discoverLock ERROR: Failed to open adapter.\n");
+    int ret = gattlib_adapter_open(NULL, &si->ble_adapter);
+    if (ret) {
+        serverLog(LL_ERROR, "discoverLock ERROR: Failed to open adapter.\n");
 		Close(si);
+        return -1;
+    }
+
+/*
+	LockInfo_t *li = (LockInfo_t*) malloc(sizeof(LockInfo_t));
+	if (NULL==li) {
 		return -1;
 	}
+*/
+/*
+	char lock_id[] = "IGM3037f4b09";
+	char device_address[] = "EC:09:02:7F:4B:09";
+	char admin_key[] = "96eb72d2852d41df94dac37eb3241caa";
+	char passwd[] = "63c5bd7dd34fe863";
 
-	/*
-	   LockInfo_t *li = (LockInfo_t*) malloc(sizeof(LockInfo_t));
-	   if (NULL==li) {
-	   return -1;
-	   }
-	 */
-	/*
-	   char lock_id[] = "IGM3037f4b09";
-	   char device_address[] = "EC:09:02:7F:4B:09";
-	   char admin_key[] = "96eb72d2852d41df94dac37eb3241caa";
-	   char passwd[] = "63c5bd7dd34fe863";
+	LockInfo_t li;
+	memset(&li, 0, sizeof(LockInfo_t));
+	memcpy(&li.lock_id, lock_id, strlen(lock_id));
+	memcpy(&li.lock_addr, device_address, strlen(device_address));
+	memcpy(&li.lock_ekey, admin_key, strlen(admin_key));
+	memcpy(&li.lock_passwd, passwd, strlen(passwd));
 
-	   LockInfo_t li;
-	   memset(&li, 0, sizeof(LockInfo_t));
-	   memcpy(&li.lock_id, lock_id, strlen(lock_id));
-	   memcpy(&li.lock_addr, device_address, strlen(device_address));
-	   memcpy(&li.lock_ekey, admin_key, strlen(admin_key));
-	   memcpy(&li.lock_passwd, passwd, strlen(passwd));
+	AddLockinfo(si, &li);
+	PrintLockinfo(si);
 
-	   AddLockinfo(si, &li);
-	   PrintLockinfo(si);
-
-	 */
+*/
 	//@@@ need async connect!!!
 	/*
-	   int ret = create_gatt_connection(li->lock_addr, &(li->gatt_connection), &(li->gatt_adapter));
-	   if(ret) {
-	   serverLog("create_gatt_connection err[%d].", ret);
-	   return -2;
-	   }
-	 */
+	int ret = create_gatt_connection(li->lock_addr, &(li->gatt_connection), &(li->gatt_adapter));
+	if(ret) {
+		serverLog("create_gatt_connection err[%d].", ret);
+		return -2;
+	}
+	*/
 
 	/*??
-	  static char admin_str[] = "5c3a659f-897e-45e1-b016-007107c96df6";
-	  if ( gattlib_string_to_uuid( admin_str, strlen(admin_str), &(admin_connection->admin_uuid))<0) {
-	  serverLog(LL_ERROR, "gattlib_string_to_uuid to admin_uuid fail");
-//goto ADMIN_ERROR_EXIT;
-}
-serverLog(LL_NOTICE, "gattlib_string_to_uuid to admin_uuid success." );
-
-ret = gattlib_adapter_scan_enable(adapter, ble_discovered_device, BLE_SCAN_TIMEOUT, NULL);
-if (ret) {
-serverLog(LL_NOTICE, "ERROR: Failed to scan.");
-	//goto EXIT;
+	static char admin_str[] = "5c3a659f-897e-45e1-b016-007107c96df6";
+	if ( gattlib_string_to_uuid( admin_str, strlen(admin_str), &(admin_connection->admin_uuid))<0) {
+		serverLog(LL_ERROR, "gattlib_string_to_uuid to admin_uuid fail");
+		//goto ADMIN_ERROR_EXIT;
 	}
-	 */
+	serverLog(LL_NOTICE, "gattlib_string_to_uuid to admin_uuid success." );
 
-return 0;
+    ret = gattlib_adapter_scan_enable(adapter, ble_discovered_device, BLE_SCAN_TIMEOUT, NULL);
+    if (ret) {
+        serverLog(LL_NOTICE, "ERROR: Failed to scan.");
+        //goto EXIT;
+    }
+	*/
+
+	return 0;
 }
 
 char* GetAddrBle(sysinfo_t* si, char* lock_id) {
@@ -748,7 +745,7 @@ void PrintLockinfo(sysinfo_t* si) {
 	for(int i =0; i<si->lock_total; i++){
 		LockInfo_t* pi = si->lockinfo + i;
 		printf("[%d], id[%s],id_size[%d],key[%X],key_size[%d],passwd[%x],passwd_size[%d],token[%x],token_size[%d],addr[%s]\n",
-				i, pi->lock_id, pi->lock_id_size, pi->lock_ekey, pi->lock_ekey_size, pi->lock_passwd, pi->lock_passwd_size, pi->lock_token, pi->lock_token_size, pi->lock_addr);
+			i, pi->lock_id, pi->lock_id_size, pi->lock_ekey, pi->lock_ekey_size, pi->lock_passwd, pi->lock_passwd_size, pi->lock_token, pi->lock_token_size, pi->lock_addr);
 	}
 }
 
@@ -767,17 +764,17 @@ LockInfo_t* SearchLockInfo(sysinfo_t* si, char* lock_id){
 void ble_discovered_cb(void *adapter, const char* addr, const char* name, void* si) {
 	ble_addr_t* bl = ((sysinfo_t*)si)->ble_list;
 	unsigned char ble_total = ((sysinfo_t*)si)->ble_list_n; 
-	if (name) {
-		printf("Discovered [%s] - [%s]\n", addr, name);
+    if (name) {
+        printf("Discovered [%s] - [%s]\n", addr, name);
 		((sysinfo_t*)si)->ble_list = realloc(bl, sizeof(ble_addr_t)*(ble_total+1));
 		ble_addr_t* nbl = ((sysinfo_t*)si)->ble_list + ble_total;
 		memset(nbl, 0x0, sizeof(ble_addr_t));
 		memcpy(nbl->name, name, strlen(name));
 		memcpy(nbl->addr, addr, strlen(addr));
 		((sysinfo_t*)si)->ble_list_n++;
-	} else {
-		printf("Discovered [%s]\n", addr);
-	}
+    } else {
+        printf("Discovered [%s]\n", addr);
+    }
 }
 
 int ScanBLE(sysinfo_t* si) {
@@ -786,26 +783,26 @@ int ScanBLE(sysinfo_t* si) {
 		return -1;
 	}
 	si->ble_list_n = 0;
-	//do scan BLE
-	int ret = gattlib_adapter_scan_enable(si->ble_adapter, ble_discovered_cb, BLE_SCAN_TIMEOUT, si);
-	if (ret) {
-		fprintf(stderr, "ERROR: Failed to scan.\n");
+    //do scan BLE
+    int ret = gattlib_adapter_scan_enable(si->ble_adapter, ble_discovered_cb, BLE_SCAN_TIMEOUT, si);
+    if (ret) {
+        fprintf(stderr, "ERROR: Failed to scan.\n");
 		Close(si);
 		return -1;
-	}
+    }
 	printf("ble_addr_n[%d]\n", si->ble_list_n);
 	for(int i =0; i<si->ble_list_n; i++) {
 		printf("[%d],name[%s],addr[%s]\n", i, si->ble_list[i].name, si->ble_list[i].addr);
 	}
-	/*
-	   printf("g_ble_addr.size[%d]\n",g_ble_addr.size());
-	   for(map<string, string>::iterator it = g_ble_addr.begin(); g_ble_addr.end()!= it; it++) {
-	   prtinf("name[%s],addr[%s]\n", it->first.c_str(), it->second.c_str());
-	   }
-	 */
-	gattlib_adapter_scan_disable(si->ble_adapter);
-	//if have the BLE addr, do init for demo
-	return 0;
+/*
+	printf("g_ble_addr.size[%d]\n",g_ble_addr.size());
+	for(map<string, string>::iterator it = g_ble_addr.begin(); g_ble_addr.end()!= it; it++) {
+		prtinf("name[%s],addr[%s]\n", it->first.c_str(), it->second.c_str());
+	}
+*/
+    gattlib_adapter_scan_disable(si->ble_adapter);
+    //if have the BLE addr, do init for demo
+    return 0;
 }
 
 void Close(sysinfo_t* si) {
@@ -818,33 +815,30 @@ void Close(sysinfo_t* si) {
 }
 
 int WifiConnection(){
-	// benny
-	return 0;
+    // benny
+    return 0;
 }
 
 int Init(void* tn) {
-
-	system("echo default-on > /sys/class/leds/r/trigger");
-	system("echo default-on > /sys/class/leds/b/trigger");
-	system("echo default-on > /sys/class/leds/g/trigger");
+	LIGHT_ON(w)
 
 	int ret = 0;
 
 	ret = GetMacAddr(g_sysif.mac, sizeof(g_sysif.mac));
-	if(ret < 0) {
-		serverLog(LL_ERROR, "Init GetMacAddr err[%d].", ret);
-		return -1;
-	}
+    if(ret < 0) {
+        serverLog(LL_ERROR, "Init GetMacAddr err[%d].", ret);
+        return -1;
+    }
 
-	ret = Init_Ble(&g_sysif);
+    ret = Init_Ble(&g_sysif);
 	if(ret) {
-		serverLog(LL_ERROR, "Init_Ble err[%d].", ret);
+        serverLog(LL_ERROR, "Init_Ble err[%d].", ret);
 		return -2;
 	}
 
-	ret = ScanBLE(&g_sysif);
+    ret = ScanBLE(&g_sysif);
 	if(ret) {
-		serverLog(LL_ERROR, "ScanBle err[%d].", ret);
+        serverLog(LL_ERROR, "ScanBle err[%d].", ret);
 		return -3;
 	}
 
@@ -852,88 +846,88 @@ int Init(void* tn) {
 	memset(TOPIC_SUB, 0, sizeof(TOPIC_SUB));
 	snprintf(TOPIC_PUB, sizeof(TOPIC_PUB), "%s%s", PUB_TOPIC_PREFIX, g_sysif.mac);
 	snprintf(TOPIC_SUB, sizeof(TOPIC_SUB), "%s%s", SUB_TOPIC_PREFIX, g_sysif.mac);
-	printf("Init Mac as Device ID[%s], TOPIC_PUB[%s], TOPIC_SUB[%s].\n", g_sysif.mac, TOPIC_PUB, TOPIC_SUB);
-	serverLog(LL_NOTICE, "Init Mac as Device ID[%s], TOPIC_PUB[%s], TOPIC_SUB[%s].", g_sysif.mac, TOPIC_PUB, TOPIC_SUB);
+    printf("Init Mac as Device ID[%s], TOPIC_PUB[%s], TOPIC_SUB[%s].\n", g_sysif.mac, TOPIC_PUB, TOPIC_SUB);
+    serverLog(LL_NOTICE, "Init Mac as Device ID[%s], TOPIC_PUB[%s], TOPIC_SUB[%s].", g_sysif.mac, TOPIC_PUB, TOPIC_SUB);
 
-	do{
-		ret = WifiConnection();
-		sleep(0.5);
-		//benny, if connection fail, set the light : can not connect wifi
-	} while(0 != ret);
-	serverLog(LL_NOTICE, "init Wifi connection success");
+    do{
+        ret = WifiConnection();
+        sleep(0.5);
+        //benny, if connection fail, set the light : can not connect wifi
+    } while(0 != ret);
+    serverLog(LL_NOTICE, "init Wifi connection success");
 
 	//system("openssl req -new -nodes -newkey rsa:2048 -keyout local.key -out local.csr");
 	//if no pem, do it;  if there is pem, pass this
-	//ret = download_ca();
+    //ret = download_ca();
 
-	//尝试下载证书的次数 默认0 直到下载成功停止
-	int try_time=0;
-	if(0 == download_ca(&g_sysif, try_time)){
-		printf("_______DOWNLOAD CSR SUCCESS\n");
-	}else{
-		printf("_______DOWNLOAD CSR FAILED\n");
-	}
+    //尝试下载证书的次数 默认0 直到下载成功停止
+    int try_time=0;
+    /*
+    if(0 == download_ca(&g_sysif, try_time)){
+        printf("_______DOWNLOAD CSR SUCCESS\n");
+    }else{
+        printf("_______DOWNLOAD CSR FAILED\n");
+    }*/
 
+	LIGHT_BLINK(b)
 	do {
 		ret = Init_MQTT(&g_sysif.mqtt_c);
-		sleep(0.5);
-		//benny, if connection fail, set the light : can not connect internet
+        sleep(0.5);
+        //benny, if connection fail, set the light : can not connect internet
 	} while (0 != ret);
-	serverLog(LL_NOTICE, "init mqtt Clients success");
+    serverLog(LL_NOTICE, "init mqtt Clients success");
+	LIGHT_ON(g)
+	
+    ret = MQTTClient_subscribe(g_sysif.mqtt_c, TOPIC_SUB, 1);
+    if(MQTTCLIENT_SUCCESS != ret){
+        serverLog(LL_ERROR, "Subscribe [%s] error with code [%d].", TOPIC_SUB, ret);
+        return -2;
+    }
+    serverLog(LL_NOTICE, "Subscribe [%s] success!!!", TOPIC_SUB);
 
-	ret = MQTTClient_subscribe(g_sysif.mqtt_c, TOPIC_SUB, 1);
+    //demo use
+    ret = MQTTClient_subscribe(g_sysif.mqtt_c, PUB_WEBDEMO, 1);
 	if(MQTTCLIENT_SUCCESS != ret){
-		serverLog(LL_ERROR, "Subscribe [%s] error with code [%d].", TOPIC_SUB, ret);
-		return -2;
-	}
-	serverLog(LL_NOTICE, "Subscribe [%s] success!!!", TOPIC_SUB);
-
-	//demo use
-	ret = MQTTClient_subscribe(g_sysif.mqtt_c, PUB_WEBDEMO, 1);
-	if(MQTTCLIENT_SUCCESS != ret){
-		serverLog(LL_ERROR, "Subscribe [%s] error with code [%d].", PUB_WEBDEMO, ret);
-		return -3;
-	}
-	serverLog(LL_NOTICE, "Subscribe [%s] success!!!", PUB_WEBDEMO);
+        serverLog(LL_ERROR, "Subscribe [%s] error with code [%d].", PUB_WEBDEMO, ret);
+        return -3;
+    }
+    serverLog(LL_NOTICE, "Subscribe [%s] success!!!", PUB_WEBDEMO);
 
 	//
-	GetUserInfo();
+    GetUserInfo();
 
 	printf("Init Finish!\n");
-	system("echo none > /sys/class/leds/r/trigger");
-	system("echo none > /sys/class/leds/b/trigger");
-	system("echo default-on > /sys/class/leds/g/trigger");
-	return 0;
+    return 0;
 }
 
 //å¤çwebç«¯æ¶æ¯
 int DoWebMsg(char *topic,void *payload){
-	printf("^^^^^^^^^^^^^^^^web msg^^^^^^^^^^^^^^^\n");
-	cJSON *root=NULL;
-	root=cJSON_Parse((char *)payload);
-	if(NULL == root){
-		cJSON_Delete(root);
-		return 0;
-	}
-	cJSON *cmd= cJSON_GetObjectItem(root,"cmd");
-	cJSON *bridgeId=cJSON_GetObjectItem(root,"bridge_id");
-	cJSON *value=cJSON_GetObjectItem(root,"value");
-	printf("recv CMD=%s,BRIDGEID=%s Value=%s\n",cmd->valuestring,bridgeId->valuestring,value->valuestring);
+    printf("^^^^^^^^^^^^^^^^web msg^^^^^^^^^^^^^^^\n");
+    cJSON *root=NULL;
+    root=cJSON_Parse((char *)payload);
+    if(NULL == root){
+        cJSON_Delete(root);
+        return 0;
+    }
+    cJSON *cmd= cJSON_GetObjectItem(root,"cmd");
+    cJSON *bridgeId=cJSON_GetObjectItem(root,"bridge_id");
+    cJSON *value=cJSON_GetObjectItem(root,"value");
+    printf("recv CMD=%s,BRIDGEID=%s Value=%s\n",cmd->valuestring,bridgeId->valuestring,value->valuestring);
 	//handle request CMD
-	if(0 == strcmp("getUserInfo",cmd->valuestring)){
+    if(0 == strcmp("getUserInfo",cmd->valuestring)){
 		printf("will do getUserInfo.\n");
-		GetUserInfo();//bridgeId->valuestring);
+        GetUserInfo();//bridgeId->valuestring);
 	}
-	/*
-	   }else if(0 == strcmp("unlock",cmd->valuestring)){
-	   printf("will do UnLock.\n");
-	   char* lockID=value->valuestring;
-	   UnLock(lockID);
-	   }*/
-printf("vvvvvvvvvvvvvvv web msgvvvvvvvvvvvvvvv\n");
-cJSON_Delete(root);
+    /*
+    }else if(0 == strcmp("unlock",cmd->valuestring)){
+		printf("will do UnLock.\n");
+        char* lockID=value->valuestring;
+        UnLock(lockID);
+    }*/
+    printf("vvvvvvvvvvvvvvv web msgvvvvvvvvvvvvvvv\n");
+	cJSON_Delete(root);
 
-return 0;
+	return 0;
 }
 
 int DealCMD(sysinfo_t *si, ign_MsgInfo imsg) {
@@ -988,41 +982,41 @@ int DealCMD(sysinfo_t *si, ign_MsgInfo imsg) {
 				}
 
 				/*/fake lock data
-				  char lock_id[] = "IGP105cc2684";
-				  char device_address[] = "ED:67:F0:CC:26:84";
-				  char guest_key[] = "7df6d0dc000873150e94deb03ccd18cb";
-				  char passwd[] = "06F3E8FC48D256CA";
-				  char token[] = "5294087c99c653ca277d5d42074572c83a853ba7c14c0a8fe72f74473777504aeb999ec892f30ab961e2d18354d02708bd6a15bcf73a6103e491dca642873b0367478e08f3a5";
+				char lock_id[] = "IGP105cc2684";
+				char device_address[] = "ED:67:F0:CC:26:84";
+				char guest_key[] = "7df6d0dc000873150e94deb03ccd18cb";
+				char passwd[] = "06F3E8FC48D256CA";
+				char token[] = "5294087c99c653ca277d5d42074572c83a853ba7c14c0a8fe72f74473777504aeb999ec892f30ab961e2d18354d02708bd6a15bcf73a6103e491dca642873b0367478e08f3a5";
 
-				  uint8_t tmp_buff[256] = {0};
-				  memset(tmp_buff, 0, sizeof(tmp_buff));
+				uint8_t tmp_buff[256] = {0};
+				memset(tmp_buff, 0, sizeof(tmp_buff));
 
-				  LockInfo_t li;
-				  memset(&li, 0, sizeof(LockInfo_t));
-				  memcpy(&li.lock_id, lock_id, strlen(lock_id));
-				  li.lock_id_size = strlen(lock_id);
-				  memcpy(&li.lock_addr, device_address, strlen(device_address));
-				  li.lock_addr_size = sizeof(device_address);
+				LockInfo_t li;
+				memset(&li, 0, sizeof(LockInfo_t));
+				memcpy(&li.lock_id, lock_id, strlen(lock_id));
+				li.lock_id_size = strlen(lock_id);
+				memcpy(&li.lock_addr, device_address, strlen(device_address));
+				li.lock_addr_size = sizeof(device_address);
 
-				  memset(tmp_buff, 0, sizeof(tmp_buff));
-				  int ekey_len = hexStrToByte(guest_key, tmp_buff, strlen(guest_key));
-				  memcpy(&li.lock_ekey, guest_key, ekey_len);
-				  li.lock_ekey_size = ekey_len;
+				memset(tmp_buff, 0, sizeof(tmp_buff));
+				int ekey_len = hexStrToByte(guest_key, tmp_buff, strlen(guest_key));
+				memcpy(&li.lock_ekey, guest_key, ekey_len);
+				li.lock_ekey_size = ekey_len;
 
-				  memset(tmp_buff, 0, sizeof(tmp_buff));
-				  int passwd_len = hexStrToByte(passwd, tmp_buff, strlen(passwd));
-				  memcpy(&li.lock_passwd, tmp_buff, passwd_len);
-				  li.lock_passwd_size = passwd_len;
+				memset(tmp_buff, 0, sizeof(tmp_buff));
+				int passwd_len = hexStrToByte(passwd, tmp_buff, strlen(passwd));
+				memcpy(&li.lock_passwd, tmp_buff, passwd_len);
+				li.lock_passwd_size = passwd_len;
 
-				  memset(tmp_buff, 0, sizeof(tmp_buff));
-				  int token_len = hexStrToByte(token, tmp_buff, strlen(token));
-				  memcpy(&li.lock_token, tmp_buff, token_len);
-				  li.lock_token_size = token_len;
+				memset(tmp_buff, 0, sizeof(tmp_buff));
+				int token_len = hexStrToByte(token, tmp_buff, strlen(token));
+				memcpy(&li.lock_token, tmp_buff, token_len);
+				li.lock_token_size = token_len;
 
-				  int ret = AddLockinfo(si, &li);
-				  if (ret) {
-				  printf("AddLockinfo err, lock_total[%d]\n", si->lock_total);
-				  }*/
+				int ret = AddLockinfo(si, &li);
+				if (ret) {
+					printf("AddLockinfo err, lock_total[%d]\n", si->lock_total);
+				}*/
 
 				PrintLockinfo(si);
 
@@ -1040,18 +1034,18 @@ int DealCMD(sysinfo_t *si, ign_MsgInfo imsg) {
 					psd->lock_entries[i] = imsg.server_data.lock_entries[i];
 				}
 				/*
-				   if(5 > psd->lock_entries_count){
-				   memcpy(psd->lock_entries[psd->lock_entries_count].bt_id, li.lock_id, li.lock_id_size); 
-				   psd->lock_entries[psd->lock_entries_count].has_ekey = 1;
-				   psd->lock_entries[psd->lock_entries_count].ekey.guest_aes_key.size = li.lock_ekey_size;
-				   memcpy(psd->lock_entries[psd->lock_entries_count].ekey.guest_aes_key.bytes, li.lock_ekey, li.lock_ekey_size);
-				   psd->lock_entries[psd->lock_entries_count].ekey.guest_token.size = li.lock_token_size;
-				   memcpy(psd->lock_entries[psd->lock_entries_count].ekey.guest_token.bytes, li.lock_token, li.lock_token_size);
-				   psd->lock_entries[psd->lock_entries_count].ekey.password.size = li.lock_passwd_size;
-				   memcpy(psd->lock_entries[psd->lock_entries_count].ekey.password.bytes, li.lock_passwd, li.lock_passwd_size); 
-				   psd->lock_entries[psd->lock_entries_count].ekey.keyId = psd->lock_entries_count;
-				   psd->lock_entries_count++;
-				   }*/
+				if(5 > psd->lock_entries_count){
+					memcpy(psd->lock_entries[psd->lock_entries_count].bt_id, li.lock_id, li.lock_id_size); 
+					psd->lock_entries[psd->lock_entries_count].has_ekey = 1;
+					psd->lock_entries[psd->lock_entries_count].ekey.guest_aes_key.size = li.lock_ekey_size;
+					memcpy(psd->lock_entries[psd->lock_entries_count].ekey.guest_aes_key.bytes, li.lock_ekey, li.lock_ekey_size);
+					psd->lock_entries[psd->lock_entries_count].ekey.guest_token.size = li.lock_token_size;
+					memcpy(psd->lock_entries[psd->lock_entries_count].ekey.guest_token.bytes, li.lock_token, li.lock_token_size);
+					psd->lock_entries[psd->lock_entries_count].ekey.password.size = li.lock_passwd_size;
+					memcpy(psd->lock_entries[psd->lock_entries_count].ekey.password.bytes, li.lock_passwd, li.lock_passwd_size); 
+					psd->lock_entries[psd->lock_entries_count].ekey.keyId = psd->lock_entries_count;
+					psd->lock_entries_count++;
+				}*/
 
 				SendMQTTMsg(&tmsg, SUB_WEBDEMO);
 				return 0;
@@ -1181,7 +1175,7 @@ void WaitMQTT(sysinfo_t *si) {
 				//imsg.server_data.lock_entries.funcs.decode=&get_server_event_data;
 				ret = pb_decode(&in, ign_MsgInfo_fields, &imsg);
 				if(true != ret) {
-					serverLog(LL_ERROR, "pb_decode err[%d].", ret);
+			        serverLog(LL_ERROR, "pb_decode err[%d].", ret);
 					printf("MQTT MSG DECODE ERROR[%d]!\n", ret);
 				}else{
 					int ret = DealCMD(si, imsg);
@@ -1220,7 +1214,25 @@ void WaitMQTT(sysinfo_t *si) {
 	}
 }
 
-#define DEV_PATH "/dev/input/event0"
+int StartBLE() {
+	pid_t pid;
+	if((pid=vfork()) < 0) {
+		printf("vfork error!\n");
+		return -1;
+	} else if(0 == pid) {
+		printf("Child process PID: [%d].\n", getpid());
+		//char *argv[ ]={"ls", "-al", "/home", NULL}; 
+		//char *envp[ ]={"PATH=/bin", NULL};
+		if(execl("./", "wifi_service") < 0) {
+			printf("subprocess[./wifi_service] start error");
+			return -1;
+		}
+	} else {
+		printf("Parent process PID: %d.\n", getpid());
+	}
+	return 0;
+}
+
 int WaitBtn(void *arg){
 	//if btn
 	//add Init into doing_list
@@ -1239,10 +1251,11 @@ int WaitBtn(void *arg){
 				if(t.value==0 || t.value==1) {   
 					printf("key %d %s\n", t.code, (t.value) ? "Pressed" : "Released");
 					if(!t.value) {
-						system("echo default-on > /sys/class/leds/g/trigger");
-						system("echo 100 > /sys/class/leds/g/trigger");
+						LIGHT_BLINK(g)
+						StartBLE();
 					} else {
-						system("echo 1 > /sys/class/leds/g/trigger");
+						printf("Btn trigger.\n");
+						//system("echo 1 > /sys/class/leds/g/trigger");
 					}
 				}                                              
 			}                                                      
@@ -1256,481 +1269,481 @@ int WaitBtn(void *arg){
 
 void visitScanResult(ble_data_t *ble_data)
 {
-	serverLog(LL_NOTICE, "6. after the task is finished, we can get the data like this.");
-	serverLog(LL_NOTICE, "7. get the result point.");
-	int num_of_result = bleGetNumsOfResult(ble_data);
-	void *result = ble_data->ble_result;
-	for (int j=0; j < num_of_result; j++)
-	{
-		serverLog(LL_NOTICE, "8. get the j:% lock.", j);
-		igm_lock_t *lock = bleGetNResult(ble_data, j, sizeof(igm_lock_t));
-		serverLog(LL_NOTICE, "name %s  addr: %s", lock->name, lock->addr);
-		// addPairingTask(lock);
-	}
-	serverLog(LL_NOTICE, "9. Release the ble data");
-	bleReleaseData(&ble_data);
+    serverLog(LL_NOTICE, "6. after the task is finished, we can get the data like this.");
+    serverLog(LL_NOTICE, "7. get the result point.");
+    int num_of_result = bleGetNumsOfResult(ble_data);
+    void *result = ble_data->ble_result;
+    for (int j=0; j < num_of_result; j++)
+    {
+        serverLog(LL_NOTICE, "8. get the j:% lock.", j);
+        igm_lock_t *lock = bleGetNResult(ble_data, j, sizeof(igm_lock_t));
+        serverLog(LL_NOTICE, "name %s  addr: %s", lock->name, lock->addr);
+        // addPairingTask(lock);
+    }
+    serverLog(LL_NOTICE, "9. Release the ble data");
+    bleReleaseData(&ble_data);
 }
 
 // æ·»å æ«ææ¹å¼æ ·ä¾
 // ble_data éé¢å¨å¸
 void addDiscoverTask(int msg_id)
 {
-	// è®¾ç½®éè¦çåæ°
-	serverLog(LL_NOTICE, "Add Discover task");
-	serverLog(LL_NOTICE, "1. set ble parameters");
-	ble_discover_param_t discover_param;
-	serverLog(LL_NOTICE, "1. set scan_timeout to 3");
-	discover_param.scan_timeout = 2;
-	serverLog(LL_NOTICE, "2. set msg_id to 0(or anything you want)");
-	// æåæ°åå¥data, å½åæä¸ªé®é¢å°±æ¯, ä½¿ç¨å®, å¾è®¿é®çäººè®°çéæ¾.
-	serverLog(LL_NOTICE, "3. alloc ble data datatype, ble_data is used to devliver parameters and get result data");
-	ble_data_t *ble_data = calloc(sizeof(ble_data_t), 1);
-	serverLog(LL_NOTICE, "3. init ble_data");
-	bleInitData(ble_data);
-	serverLog(LL_NOTICE, "3. set ble parametes to ble data");
-	bleSetBleParam(ble_data, &discover_param, sizeof(ble_discover_param_t));
-	// ä¸è®°æå¤å°ä¸ªç»æ, 30ä¸ªé
-	serverLog(LL_NOTICE, "3. init ble result memory, suppose the max num of locks is 30");
-	bleInitResults(ble_data, 30, sizeof(igm_lock_t));
+    // è®¾ç½®éè¦çåæ°
+    serverLog(LL_NOTICE, "Add Discover task");
+    serverLog(LL_NOTICE, "1. set ble parameters");
+    ble_discover_param_t discover_param;
+    serverLog(LL_NOTICE, "1. set scan_timeout to 3");
+    discover_param.scan_timeout = 2;
+    serverLog(LL_NOTICE, "2. set msg_id to 0(or anything you want)");
+    // æåæ°åå¥data, å½åæä¸ªé®é¢å°±æ¯, ä½¿ç¨å®, å¾è®¿é®çäººè®°çéæ¾.
+    serverLog(LL_NOTICE, "3. alloc ble data datatype, ble_data is used to devliver parameters and get result data");
+    ble_data_t *ble_data = calloc(sizeof(ble_data_t), 1);
+    serverLog(LL_NOTICE, "3. init ble_data");
+    bleInitData(ble_data);
+    serverLog(LL_NOTICE, "3. set ble parametes to ble data");
+    bleSetBleParam(ble_data, &discover_param, sizeof(ble_discover_param_t));
+    // ä¸è®°æå¤å°ä¸ªç»æ, 30ä¸ªé
+    serverLog(LL_NOTICE, "3. init ble result memory, suppose the max num of locks is 30");
+    bleInitResults(ble_data, 30, sizeof(igm_lock_t));
 
-	// æå¥ç³»ç»çéå
-	serverLog(LL_NOTICE, "4. used InsertBle2DFront to insert the task to system.");
-	InsertBle2DTail(msg_id, BLE_DISCOVER_BEGIN, 
-			ble_data, sizeof(ble_data_t),
-			getDiscoverFsmTable(), getDiscoverFsmTableLen(), TASK_BLE_DISCOVER
-			);
-	serverLog(LL_NOTICE, "5. Add Discover task.");
-	return;
+    // æå¥ç³»ç»çéå
+    serverLog(LL_NOTICE, "4. used InsertBle2DFront to insert the task to system.");
+    InsertBle2DTail(msg_id, BLE_DISCOVER_BEGIN, 
+        ble_data, sizeof(ble_data_t),
+        getDiscoverFsmTable(), getDiscoverFsmTableLen(), TASK_BLE_DISCOVER
+    );
+    serverLog(LL_NOTICE, "5. Add Discover task.");
+    return;
 }
 
 igm_lock_t* checkLockIsDiscovered(igm_lock_t *lock)
 {
-	int n_try_scan = 3;
-	igm_lock_t *lock_nearby;
-	while (n_try_scan--) {
-		lock_nearby = findLockByName(lock->name);
-		if (!lock_nearby) {
-			serverLog(LL_NOTICE, "Pairing lock, not discover by the bridge, bridge scan first");
-			continueDiscoverLock();
-		}
-	}
-	if (!lock_nearby) {
-		serverLog(LL_NOTICE, "Pairing lock, not discover by the bridge");
-		return NULL;
-	}
-	return lock_nearby;
+    int n_try_scan = 3;
+    igm_lock_t *lock_nearby;
+    while (n_try_scan--) {
+        lock_nearby = findLockByName(lock->name);
+        if (!lock_nearby) {
+            serverLog(LL_NOTICE, "Pairing lock, not discover by the bridge, bridge scan first");
+            continueDiscoverLock();
+        }
+    }
+    if (!lock_nearby) {
+        serverLog(LL_NOTICE, "Pairing lock, not discover by the bridge");
+        return NULL;
+    }
+    return lock_nearby;
 }
 
 
 int main() {
-	int rc = Init(NULL);
+    int rc = Init(NULL);
 	assert(0 == rc);
-	serverLog(LL_NOTICE,"Ready to start.");
+    serverLog(LL_NOTICE,"Ready to start.");
 
-	//daemon(1, 0);
+    //daemon(1, 0);
 
-	//sysinfo_t *si = (sysinfo_t *)malloc(sizeof(sysinfo_t));
-	//sysinfoInit(si);
-	//Init for paring
-	/*int rc = Init(si);
-	  if (0 != rc) {
-	  GoExit(si);
-	  return -1;
-	  } */
+    //sysinfo_t *si = (sysinfo_t *)malloc(sizeof(sysinfo_t));
+    //sysinfoInit(si);
+    //Init for paring
+    /*int rc = Init(si);
+      if (0 != rc) {
+      GoExit(si);
+      return -1;
+      } */
 
-	//g_sysif.mutex = Thread_create_mutex();
+    //g_sysif.mutex = Thread_create_mutex();
 
-	//INIT_LIST_HEAD(&waiting_task_head);
-	//INIT_LIST_HEAD(&doing_task_head);
+    //INIT_LIST_HEAD(&waiting_task_head);
+    //INIT_LIST_HEAD(&doing_task_head);
+ 
+    pthread_t mqtt_thread = Thread_start(WaitMQTT, &g_sysif);
+    serverLog(LL_NOTICE,"new thread to WaitMQTT[%u].", mqtt_thread);
+    
+    //benny, Btn monitor to update wifi info and do reconnection
+    pthread_t bt_thread = Thread_start(WaitBtn, &g_sysif);
+    serverLog(LL_NOTICE,"new thread to WaitMQTT[%u].", bt_thread);
 
-	pthread_t mqtt_thread = Thread_start(WaitMQTT, &g_sysif);
-	serverLog(LL_NOTICE,"new thread to WaitMQTT[%u].", mqtt_thread);
+    //check req list, start a new thread to work, bred
+    //after work delete node
 
-	//benny, Btn monitor to update wifi info and do reconnection
-	pthread_t bt_thread = Thread_start(WaitBtn, &g_sysif);
-	serverLog(LL_NOTICE,"new thread to WaitMQTT[%u].", bt_thread);
+    // addDiscoverTask();
+    while(1) {
+        //if empty, sleep(0.5);
+        //do it , after set into waiting_list
+        if (IsDEmpty()) {
+            //serverLog(LL_NOTICE,"doing_task_head is empty, check Lock list.");
+            //printLockList();
+            sleep(1);
+        } else {
+            serverLog(LL_NOTICE,"doing_task_head not empty, do it.-----------");
+        // if doing list has task
+            // è·åå½ådoing list çå¤´é¨
+            task_node_t *ptn = GetDHeadNode();
+            while (ptn) {
+                // TODO, å½ä»»å¡å®æ,éè¦æä¹å¤ç?
+                int ret = FSMHandle(ptn);
+                if(ret) {
+                    serverLog(LL_NOTICE, "one mission error[%d].", ret);
+                } else {
+                    serverLog(LL_NOTICE, "one mission finished, delete this task");
+                }
+                saveTaskData(ptn);
+                DeleteDTask(&ptn); // èªå¨ç½® ptn ä¸º NULL
+                
+                task_node_t *tmp = NextDTask(ptn);
+                if (tmp) {
+                    serverLog(LL_NOTICE, "NextDTask not NULL.");
+                }
+                ptn = tmp;
+            }
+            serverLog(LL_NOTICE,"doing_task_head not empty, do end.-----------");
+        }
+    }
 
-	//check req list, start a new thread to work, bred
-	//after work delete node
-
-	// addDiscoverTask();
-	while(1) {
-		//if empty, sleep(0.5);
-		//do it , after set into waiting_list
-		if (IsDEmpty()) {
-			//serverLog(LL_NOTICE,"doing_task_head is empty, check Lock list.");
-			//printLockList();
-			sleep(1);
-		} else {
-			serverLog(LL_NOTICE,"doing_task_head not empty, do it.-----------");
-			// if doing list has task
-			// è·åå½ådoing list çå¤´é¨
-			task_node_t *ptn = GetDHeadNode();
-			while (ptn) {
-				// TODO, å½ä»»å¡å®æ,éè¦æä¹å¤ç?
-				int ret = FSMHandle(ptn);
-				if(ret) {
-					serverLog(LL_NOTICE, "one mission error[%d].", ret);
-				} else {
-					serverLog(LL_NOTICE, "one mission finished, delete this task");
-				}
-				saveTaskData(ptn);
-				DeleteDTask(&ptn); // èªå¨ç½® ptn ä¸º NULL
-
-				task_node_t *tmp = NextDTask(ptn);
-				if (tmp) {
-					serverLog(LL_NOTICE, "NextDTask not NULL.");
-				}
-				ptn = tmp;
-			}
-			serverLog(LL_NOTICE,"doing_task_head not empty, do end.-----------");
-		}
-	}
-
-	return 0;
+    return 0;
 }
 
 
 
 /*
-   void addAdminDoLockTask(igm_lock_t *lock) {
-// è®¾ç½®éè¦çåæ°
-serverLog(LL_NOTICE, "Add Admin Unlock task");
-serverLog(LL_NOTICE, "1. set ble admin Unlock parameters");
-ble_admin_param_t *admin_param = (ble_admin_param_t *)calloc(sizeof(ble_admin_param_t), 1);
-serverLog(LL_NOTICE, "1. set admin Unlock param lock to name[%s] addr[%s]", lock->name, lock->addr);
-bleSetAdminParam(admin_param, lock);
-serverLog(LL_NOTICE, "2. set msg_id to 4(or anything you want)");
-int msg_id = GetMsgID();
-// æåæ°åå¥data, å½åæä¸ªé®é¢å°±æ¯, ä½¿ç¨å®, å¾è®¿é®çäººè®°çéæ¾.
-serverLog(LL_NOTICE, "3. alloc ble data datatype, ble_data is used to devliver parameters and get result data");
-ble_data_t *ble_data = calloc(sizeof(ble_data_t), 1);
-serverLog(LL_NOTICE, "3. init ble_data");
-bleInitData(ble_data);
-serverLog(LL_NOTICE, "3. set ble parametes to ble data");
-bleSetBleParam(ble_data, admin_param, sizeof(ble_admin_param_t));
+void addAdminDoLockTask(igm_lock_t *lock) {
+    // è®¾ç½®éè¦çåæ°
+    serverLog(LL_NOTICE, "Add Admin Unlock task");
+    serverLog(LL_NOTICE, "1. set ble admin Unlock parameters");
+    ble_admin_param_t *admin_param = (ble_admin_param_t *)calloc(sizeof(ble_admin_param_t), 1);
+    serverLog(LL_NOTICE, "1. set admin Unlock param lock to name[%s] addr[%s]", lock->name, lock->addr);
+    bleSetAdminParam(admin_param, lock);
+    serverLog(LL_NOTICE, "2. set msg_id to 4(or anything you want)");
+	int msg_id = GetMsgID();
+    // æåæ°åå¥data, å½åæä¸ªé®é¢å°±æ¯, ä½¿ç¨å®, å¾è®¿é®çäººè®°çéæ¾.
+    serverLog(LL_NOTICE, "3. alloc ble data datatype, ble_data is used to devliver parameters and get result data");
+    ble_data_t *ble_data = calloc(sizeof(ble_data_t), 1);
+    serverLog(LL_NOTICE, "3. init ble_data");
+    bleInitData(ble_data);
+    serverLog(LL_NOTICE, "3. set ble parametes to ble data");
+    bleSetBleParam(ble_data, admin_param, sizeof(ble_admin_param_t));
 
-// æå¥ç³»ç»çéå
-serverLog(LL_NOTICE, "4. used InsertBle2DFront to insert the task to system.");
-InsertBle2DFront(msg_id, BLE_ADMIN_BEGIN, 
-ble_data, sizeof(ble_data_t), lock->lock_cmd, lock->lock_cmd_size,
-getAdminUnlockFsmTable(), getAdminUnlockFsmTableLen(), TASK_BLE_ADMIN_UNLOCK);
-serverLog(LL_NOTICE, "5. Add admin unlock task.");
-return;
+    // æå¥ç³»ç»çéå
+    serverLog(LL_NOTICE, "4. used InsertBle2DFront to insert the task to system.");
+    InsertBle2DFront(msg_id, BLE_ADMIN_BEGIN, 
+        ble_data, sizeof(ble_data_t), lock->lock_cmd, lock->lock_cmd_size,
+        getAdminUnlockFsmTable(), getAdminUnlockFsmTableLen(), TASK_BLE_ADMIN_UNLOCK);
+    serverLog(LL_NOTICE, "5. Add admin unlock task.");
+    return;
 }
 
 int testGetLockStatus(igm_lock_t *lock) {
-printf("get lock status cmd ask invoker to release the lock.\n");
-ble_admin_param_t *admin_param = (ble_admin_param_t *)malloc(sizeof(ble_admin_param_t));
-bleInitAdminParam(admin_param);
-bleSetAdminParam(admin_param, lock);
+	printf("get lock status cmd ask invoker to release the lock.\n");
+	ble_admin_param_t *admin_param = (ble_admin_param_t *)malloc(sizeof(ble_admin_param_t));
+    bleInitAdminParam(admin_param);
+    bleSetAdminParam(admin_param, lock);
 
-ble_data_t *ble_data = malloc(sizeof(ble_data_t));
-bleInitData(ble_data);
-bleSetBleParam(ble_data, admin_param, sizeof(ble_admin_param_t));
+    ble_data_t *ble_data = malloc(sizeof(ble_data_t));
+    bleInitData(ble_data);
+    bleSetBleParam(ble_data, admin_param, sizeof(ble_admin_param_t));
 
-fsm_table_t *get_lock_status_fsm = getAdminGetLockStatusFsmTable();
-int fsm_max_n = getAdminGetLockStatusFsmTableLen();
-int current_state = BLE_ADMIN_BEGIN;
-int error = 0;
+    fsm_table_t *get_lock_status_fsm = getAdminGetLockStatusFsmTable();
+    int fsm_max_n = getAdminGetLockStatusFsmTableLen();
+    int current_state = BLE_ADMIN_BEGIN;
+    int error = 0;
 
-task_node_t *tn = (task_node_t *)malloc(sizeof(task_node_t));
-tn->ble_data = ble_data;
-tn->ble_data_len = sizeof(task_node_t);
+    task_node_t *tn = (task_node_t *)malloc(sizeof(task_node_t));
+    tn->ble_data = ble_data;
+    tn->ble_data_len = sizeof(task_node_t);
 
-tn->sm_table_len = fsm_max_n;
-tn->task_sm_table = get_lock_status_fsm;
+    tn->sm_table_len = fsm_max_n;
+    tn->task_sm_table = get_lock_status_fsm;
 
-tn->task_type = TASK_BLE_ADMIN_GETLOCKSTATUS;
+    tn->task_type = TASK_BLE_ADMIN_GETLOCKSTATUS;
 
-for (int j = 0; j < fsm_max_n; j++) {
-if (current_state == tn->task_sm_table[j].cur_state) {
-int event_result = tn->task_sm_table[j].eventActFun(tn);
-if (event_result) {
-printf("%d step error[%d]\n", j, event_result);
-error = 1;
-break;
-} else {
-current_state = tn->task_sm_table[j].next_state;
-}
-}
-}
-if (error) {
-printf("process error.\n");
-return error;
-}
+    for (int j = 0; j < fsm_max_n; j++) {
+        if (current_state == tn->task_sm_table[j].cur_state) {
+			int event_result = tn->task_sm_table[j].eventActFun(tn);
+            if (event_result) {
+                printf("%d step error[%d]\n", j, event_result);
+                error = 1;
+                break;
+            } else {
+                current_state = tn->task_sm_table[j].next_state;
+            }
+		}
+    }
+    if (error) {
+        printf("process error.\n");
+        return error;
+    }
 
-saveTaskData(tn);
-bleReleaseBleResult(ble_data);
-free(ble_data);
-ble_data = NULL;
-free(tn);
-tn = NULL;
-free(admin_param);
-admin_param = NULL;
-printf( "lock end-------\n");
-return 0;
+    saveTaskData(tn);
+    bleReleaseBleResult(ble_data);
+    free(ble_data);
+    ble_data = NULL;
+    free(tn);
+    tn = NULL;
+    free(admin_param);
+    admin_param = NULL;
+    printf( "lock end-------\n");
+    return 0;
 }
 
 int testGetLockBattery(igm_lock_t *lock) {
 	printf("get lock battery cmd ask invoker to release the lock.\n");
 
 	ble_admin_param_t *admin_param = (ble_admin_param_t *)malloc(sizeof(ble_admin_param_t));
-	bleInitAdminParam(admin_param);
-	bleSetAdminParam(admin_param, lock);
+    bleInitAdminParam(admin_param);
+    bleSetAdminParam(admin_param, lock);
 
-	ble_data_t *ble_data = malloc(sizeof(ble_data_t));
-	bleInitData(ble_data);
-	bleSetBleParam(ble_data, admin_param, sizeof(ble_admin_param_t));
+    ble_data_t *ble_data = malloc(sizeof(ble_data_t));
+    bleInitData(ble_data);
+    bleSetBleParam(ble_data, admin_param, sizeof(ble_admin_param_t));
 
-	fsm_table_t *get_lock_fsm = getAdminGetBatteryLevelFsmTable();
-	int fsm_max_n = getAdminGetBatteryLevelFsmTableLen();
-	int current_state = BLE_ADMIN_BEGIN;
-	int error = 0;
+    fsm_table_t *get_lock_fsm = getAdminGetBatteryLevelFsmTable();
+    int fsm_max_n = getAdminGetBatteryLevelFsmTableLen();
+    int current_state = BLE_ADMIN_BEGIN;
+    int error = 0;
 
-	task_node_t *tn = (task_node_t *)malloc(sizeof(task_node_t));
-	tn->ble_data = ble_data;
+    task_node_t *tn = (task_node_t *)malloc(sizeof(task_node_t));
+    tn->ble_data = ble_data;
 
-	tn->sm_table_len = fsm_max_n;
-	tn->task_sm_table = get_lock_fsm;
+    tn->sm_table_len = fsm_max_n;
+    tn->task_sm_table = get_lock_fsm;
 
-	tn->task_type = TASK_BLE_ADMIN_GET_BATTERY_LEVEL;
+    tn->task_type = TASK_BLE_ADMIN_GET_BATTERY_LEVEL;
 
-	for (int j = 0; j < fsm_max_n; j++) {
-		if (current_state == tn->task_sm_table[j].cur_state) {
-			// å¢å ä¸ä¸ªå¤æ­å½åå½æ°, æ¯å¦å½åå½æ°åºé. 0 è¡¨ç¤ºæ²¡é®é¢
+    for (int j = 0; j < fsm_max_n; j++) {
+        if (current_state == tn->task_sm_table[j].cur_state) {
+            // å¢å ä¸ä¸ªå¤æ­å½åå½æ°, æ¯å¦å½åå½æ°åºé. 0 è¡¨ç¤ºæ²¡é®é¢
 			int event_result = tn->task_sm_table[j].eventActFun(tn);
-			if (event_result) {
-				printf("%d step error[%d]\n", j, event_result);
-				error = 1;
-				break;
-			} else {
-				current_state = tn->task_sm_table[j].next_state;
-			}
+            if (event_result) {
+                printf("%d step error[%d]\n", j, event_result);
+                error = 1;
+                break;
+            } else {
+                current_state = tn->task_sm_table[j].next_state;
+            }
 		}
-	}
-	if (error) {
-		printf("process error.\n");
-		return error;
-	}
+    }
+    if (error) {
+        printf("process error.\n");
+        return error;
+    }
 
-	saveTaskData(tn);
-	bleReleaseBleResult(ble_data);
-	free(ble_data);
-	ble_data = NULL;
-	free(tn);
-	tn = NULL;
-	free(admin_param);
-	admin_param = NULL;
-	printf( "lock end-------\n");
-	return 0;
+    saveTaskData(tn);
+    bleReleaseBleResult(ble_data);
+    free(ble_data);
+    ble_data = NULL;
+    free(tn);
+    tn = NULL;
+    free(admin_param);
+    admin_param = NULL;
+    printf( "lock end-------\n");
+    return 0;
 }
 
 int testLock(igm_lock_t *lock) {
-	serverLog(LL_NOTICE,"Lock cmd ask invoker to release the lock.");
+    serverLog(LL_NOTICE,"Lock cmd ask invoker to release the lock.");
+      
+    ble_admin_param_t *admin_param = (ble_admin_param_t *)malloc(sizeof(ble_admin_param_t));
+    bleInitAdminParam(admin_param);
+    bleSetAdminParam(admin_param, lock);
 
-	ble_admin_param_t *admin_param = (ble_admin_param_t *)malloc(sizeof(ble_admin_param_t));
-	bleInitAdminParam(admin_param);
-	bleSetAdminParam(admin_param, lock);
+    ble_data_t *ble_data = malloc(sizeof(ble_data_t));
+    bleInitData(ble_data);
+    bleSetBleParam(ble_data, admin_param, sizeof(ble_admin_param_t));
 
-	ble_data_t *ble_data = malloc(sizeof(ble_data_t));
-	bleInitData(ble_data);
-	bleSetBleParam(ble_data, admin_param, sizeof(ble_admin_param_t));
+    fsm_table_t *unlock_fsm = getAdminLockFsmTable();
+    int fsm_max_n = getAdminLockFsmTableLen();
+    int current_state = BLE_ADMIN_BEGIN;
+    int error = 0;
 
-	fsm_table_t *unlock_fsm = getAdminLockFsmTable();
-	int fsm_max_n = getAdminLockFsmTableLen();
-	int current_state = BLE_ADMIN_BEGIN;
-	int error = 0;
+    task_node_t *tn = (task_node_t *)malloc(sizeof(task_node_t));
+    tn->ble_data = ble_data;
 
-	task_node_t *tn = (task_node_t *)malloc(sizeof(task_node_t));
-	tn->ble_data = ble_data;
+    tn->sm_table_len = fsm_max_n;
+    tn->task_sm_table = unlock_fsm;
 
-	tn->sm_table_len = fsm_max_n;
-	tn->task_sm_table = unlock_fsm;
+    tn->task_type = TASK_BLE_ADMIN_LOCK;
 
-	tn->task_type = TASK_BLE_ADMIN_LOCK;
-
-	for (int j = 0; j < fsm_max_n; j++) {
-		if (current_state == tn->task_sm_table[j].cur_state) {
-			// å¢å ä¸ä¸ªå¤æ­å½åå½æ°, æ¯å¦å½åå½æ°åºé. 0 è¡¨ç¤ºæ²¡é®é¢
+    for (int j = 0; j < fsm_max_n; j++) {
+        if (current_state == tn->task_sm_table[j].cur_state) {
+            // å¢å ä¸ä¸ªå¤æ­å½åå½æ°, æ¯å¦å½åå½æ°åºé. 0 è¡¨ç¤ºæ²¡é®é¢
 			int event_result = tn->task_sm_table[j].eventActFun(tn);
-			if (event_result) {
-				serverLog(LL_ERROR, "%d step error", j);
-				error = 1;
-				break;
-			} else {
+            if (event_result) {
+                serverLog(LL_ERROR, "%d step error", j);
+                error = 1;
+                break;
+            } else {
 				current_state = tn->task_sm_table[j].next_state;
-			}
+            }
 		}
-	}
-	if (error) {
-		serverLog(LL_ERROR, "lock error");
-		return error;
-	}
+    }
+    if (error) {
+        serverLog(LL_ERROR, "lock error");
+        return error;
+    }
 
-	//saveTaskData(tn);
-	ble_admin_result_t *admin_unlock_result = (ble_admin_result_t *)ble_data->ble_result;
-	ig_AdminLockResponse_deinit(admin_unlock_result->cmd_response);
-	// è¿å¿æ¯éæ¾ç»æ, å ä¸ºå·²ç»ç¨å®
-	releaseAdminResult(&admin_unlock_result);
-	bleReleaseBleResult(ble_data);
-	free(ble_data);
-	ble_data = NULL;
-	free(tn);
-	tn = NULL;
-	free(admin_param);
-	admin_param = NULL;
-	serverLog(LL_NOTICE, "lock end-------");
-	return 0;
+    //saveTaskData(tn);
+    ble_admin_result_t *admin_unlock_result = (ble_admin_result_t *)ble_data->ble_result;
+    ig_AdminLockResponse_deinit(admin_unlock_result->cmd_response);
+    // è¿å¿æ¯éæ¾ç»æ, å ä¸ºå·²ç»ç¨å®
+    releaseAdminResult(&admin_unlock_result);
+    bleReleaseBleResult(ble_data);
+    free(ble_data);
+    ble_data = NULL;
+    free(tn);
+    tn = NULL;
+    free(admin_param);
+    admin_param = NULL;
+    serverLog(LL_NOTICE, "lock end-------");
+    return 0;
 }
 
 int testCreatePin(igm_lock_t *lock, IgCreatePinRequest *request) {
-	printf("create pin request cmd ask invoker to release the lock.\n");
+    printf("create pin request cmd ask invoker to release the lock.\n");
+      
+    ble_admin_param_t *admin_param = (ble_admin_param_t *)malloc(sizeof(ble_admin_param_t));
+    bleInitAdminParam(admin_param);
+    bleSetAdminParam(admin_param, lock);
+    bleSetAdminRequest(admin_param, request, sizeof(IgCreatePinRequest));
 
-	ble_admin_param_t *admin_param = (ble_admin_param_t *)malloc(sizeof(ble_admin_param_t));
-	bleInitAdminParam(admin_param);
-	bleSetAdminParam(admin_param, lock);
-	bleSetAdminRequest(admin_param, request, sizeof(IgCreatePinRequest));
+    ble_data_t *ble_data = malloc(sizeof(ble_data_t));
+    bleInitData(ble_data);
+    bleSetBleParam(ble_data, admin_param, sizeof(ble_admin_param_t));
 
-	ble_data_t *ble_data = malloc(sizeof(ble_data_t));
-	bleInitData(ble_data);
-	bleSetBleParam(ble_data, admin_param, sizeof(ble_admin_param_t));
+    fsm_table_t *create_pin_fsm = getAdminCreatePinRequestFsmTable();
+    int fsm_max_n = getAdminCreatePinRequestFsmTableLen();
+    int current_state = BLE_ADMIN_BEGIN;
+    int error = 0;
 
-	fsm_table_t *create_pin_fsm = getAdminCreatePinRequestFsmTable();
-	int fsm_max_n = getAdminCreatePinRequestFsmTableLen();
-	int current_state = BLE_ADMIN_BEGIN;
-	int error = 0;
+    task_node_t *tn = (task_node_t *)malloc(sizeof(task_node_t));
+    tn->ble_data = ble_data;
 
-	task_node_t *tn = (task_node_t *)malloc(sizeof(task_node_t));
-	tn->ble_data = ble_data;
+    tn->sm_table_len = fsm_max_n;
+    tn->task_sm_table = create_pin_fsm;
 
-	tn->sm_table_len = fsm_max_n;
-	tn->task_sm_table = create_pin_fsm;
+    tn->task_type = TASK_BLE_ADMIN_CREATE_PIN_REQUEST;
 
-	tn->task_type = TASK_BLE_ADMIN_CREATE_PIN_REQUEST;
-
-	for (int j = 0; j < fsm_max_n; j++) {
-		if (current_state == tn->task_sm_table[j].cur_state) {
-			// å¢å ä¸ä¸ªå¤æ­å½åå½æ°, æ¯å¦å½åå½æ°åºé. 0 è¡¨ç¤ºæ²¡é®é¢
+    for (int j = 0; j < fsm_max_n; j++) {
+        if (current_state == tn->task_sm_table[j].cur_state) {
+            // å¢å ä¸ä¸ªå¤æ­å½åå½æ°, æ¯å¦å½åå½æ°åºé. 0 è¡¨ç¤ºæ²¡é®é¢
 			int event_result = tn->task_sm_table[j].eventActFun(tn);
-			if (event_result) {
-				printf("%d step error.\n", j);
-				error = 1;
-				break;
-			} else {
-				current_state = tn->task_sm_table[j].next_state;
-			}
+            if (event_result) {
+                printf("%d step error.\n", j);
+                error = 1;
+                break;
+            } else {
+                current_state = tn->task_sm_table[j].next_state;
+            }
 		}
-	}
-	if (error) {
-		printf("lock error.\n");
-		return error;
-	}
+    }
+    if (error) {
+        printf("lock error.\n");
+        return error;
+    }
 
-	//saveTaskData(tn);
-	ble_admin_result_t *result = (ble_admin_result_t *)ble_data->ble_result;
-	//ig_CreatePinResponse_deinit(result->cmd_response);
-	free(result->cmd_response);
-	result->cmd_response = NULL;
-	bleReleaseBleResult(ble_data);
-	free(ble_data);
-	ble_data = NULL;
-	free(tn);
-	tn = NULL;
-	// ä¸å®è¦ç­å°ç°å¨æè½éæ¾, å ä¸ºéé¢çåå®¹, æ¯ä¼
-	// è¢«å¤å¶, ç¶åä½¿ç¨
-	free(admin_param);
-	admin_param = NULL;
-	printf( "lock end-------\n");
-	return 0;
+    //saveTaskData(tn);
+    ble_admin_result_t *result = (ble_admin_result_t *)ble_data->ble_result;
+    //ig_CreatePinResponse_deinit(result->cmd_response);
+    free(result->cmd_response);
+    result->cmd_response = NULL;
+    bleReleaseBleResult(ble_data);
+    free(ble_data);
+    ble_data = NULL;
+    free(tn);
+    tn = NULL;
+    // ä¸å®è¦ç­å°ç°å¨æè½éæ¾, å ä¸ºéé¢çåå®¹, æ¯ä¼
+    // è¢«å¤å¶, ç¶åä½¿ç¨
+    free(admin_param);
+    admin_param = NULL;
+    printf( "lock end-------\n");
+    return 0;
 }
 
 int testDeletePin(igm_lock_t *lock, IgDeletePinRequest *request) {
-	printf("delete pin request cmd ask invoker to release the lock.\n");
+    printf("delete pin request cmd ask invoker to release the lock.\n");
+      
+    ble_admin_param_t *admin_param = (ble_admin_param_t *)malloc(sizeof(ble_admin_param_t));
+    bleInitAdminParam(admin_param);
+    bleSetAdminParam(admin_param, lock);
+    bleSetAdminRequest(admin_param, request, sizeof(IgDeletePinRequest));
 
-	ble_admin_param_t *admin_param = (ble_admin_param_t *)malloc(sizeof(ble_admin_param_t));
-	bleInitAdminParam(admin_param);
-	bleSetAdminParam(admin_param, lock);
-	bleSetAdminRequest(admin_param, request, sizeof(IgDeletePinRequest));
+    ble_data_t *ble_data = malloc(sizeof(ble_data_t));
+    bleInitData(ble_data);
+    bleSetBleParam(ble_data, admin_param, sizeof(ble_admin_param_t));
 
-	ble_data_t *ble_data = malloc(sizeof(ble_data_t));
-	bleInitData(ble_data);
-	bleSetBleParam(ble_data, admin_param, sizeof(ble_admin_param_t));
+    fsm_table_t *delete_pin_fsm = getAdminDeletePinRequestFsmTable();
+    int fsm_max_n = getAdminDeletePinRequestFsmTableLen();
+    int current_state = BLE_ADMIN_BEGIN;
+    int error = 0;
 
-	fsm_table_t *delete_pin_fsm = getAdminDeletePinRequestFsmTable();
-	int fsm_max_n = getAdminDeletePinRequestFsmTableLen();
-	int current_state = BLE_ADMIN_BEGIN;
-	int error = 0;
+    task_node_t *tn = (task_node_t *)malloc(sizeof(task_node_t));
+    tn->ble_data = ble_data;
 
-	task_node_t *tn = (task_node_t *)malloc(sizeof(task_node_t));
-	tn->ble_data = ble_data;
+    tn->sm_table_len = fsm_max_n;
+    tn->task_sm_table = delete_pin_fsm;
 
-	tn->sm_table_len = fsm_max_n;
-	tn->task_sm_table = delete_pin_fsm;
+    tn->task_type = TASK_BLE_ADMIN_CREATE_PIN_REQUEST;
 
-	tn->task_type = TASK_BLE_ADMIN_CREATE_PIN_REQUEST;
+    for (int j = 0; j < fsm_max_n; j++) {
+        if (current_state == tn->task_sm_table[j].cur_state) {
+            // å¢å ä¸ä¸ªå¤æ­å½åå½æ°, æ¯å¦å½åå½æ°åºé. 0 è¡¨ç¤ºæ²¡é®é¢
+            int event_result = tn->task_sm_table[j].eventActFun(tn);
+            if (event_result) {
+                printf("[%d] step error.\n", j);
+                error = 1;
+                break;
+            } else {
+                current_state = tn->task_sm_table[j].next_state;
+            }
+        }
+    }
+    if (error) {
+        printf("lock error.\n");
+        return error;
+    }
 
-	for (int j = 0; j < fsm_max_n; j++) {
-		if (current_state == tn->task_sm_table[j].cur_state) {
-			// å¢å ä¸ä¸ªå¤æ­å½åå½æ°, æ¯å¦å½åå½æ°åºé. 0 è¡¨ç¤ºæ²¡é®é¢
-			int event_result = tn->task_sm_table[j].eventActFun(tn);
-			if (event_result) {
-				printf("[%d] step error.\n", j);
-				error = 1;
-				break;
-			} else {
-				current_state = tn->task_sm_table[j].next_state;
-			}
-		}
-	}
-	if (error) {
-		printf("lock error.\n");
-		return error;
-	}
-
-	//saveTaskData(tn);
-	ble_admin_result_t *result = (ble_admin_result_t *)ble_data->ble_result;
-	//ig_DeletePinResponse_deinit(result->cmd_response);
-	free(result->cmd_response);
-	result->cmd_response = NULL;
-	bleReleaseBleResult(ble_data);
-	free(ble_data);
-	ble_data = NULL;
-	free(tn);
-	tn = NULL;
-	free(admin_param);
-	admin_param = NULL;
-	printf( "lock end-------.\n");
-	return 0;
+    //saveTaskData(tn);
+    ble_admin_result_t *result = (ble_admin_result_t *)ble_data->ble_result;
+    //ig_DeletePinResponse_deinit(result->cmd_response);
+    free(result->cmd_response);
+    result->cmd_response = NULL;
+    bleReleaseBleResult(ble_data);
+    free(ble_data);
+    ble_data = NULL;
+    free(tn);
+    tn = NULL;
+    free(admin_param);
+    admin_param = NULL;
+    printf( "lock end-------.\n");
+    return 0;
 }
 
 fsm_table_t g_fsm_table[] = {
-	// {  CMD_INIT,                Init,               GET_WIFI_USER},
-	// {  GET_WIFI_USER,           BLEParing,          CMD_REQ_USERINFO},
-	// {  CMD_REQ_USERINFO,        GetUserInfo,        CMD_UPDATE_USERINFO},
-	// {  CMD_UPDATE_USERINFO,     DealUserInfo,       CMD_CONNECT_LOCK},
-	{  CMD_CONNECT_LOCK,        ScanLock,           CMD_UPDATE_LOCKSTATUS},
-	{  CMD_UPDATE_LOCKSTATUS,   UpdateLockState,    DONE},
-	{  CMD_UNLOCK,              UnLock,             CMD_UPDATE_LOCKSTATUS},
-	{  }
+    // {  CMD_INIT,                Init,               GET_WIFI_USER},
+    // {  GET_WIFI_USER,           BLEParing,          CMD_REQ_USERINFO},
+    // {  CMD_REQ_USERINFO,        GetUserInfo,        CMD_UPDATE_USERINFO},
+    // {  CMD_UPDATE_USERINFO,     DealUserInfo,       CMD_CONNECT_LOCK},
+    {  CMD_CONNECT_LOCK,        ScanLock,           CMD_UPDATE_LOCKSTATUS},
+    {  CMD_UPDATE_LOCKSTATUS,   UpdateLockState,    DONE},
+    {  CMD_UNLOCK,              UnLock,             CMD_UPDATE_LOCKSTATUS},
+    {  }
 };
 
 fsm_table_t g_sm_table[] = {
-	{  CMD_INIT,                Init,               GET_WIFI_USER},
-	{  GET_WIFI_USER,           BLEParing,          CMD_REQ_USERINFO},
-	{  CMD_REQ_USERINFO,        GetUserInfo,        CMD_UPDATE_USERINFO},
-	{  CMD_UPDATE_USERINFO,     DealUserInfo,       CMD_CONNECT_LOCK},
-	{  CMD_CONNECT_LOCK,        ScanLock,           CMD_UPDATE_LOCKSTATUS},
-	{  CMD_UPDATE_LOCKSTATUS,   UpdateLockState,    DONE},
-	{  CMD_UNLOCK,              UnLock,             CMD_UPDATE_LOCKSTATUS},
+    {  CMD_INIT,                Init,               GET_WIFI_USER},
+    {  GET_WIFI_USER,           BLEParing,          CMD_REQ_USERINFO},
+    {  CMD_REQ_USERINFO,        GetUserInfo,        CMD_UPDATE_USERINFO},
+    {  CMD_UPDATE_USERINFO,     DealUserInfo,       CMD_CONNECT_LOCK},
+    {  CMD_CONNECT_LOCK,        ScanLock,           CMD_UPDATE_LOCKSTATUS},
+    {  CMD_UPDATE_LOCKSTATUS,   UpdateLockState,    DONE},
+    {  CMD_UNLOCK,              UnLock,             CMD_UPDATE_LOCKSTATUS},
 };
 
 //admin
 int HandleLockCMD (igm_lock_t *lock, int cmd, void* request) {
-	serverLog(LL_NOTICE, "in HandleLockCMD.");
-	ble_admin_param_t *admin_param = (ble_admin_param_t *)malloc(sizeof(ble_admin_param_t));
-	bleInitAdminParam(admin_param);
-	bleSetAdminParam(admin_param, lock);
+    serverLog(LL_NOTICE, "in HandleLockCMD.");
+    ble_admin_param_t *admin_param = (ble_admin_param_t *)malloc(sizeof(ble_admin_param_t));
+    bleInitAdminParam(admin_param);
+    bleSetAdminParam(admin_param, lock);
 
 	if (ign_DemoLockCommand_CREATE_PIN == cmd && NULL != request) {
 		bleSetAdminRequest(admin_param, request, sizeof(IgCreatePinRequest));
@@ -1738,9 +1751,9 @@ int HandleLockCMD (igm_lock_t *lock, int cmd, void* request) {
 		bleSetAdminRequest(admin_param, request, sizeof(IgDeletePinRequest));
 	}
 
-	ble_data_t *ble_data = malloc(sizeof(ble_data_t));
-	bleInitData(ble_data);
-	bleSetBleParam(ble_data, admin_param, sizeof(ble_admin_param_t));
+    ble_data_t *ble_data = malloc(sizeof(ble_data_t));
+    bleInitData(ble_data);
+    bleSetBleParam(ble_data, admin_param, sizeof(ble_admin_param_t));
 
 	task_node_t *tn = (task_node_t *)malloc(sizeof(task_node_t));
 	tn->ble_data = ble_data;
@@ -1758,7 +1771,7 @@ int HandleLockCMD (igm_lock_t *lock, int cmd, void* request) {
 	} else if (ign_DemoLockCommand_GET_LOCK_STATUS == cmd) {
 		tn->sm_table_len = getAdminGetLockStatusFsmTableLen();
 		tn->task_sm_table = getAdminGetLockStatusFsmTable();
-		tn->task_type = TASK_BLE_ADMIN_GETLOCKSTATUS;
+	    tn->task_type = TASK_BLE_ADMIN_GETLOCKSTATUS;
 	} else if (ign_DemoLockCommand_GET_BATTERY == cmd) {
 		tn->sm_table_len = getAdminGetBatteryLevelFsmTableLen();
 		tn->task_sm_table = getAdminGetBatteryLevelFsmTable();
@@ -1766,41 +1779,41 @@ int HandleLockCMD (igm_lock_t *lock, int cmd, void* request) {
 	} else if (ign_DemoLockCommand_GET_LOGS == cmd) {
 		tn->sm_table_len = getAdminGetLogsFsmTableLen();
 		tn->task_sm_table = getAdminGetLogsFsmTable();
-		tn->task_type = TASK_BLE_ADMIN_GETLOGS;
+	    tn->task_type = TASK_BLE_ADMIN_GETLOGS;
 	} else if (ign_DemoLockCommand_CREATE_PIN == cmd) {
 		tn->sm_table_len = getAdminCreatePinRequestFsmTableLen();
 		tn->task_sm_table = getAdminCreatePinRequestFsmTable();
-		tn->task_type = TASK_BLE_ADMIN_CREATE_PIN_REQUEST;
+	    tn->task_type = TASK_BLE_ADMIN_CREATE_PIN_REQUEST;
 	} else if (ign_DemoLockCommand_DELETE_PIN == cmd) {
 		tn->sm_table_len = getAdminDeletePinRequestFsmTableLen();
 		tn->task_sm_table = getAdminDeletePinRequestFsmTable();
-		tn->task_type = TASK_BLE_ADMIN_CREATE_PIN_REQUEST;
+	    tn->task_type = TASK_BLE_ADMIN_CREATE_PIN_REQUEST;
 	} 
 
 	int current_state = BLE_ADMIN_BEGIN;
-	for (int j = 0; j < tn->sm_table_len; j++) {
-		if (current_state == tn->task_sm_table[j].cur_state) {
+    for (int j = 0; j < tn->sm_table_len; j++) {
+        if (current_state == tn->task_sm_table[j].cur_state) {
 			int event_result = tn->task_sm_table[j].eventActFun(tn);
-			if (event_result) {
-				serverLog(LL_ERROR, "[%d] step error", j);
-				return -1;
-				break;
-			} else {
+            if (event_result) {
+                serverLog(LL_ERROR, "[%d] step error", j);
+                return -1;
+                break;
+            } else {
 				current_state = tn->task_sm_table[j].next_state;
-			}
+            }
 		}
-	}
+    }
 
-	saveTaskData(tn);
-	ble_admin_result_t *admin_unlock_result = (ble_admin_result_t *)ble_data->ble_result;
-	//ig_AdminLockResponse_deinit(admin_unlock_result->cmd_response);
-	releaseAdminResult(&admin_unlock_result);
-	bleReleaseBleResult(ble_data);
-	free(ble_data); ble_data = NULL;
-	free(tn); tn = NULL;
-	free(admin_param); admin_param = NULL;
-	serverLog(LL_NOTICE, "HandleLockCMD end-------");
-	return 0;
+    saveTaskData(tn);
+    ble_admin_result_t *admin_unlock_result = (ble_admin_result_t *)ble_data->ble_result;
+    //ig_AdminLockResponse_deinit(admin_unlock_result->cmd_response);
+    releaseAdminResult(&admin_unlock_result);
+    bleReleaseBleResult(ble_data);
+    free(ble_data); ble_data = NULL;
+    free(tn); tn = NULL;
+    free(admin_param); admin_param = NULL;
+    serverLog(LL_NOTICE, "HandleLockCMD end-------");
+    return 0;
 }
 
 
