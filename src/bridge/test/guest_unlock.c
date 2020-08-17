@@ -72,37 +72,20 @@ int testUnLock(igm_lock_t *lock) {
     ble_data_t *ble_data = malloc(sizeof(ble_data_t));
     bleInitData(ble_data);
     bleSetBleParam(ble_data, guest_param, sizeof(ble_guest_param_t));
-
-    fsm_table_t *unlock_fsm = getGuestUnlockFsmTable();
-    int fsm_max_n = getGuestUnlockFsmTableLen();
-    int current_state = BLE_GUEST_BEGIN;
     int error = 0;
 
     task_node_t *tn = (task_node_t *)malloc(sizeof(task_node_t));
 	tn->sysif = &g_sysif;
     tn->ble_data = ble_data;
+    tn->ble_data_len = sizeof(task_node_t);
+	memset(tn->lock_id, 0x0, sizeof(tn->lock_id));
+	memcpy(tn->lock_id, lock->name, lock->name_len);
+	tn->task_type = TASK_BLE_GUEST_UNLOCK;
 
-    tn->sm_table_len = fsm_max_n;
-    tn->task_sm_table = unlock_fsm;
-
-    tn->task_type = TASK_BLE_ADMIN_UNLOCK;
-
-    for (int j = 0; j < fsm_max_n; j++) {
-        if (current_state == tn->task_sm_table[j].cur_state) {
-            // 增加一个判断当前函数, 是否当前函数出错. 0 表示没问题
-			int event_result = tn->task_sm_table[j].eventActFun(tn);
-            if (event_result) {
-                printf( "%d step error\n", j);
-                error = 1;
-                break;
-            } else {
-                current_state = tn->task_sm_table[j].next_state;
-            }
-		}
-    }
-    if (error) {
-        printf( "unlock error\n");
-        return error;
+    int ret = guest_connection_and_do_cmd(tn);
+    if(ret) {
+        serverLog(LL_ERROR, "guest_connection_and_do_cmd err[%d].", ret);
+        return -1;
     }
 
     saveTaskData(tn);

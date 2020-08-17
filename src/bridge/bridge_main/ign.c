@@ -724,6 +724,7 @@ int AddLockinfo(sysinfo_t* si, LockInfo_t* li) {
 			printf("GetAddrBle get NULL.\n");
 			p->lock_addr_size = 0;
 			//jusg for test
+			/*
 			{
 				if(!strcmp(li->lock_id, "IGM3037f4b09")) {
 					memcpy(p, li, sizeof(LockInfo_t)); 
@@ -734,7 +735,7 @@ int AddLockinfo(sysinfo_t* si, LockInfo_t* li) {
 					memcpy(p->lock_addr, "ED:67:F0:CC:26:84", sizeof("ED:67:F0:CC:26:84")); 
 					si->lock_total++;
 				}
-			}
+			}*/
 		}
 		return 0;
 	}
