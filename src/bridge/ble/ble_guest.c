@@ -750,7 +750,7 @@ static int write_cmd_request(void *arg) {
 	guest_connection_t *guest_connection = (guest_connection_t *)ble_data->ble_connection;
 	srand(time(0));
 	int requestID = rand() % 2147483647;
-	size_t buf_size = 32;
+	size_t buf_size = 128;
 	size_t encode_size = 0;
 	uint8_t buf[buf_size];
 	int retvalLen;
@@ -834,6 +834,7 @@ static int write_cmd_request(void *arg) {
 
 		ig_CreatePinRequest_set_operation_id( &create_pin_request, requestID);
 		ig_CreatePinRequest_set_password(&create_pin_request, guest_connection->lock->password, guest_connection->lock->password_size);
+		//ig_CreatePinRequest_set_password(&create_pin_request, cmd_req->password, cmd_req->password_size);
 		if (!cmd_req ||  !ig_CreatePinRequest_is_valid(cmd_req)) {
 			serverLog(LL_ERROR, "cmd_req NULL or cmd_req don't have pin");
 			ERR_EXIT(ERR_CMD, LOCK_REQUEST_ERROR)
@@ -845,7 +846,6 @@ static int write_cmd_request(void *arg) {
 		ByteToHexStr(create_pin_request.new_pin, xbuf, create_pin_request.new_pin_size);
 		serverLog(LL_NOTICE,"ig_CreatePinRequest_set_new_pin:[%s].", xbuf);
 
-		ig_CreatePinRequest_set_password(&create_pin_request, cmd_req->password, cmd_req->password_size);
 		//@@@test
 		memset(xbuf, 0x0, sizeof(xbuf));
 		ByteToHexStr(create_pin_request.password, xbuf, create_pin_request.password_size);
