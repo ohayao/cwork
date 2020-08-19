@@ -40,17 +40,17 @@ atomic_int g_msg_id;
 system("echo none > /sys/class/leds/r/trigger");\
 system("echo none > /sys/class/leds/g/trigger");\
 system("echo none > /sys/class/leds/b/trigger");\
-if('b' == 'color' ||'w' == 'color') { system("echo default-on > /sys/class/leds/b/trigger");}\
-if('g' == 'color' ||'w' == 'color') { system("echo default-on > /sys/class/leds/g/trigger");}\
-if('r' == 'color' ||'w' == 'color') { system("echo default-on > /sys/class/leds/r/trigger");}
+if('b' == color ||'w' == color) { system("echo default-on > /sys/class/leds/b/trigger");}\
+if('g' == color ||'w' == color) { system("echo default-on > /sys/class/leds/g/trigger");}\
+if('r' == color ||'w' == color) { system("echo default-on > /sys/class/leds/r/trigger");}
 
 #define LIGHT_BLINK(color) \
 system("echo none > /sys/class/leds/r/trigger");\
 system("echo none > /sys/class/leds/g/trigger");\
 system("echo none > /sys/class/leds/b/trigger");\
-if('b' == 'color' ||'w' == 'color') { system("echo timer > /sys/class/leds/b/trigger");}\
-if('g' == 'color' ||'w' == 'color') { system("echo timer > /sys/class/leds/g/trigger");}\
-if('r' == 'color' ||'w' == 'color') { system("echo timer > /sys/class/leds/r/trigger");}
+if('b' == color ||'w' == color) { system("echo timer > /sys/class/leds/b/trigger");}\
+if('g' == color ||'w' == color) { system("echo timer > /sys/class/leds/g/trigger");}\
+if('r' == color ||'w' == color) { system("echo timer > /sys/class/leds/r/trigger");}
 
 #define LIGHT_OFF \
 system("echo none > /sys/class/leds/r/trigger");\

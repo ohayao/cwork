@@ -30,7 +30,6 @@ static char guest_str[] = "5c3a65a0-897e-45e1-b016-007107c96df6";
 
 int guest_connection_and_do_cmd(void *arg);
 static void message_handler(const uuid_t* uuid, const uint8_t* data, size_t data_length, void* user_data);
-static int waiting_guest_step2(void *arg);
 static int handle_step2_message(const uint8_t* data, int data_length,void* user_data);
 static int save_message_data(const uint8_t* data, int data_length, void* user_data);
 static int write_guest_step3(void *arg);
@@ -392,7 +391,7 @@ int guest_connection_and_do_cmd(void *arg) {
 		ERR_EXIT(ERR_STEP1, GUEST_ERROR_EXIT)
 	}
 
-	serverLog(LL_NOTICE, "write_guest_step2 begin");
+	serverLog(LL_NOTICE, "waite_guest_step2 begin");
 	//step 2
 	g_main_loop_run(task_node->loop);
 	if (guest_connection->waiting_err || guest_connection->receive_err) {
@@ -484,41 +483,6 @@ GUEST_STEP1_EXIT:
 	return 0;
 }
 
-int waiting_guest_step2(void *arg) {
-	serverLog(LL_NOTICE, "waiting_pairing_step2.");
-	task_node_t *task_node = (task_node_t *) arg;
-	ble_data_t *ble_data = (ble_data_t *) (task_node->ble_data);
-	guest_connection_t *guest_connection = (guest_connection_t *) ble_data->ble_connection;
-
-	serverLog(LL_NOTICE, "waiting_guest_step2 new loop waiting.");
-	g_main_loop_run(task_node->loop);
-	if (guest_connection->waiting_err || guest_connection->receive_err)
-		goto WAITING_STEP2_ERROR;
-	serverLog(LL_NOTICE, "waiting_guest_step2 exit task_node->loop");
-	return 0;
-
-WAITING_STEP2_ERROR:
-	// 这儿, 需要释放订阅,释放数据
-	serverLog(LL_ERROR, "WAITING_STEP2_ERROR ");
-	g_main_loop_unref(task_node->loop);
-	releaseGuestConnectionData(guest_connection);
-	setGuestResultErr(ble_data->ble_result, 1);
-	//bleSetBleResult(ble_data, ble_data->ble_result);
-	int ret = releaseGuestConnection(&guest_connection);
-	if (ret) {
-		serverLog(LL_ERROR, "waiting_guest_step2 releaseGuestConnection error");
-		return ret;
-	}
-	serverLog(LL_NOTICE, "waiting_guest_step2 releaseGuestConnection success");
-
-	/*
-	ret = gattlib_adapter_close(ble_data->adapter);
-	if (ret) {
-		serverLog(LL_ERROR, "gattlib_adapter_close error ");
-		return ret;
-	}*/
-	return 1;
-}
 
 int handle_step2_message(const uint8_t* data, int data_length,void* user_data) {
 	serverLog(LL_NOTICE, "handle_step2_message");
@@ -1145,6 +1109,36 @@ LOCK_RESPONCE_EXIT:
 /*
 //  ------------------------ Guest step start ------------------------
 
+
+int waiting_guest_step2(void *arg) {
+	serverLog(LL_NOTICE, "waiting_pairing_step2.");
+	task_node_t *task_node = (task_node_t *) arg;
+	ble_data_t *ble_data = (ble_data_t *) (task_node->ble_data);
+	guest_connection_t *guest_connection = (guest_connection_t *) ble_data->ble_connection;
+
+	serverLog(LL_NOTICE, "waiting_guest_step2 new loop waiting.");
+	g_main_loop_run(task_node->loop);
+	if (guest_connection->waiting_err || guest_connection->receive_err)
+		goto WAITING_STEP2_ERROR;
+	serverLog(LL_NOTICE, "waiting_guest_step2 exit task_node->loop");
+	return 0;
+
+WAITING_STEP2_ERROR:
+	// 这儿, 需要释放订阅,释放数据
+	serverLog(LL_ERROR, "WAITING_STEP2_ERROR ");
+	g_main_loop_unref(task_node->loop);
+	releaseGuestConnectionData(guest_connection);
+	setGuestResultErr(ble_data->ble_result, 1);
+	//bleSetBleResult(ble_data, ble_data->ble_result);
+	int ret = releaseGuestConnection(&guest_connection);
+	if (ret) {
+		serverLog(LL_ERROR, "waiting_guest_step2 releaseGuestConnection error");
+		return ret;
+	}
+	serverLog(LL_NOTICE, "waiting_guest_step2 releaseGuestConnection success");
+
+	return 1;
+}
 fsm_table_t guest_fsm_table[GUEST_SM_TABLE_LEN] = {
   {BLE_GUEST_BEGIN,     guest_connection_and_do_cmd,		BLE_GUEST_STEP2},
   {BLE_GUEST_STEP2,     waiting_guest_step2,			BLE_GUEST_STEP3},
