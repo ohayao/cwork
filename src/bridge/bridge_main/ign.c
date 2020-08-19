@@ -52,11 +52,11 @@ int h_GetUserToken(char *userToken){
     HTTP_INFO hi;
     http_init(&hi, TRUE);
     char *url = "https://tkm70zar9f.execute-api.ap-southeast-1.amazonaws.com/development/login";
-    sprintf(data,"{\"email\":\"cs.lim+bridge@igloohome.co\",\"password\":\"igloohome\"}");
+    snprintf(data, sizeof(data), "{\"email\":\"cs.lim+bridge@igloohome.co\",\"password\":\"igloohome\"}");
     int ret = http_post(&hi, url, data, res, sizeof(res));
     http_close(&hi);
     if(ret!=200){ 
-        printf("h_GetUserToken error [%d:%s]\n",ret,res);
+        serverLog(LL_NOTICE,"h_GetUserToken error [%d:%s]",ret,res);
         return -1;                                                            
     }
     strncpy(userToken,res+16,strlen(res)-18);
@@ -71,9 +71,9 @@ int h_GetBridgeToken(char *userToken,char *bridgeToken){
     http_init(&hi,TRUE);
     char *url="https://tkm70zar9f.execute-api.ap-southeast-1.amazonaws.com/development/token";
     int ret=http_get_with_auth(&hi,url,userToken,res,4096);
-    //printf("----->> res=%s\n",res);
+    //serverLog(LL_NOTICE,"----->> res=%s",res);
     if(ret!=200) {
-        printf("h_GetBridgeToken error [%d:%s]\n",ret,res);
+        serverLog(LL_NOTICE,"h_GetBridgeToken error [%d:%s]",ret,res);
         return -1;
     }
     strncpy(bridgeToken,res+18,strlen(res)-20);
@@ -81,18 +81,18 @@ int h_GetBridgeToken(char *userToken,char *bridgeToken){
 }
 
 int h_downloadcsr(sysinfo_t* si, char *bridgeToken){
-    char res[4096],url[200];
+    char res[4096],url[512];
     char *localCSR = get_file_content(LOCAL_CSR);
 	if(NULL == localCSR) {
-		printf("get_file_content ./certificate/local.csr err.\n");
+		serverLog(LL_NOTICE,"get_file_content ./certificate/local.csr err.");
 		return -1;
 	}
     memset(res,0,sizeof(res));
     memset(url,0,sizeof(url));
     HTTP_INFO hi;
-    sprintf(url,"https://tkm70zar9f.execute-api.ap-southeast-1.amazonaws.com/development/devices/bridge/%s", si->mac);
+    snprintf(url, sizeof(url), "https://tkm70zar9f.execute-api.ap-southeast-1.amazonaws.com/development/devices/bridge/%s", si->mac);
 
-    printf("h_downloadcsr,request_url=[%s]\n",url);
+    serverLog(LL_NOTICE,"h_downloadcsr,request_url=[%s]",url);
     cJSON *root;
     root=cJSON_CreateObject();
     cJSON_AddStringToObject(root,"csr",localCSR);
@@ -107,36 +107,36 @@ int h_downloadcsr(sysinfo_t* si, char *bridgeToken){
 	}
 
     cJSON_Delete(root);
-    printf("________________Request BridgeToken\n%s\nBody Content\n%s\n",bridgeToken,sdata);
+    serverLog(LL_NOTICE,"________________Request BridgeToken%sBody Content%s",bridgeToken,sdata);
     int ret=http_post_with_auth(&hi,url,bridgeToken,sdata,res,sizeof(res));
-    //printf("----->downloadcsr response[%s]\n",res);
+    //serverLog(LL_NOTICE,"----->downloadcsr response[%s]",res);
     if(200 != ret) {
-        printf("h_downloadcsr error [%d:%s]\n",ret,res);
+        serverLog(LL_NOTICE,"h_downloadcsr error [%d:%s]",ret,res);
         return -1;
     }
-	printf("res size[%d] [%s]\n", sizeof(res),res);
+	serverLog(LL_NOTICE,"res size[%d] [%s]", sizeof(res),res);
     root=cJSON_Parse(res);
     if(NULL == root) {
-        serverLog(LL_ERROR, "h_downloadcsr content not json type\n");
+        serverLog(LL_ERROR, "h_downloadcsr content not json type");
         cJSON_Delete(root);
         return -1;
     }
-	printf("root[%s]\n", root);
+	serverLog(LL_NOTICE,"root[%s]", root);
     cJSON *pem = cJSON_GetObjectItem(root,"pem");
 	if (NULL == pem) {
 		serverLog(LL_ERROR, "cJSON_GetObjectItem return pem is NULL err.");
 		return -1;
 	}
-    printf("pem=[%s]\n",pem->valuestring);
+    serverLog(LL_NOTICE,"pem=[%s]",pem->valuestring);
     write_file_content(SERVICE_PEM, pem->valuestring);
 	cJSON_Delete(root);
-	printf("=====>>>>>DOWNLOAD-CSR Over!!!!!\n");
+	serverLog(LL_NOTICE,"=====>>>>>DOWNLOAD-CSR Over!!!!!");
 	return 0;
 }
 
 int download_ca(sysinfo_t* si, int tryTimes){
 	if(-1 != (access(SERVICE_PEM, F_OK))){   
-        printf("file mytest.c exist.\n");   
+        serverLog(LL_NOTICE,"file mytest.c exist.");   
 		return 0;
     }   
 
@@ -146,19 +146,19 @@ int download_ca(sysinfo_t* si, int tryTimes){
     memset(userToken,0,sizeof(userToken));
     memset(bridgeToken,0,sizeof(bridgeToken));
     while((ret=h_GetUserToken(userToken))!=0){
-        printf("GetUserTokenError [%d]\n",ret);
+        serverLog(LL_NOTICE,"GetUserTokenError [%d]",ret);
         if(tryTimes>0) _tt++;
         else if(_tt>0 && _tt>=tryTimes) return -1;
     }
     _tt=0;
     while((ret=h_GetBridgeToken(userToken,bridgeToken))!=0){
-        printf("GetBridgetTokenError [%d]\n",ret);
+        serverLog(LL_NOTICE,"GetBridgetTokenError [%d]",ret);
         if(tryTimes>0) _tt++;
         if(_tt>0 && _tt>=tryTimes) return -1;
     }
     _tt=0;
     while((ret=h_downloadcsr(si,bridgeToken))!=0){
-        printf("DownloadCSR Error [%d]\n",ret);
+        serverLog(LL_NOTICE,"DownloadCSR Error [%d]",ret);
         if(tryTimes>0) _tt++;
         if(_tt>0 && _tt>=tryTimes) return -1;
     }
@@ -169,7 +169,7 @@ int download_ca(sysinfo_t* si, int tryTimes){
 int SendMQTTMsg(ign_MsgInfo* msg, char* topic) {
 	if (NULL == g_sysif.mqtt_c) {
 		serverLog(LL_ERROR, "mqtt is NULL, no available connection.");
-		printf("mqtt is NULL, no available connection.\n");
+		serverLog(LL_NOTICE,"mqtt is NULL, no available connection.");
 		return -1;
 	}
     int ret = 0;
@@ -195,12 +195,12 @@ int SendMQTTMsg(ign_MsgInfo* msg, char* topic) {
 				serverLog(LL_ERROR, "Re-Subscribe [%s] error with code [%d].", PUB_WEBDEMO, ret);
 			}
 		} else {
-			printf("<<<< Send MQTT to[%s] len[%d]\n", topic, len);
+			serverLog(LL_NOTICE,"<<<< Send MQTT to[%s] len[%d]", topic, len);
 		}
 
     }else{
         serverLog(LL_ERROR, "pb_encode failed.");
-        printf("ENCODE UPDATEUSERINFO ERROR\n");
+        serverLog(LL_NOTICE,"ENCODE UPDATEUSERINFO ERROR");
     }
     return 0;
 }
@@ -286,29 +286,29 @@ int Sync_Activities(char* lock_id, char* logs, unsigned int logs_size){
 void saveTaskData(task_node_t* ptn) {
 	if (!ptn) return;
 
-	printf( "in saveTaskData, ptn->task_type[%d], ble_data_len[%d]\n", ptn->task_type, ptn->ble_data_len);
+	serverLog(LL_NOTICE, "in saveTaskData, ptn->task_type[%d], ble_data_len[%d]", ptn->task_type, ptn->ble_data_len);
 	if(ptn->ble_data) {
 		ble_data_t *ble_data = ptn->ble_data;
 		switch (ptn->task_type) {
 			case TASK_BLE_GUEST_GETLOCKSTATUS:
 				{
-					printf( "handle ble get lock status data.\n");
+					serverLog(LL_NOTICE, "handle ble get lock status data.");
 					ble_guest_result_t *guest_result = (ble_guest_result_t *)ble_data->ble_result;
 					if(NULL == guest_result) {
 						serverLog(LL_ERROR, "guest_result is NULL err.");
 						return;
 					}
 					if(guest_result->result) {
-						printf("get status error[%d].\n", guest_result->result);
+						serverLog(LL_NOTICE,"get status error[%d].", guest_result->result);
 					} else {
-						printf("@@@get status success. lock_status[%d]\n", ble_data->lock_status);
+						serverLog(LL_NOTICE,"@@@get status success. lock_status[%d]", ble_data->lock_status);
 						Sync_Status(ptn->lock_id, ble_data->lock_status);
 					}
 					break;
 				}
 			case TASK_BLE_GUEST_GET_BATTERY_LEVEL:
 				{
-					printf( "handle battery data.\n");
+					serverLog(LL_NOTICE, "handle battery data.");
 					ble_guest_result_t* guest_result = (ble_guest_result_t *)ble_data->ble_result;
 					if(NULL == guest_result) {
 						serverLog(LL_ERROR, "guest_result is NULL err.");
@@ -316,9 +316,9 @@ void saveTaskData(task_node_t* ptn) {
 					}
 					int ret = guest_result->result;
 					if (ret) {
-						printf("get battery error[%d].\n", ret);
+						serverLog(LL_NOTICE,"get battery error[%d].", ret);
 					} else {
-						printf("get battery success, battery_level[%d], lock_id[%s]\n", ble_data->battery_level, ptn->lock_id);
+						serverLog(LL_NOTICE,"get battery success, battery_level[%d], lock_id[%s]", ble_data->battery_level, ptn->lock_id);
 						Sync_Battery(ptn->lock_id, ble_data->battery_level);
 					}
 
@@ -326,7 +326,7 @@ void saveTaskData(task_node_t* ptn) {
 				}
 			case TASK_BLE_GUEST_GETLOGS:
 				{
-					printf( "get ble response data of TASK_BLE_GUEST_GETLOGS\n");
+					serverLog(LL_NOTICE, "get ble response data of TASK_BLE_GUEST_GETLOGS");
 					ble_guest_result_t *guest_get_logs_result = (ble_guest_result_t *)ble_data->ble_result;
 					if(NULL == guest_get_logs_result) {
 						serverLog(LL_ERROR, "guest_result is NULL err.");
@@ -334,10 +334,10 @@ void saveTaskData(task_node_t* ptn) {
 					}
 					int ret = guest_get_logs_result->result;
 					if (ret) {
-						printf( "get lock logs error\n");
+						serverLog(LL_NOTICE, "get lock logs error");
 					} else {
 						IgGetLogsResponse *get_logs_response = guest_get_logs_result->cmd_response;
-						printf( "get lock logs success size [%lu], data[%s]\n", get_logs_response->data_size, get_logs_response->data);
+						serverLog(LL_NOTICE, "get lock logs success size [%lu], data[%s]", get_logs_response->data_size, get_logs_response->data);
 						// send get_logs_response.data;
 						Sync_Activities(ptn->lock_id, get_logs_response->data, get_logs_response->data_size);
 					}   
@@ -362,7 +362,7 @@ void saveTaskData(task_node_t* ptn) {
 }
 
 int HandleLockCMD (sysinfo_t* si, igm_lock_t* lock, int cmd, void* request) {
-    serverLog(LL_NOTICE, "in HandleLockCMD.");
+	LIGHT_BLINK('b')
     ble_guest_param_t *guest_param = (ble_guest_param_t *)malloc(sizeof(ble_guest_param_t));
     bleInitGuestParam(guest_param);
     bleSetGuestParam(guest_param, lock);
@@ -431,6 +431,7 @@ int HandleLockCMD (sysinfo_t* si, igm_lock_t* lock, int cmd, void* request) {
 		}
     }*/
 
+    serverLog(LL_NOTICE, "in HandleLockCMD, task_type[%d].", tn->task_type);
     int ret = guest_connection_and_do_cmd(tn);
     if(ret) {
         serverLog(LL_ERROR, "guest_connection_and_do_cmd err[%d].", ret);
@@ -446,6 +447,7 @@ int HandleLockCMD (sysinfo_t* si, igm_lock_t* lock, int cmd, void* request) {
     free(tn); tn = NULL;
     free(guest_param); guest_param = NULL;
     serverLog(LL_NOTICE, "HandleLockCMD end-------");
+	LIGHT_ON('g')
     return 0;
 }
 
@@ -456,19 +458,19 @@ int download_ca(){
     char data[1024], response[4096];
     int  i, ret, size;
 
-    printf("=====>>>>>Step1. Get User login token\n");
+    serverLog(LL_NOTICE,"=====>>>>>Step1. Get User login token");
     HTTP_INFO hi1;
     http_init(&hi1, TRUE);
     url = "https://tkm70zar9f.execute-api.ap-southeast-1.amazonaws.com/development/login";
-    sprintf(data,"{\"email\":\"cs.lim+bridge@igloohome.co\",\"password\":\"igloohome\"}");
+    sserverLog(LL_NOTICE,data,"{\"email\":\"cs.lim+bridge@igloohome.co\",\"password\":\"igloohome\"}");
     ret = http_post(&hi1, url, data, response, sizeof(response));
     http_close(&hi1);
     if(ret!=200) return -1;
     char userToken[2048];
     memset(userToken,0,sizeof(userToken));
     strncpy(userToken,response+16,strlen(response)-18);
-    printf("UserToken=[%s]\n",userToken);
-    printf("=====>>>>>Step2. Get Bridge token\n");
+    serverLog(LL_NOTICE,"UserToken=[%s]",userToken);
+    serverLog(LL_NOTICE,"=====>>>>>Step2. Get Bridge token");
     memset(data,0,sizeof(data));
     memset(response,0,sizeof(response));
     HTTP_INFO hi2;
@@ -479,8 +481,8 @@ int download_ca(){
     char biridgeToken[2048];
     memset(biridgeToken,0,sizeof(biridgeToken));
     strncpy(biridgeToken,response+18,strlen(response)-20);
-    printf("BirdgeTOken=[%s]\n",biridgeToken);
-    printf("=====>>>>>Step3. Download CA \n");
+    serverLog(LL_NOTICE,"BirdgeTOken=[%s]",biridgeToken);
+    serverLog(LL_NOTICE,"=====>>>>>Step3. Download CA ");
     char* localCSR=get_file_content("/root/project/gomvc_blog/ign/webign.csr");
     memset(data,0,sizeof(data));
     memset(response,0,sizeof(response));
@@ -491,16 +493,16 @@ int download_ca(){
     cJSON_AddStringToObject(root,"csr",localCSR);
     char *sdata=cJSON_PrintUnformatted(root);
     cJSON_Delete(root);
-    printf("________________Request Body Content\n%s\n",sdata);
+    serverLog(LL_NOTICE,"________________Request Body Content%s",sdata);
     ret=http_post_with_auth(&hi3,url,biridgeToken,sdata,response,sizeof(response));
     if(ret!=200) return -3;
     root=cJSON_Parse(response);
     if(root==NULL) return -4;
     cJSON *pem=cJSON_GetObjectItem(root,"pem");
-    printf("pem=%s\n",pem->valuestring);
+    serverLog(LL_NOTICE,"pem=%s",pem->valuestring);
     write_file_content("./test_test_test_test.csr",pem->valuestring);
     cJSON_Delete(root);
-    printf("=====>>>>>DOWNLOAD-CSR Over!!!!!\n");
+    serverLog(LL_NOTICE,"=====>>>>>DOWNLOAD-CSR Over!!!!!");
     return 0;
 }
 */
@@ -568,9 +570,9 @@ ign_BridgeProfile Create_IgnBridgeProfile(sysinfo_t* si){
                                                  
     PRO_DISK_INFO *di=Pro_GetDiskInfo();
     PRO_MEMORY_INFO *mi=Pro_GetMemoryInfo();
-    char cpu[200];
+    char cpu[256];
     memset(cpu,0,sizeof(cpu));
-    sprintf(cpu,"CR:%.4f;MT:%d,MF:%d,MUR:%.4f;DT:%d,DU:%d,DUR:%.4f",
+    snprintf(cpu,sizeof(cpu),"CR:%.4f;MT:%d,MF:%d,MUR:%.4f;DT:%d,DU:%d,DUR:%.4f",
             Pro_GetCpuRate(),
             mi->total,mi->free,mi->used_rate,
             di->total,di->used,di->used_rate);
@@ -584,7 +586,7 @@ ign_BridgeProfile Create_IgnBridgeProfile(sysinfo_t* si){
     bp.inited_time = Pro_GetInitedTime();
     bp.name.size = strlen(temp);
     memcpy(bp.name.bytes, si->mac, strlen(si->mac));
-    printf("[DEVICEINFO]LocalIP=%s PublicIP=%s Name=%s Sys_statics=%s Wifi_ssid=%s Wifi_signal=%d inited_time=%d\n",
+    serverLog(LL_NOTICE,"[DEVICEINFO]LocalIP=%s PublicIP=%s Name=%s Sys_statics=%s Wifi_ssid=%s Wifi_signal=%d inited_time=%d",
             bp.local_ip.bytes,bp.public_ip.bytes,bp.name.bytes,bp.sys_statics.bytes,bp.wifi_ssid.bytes,bp.wifi_signal,bp.inited_time);
     return bp;
 }
@@ -604,7 +606,7 @@ bool get_server_event_data(pb_istream_t *stream,const pb_field_t *field,void **a
 
 int GetUserInfo() {
 	//send request to server to get userinfo
-	printf("send request to server to get userinfo!\n");
+	serverLog(LL_NOTICE,"send request to server to get userinfo!");
 
 	ign_MsgInfo msg = {};
 	msg.event_type = ign_EventType_GET_USER_INFO;
@@ -619,13 +621,13 @@ int GetUserInfo() {
 }
 
 int Init_MQTT(MQTTClient* p_mqtt){
-    printf("====>CAPATH=%s;TRUST_STORE=%s;PRIVATE_KEY=%s;KEY_STORE=%s\n",CA_PATH,TRUST_STORE,PRIVATE_KEY,KEY_STORE);
+    serverLog(LL_NOTICE,"====>CAPATH=%s;TRUST_STORE=%s;PRIVATE_KEY=%s;KEY_STORE=%s",CA_PATH,TRUST_STORE,PRIVATE_KEY,KEY_STORE);
     *p_mqtt = MQTT_initClients(HOST, g_sysif.mac, 60, 1, CA_PATH, TRUST_STORE, PRIVATE_KEY, KEY_STORE);
     if(NULL == *p_mqtt) {
         serverLog(LL_ERROR, "MQTT_initClients err, mqtt_c is NULL.");
         return -1;
     }
-	serverLog(LL_DEBUG, "MQTT_initClients succ, mqtt_c[%x], addr[%x]\n", p_mqtt, &p_mqtt);
+	serverLog(LL_DEBUG, "MQTT_initClients succ, mqtt_c[%x], addr[%x]", p_mqtt, &p_mqtt);
 	return 0;
 }
 
@@ -637,7 +639,7 @@ int Init_Ble(sysinfo_t* si) {
 
     int ret = gattlib_adapter_open(NULL, &si->ble_adapter);
     if (ret) {
-        serverLog(LL_ERROR, "discoverLock ERROR: Failed to open adapter.\n");
+        serverLog(LL_ERROR, "discoverLock ERROR: Failed to open adapter.");
 		Close(si);
         return -1;
     }
@@ -662,7 +664,6 @@ int Init_Ble(sysinfo_t* si) {
 	memcpy(&li.lock_passwd, passwd, strlen(passwd));
 
 	AddLockinfo(si, &li);
-	PrintLockinfo(si);
 
 */
 	//@@@ need async connect!!!
@@ -719,9 +720,10 @@ int AddLockinfo(sysinfo_t* si, LockInfo_t* li) {
 			}
 			si->lock_total++;
 		}else{
-			printf("GetAddrBle get NULL.\n");
+			serverLog(LL_NOTICE,"GetAddrBle get NULL.");
 			p->lock_addr_size = 0;
 			//jusg for test
+			/*
 			{
 				if(!strcmp(li->lock_id, "IGM3037f4b09")) {
 					memcpy(p, li, sizeof(LockInfo_t)); 
@@ -732,7 +734,7 @@ int AddLockinfo(sysinfo_t* si, LockInfo_t* li) {
 					memcpy(p->lock_addr, "ED:67:F0:CC:26:84", sizeof("ED:67:F0:CC:26:84")); 
 					si->lock_total++;
 				}
-			}
+			}*/
 		}
 		return 0;
 	}
@@ -740,10 +742,12 @@ int AddLockinfo(sysinfo_t* si, LockInfo_t* li) {
 }
 
 void PrintLockinfo(sysinfo_t* si) {
+	serverLog(LL_NOTICE, "in PrintLockinfo, lock_total[%d].", si->lock_total);
 	for(int i =0; i<si->lock_total; i++){
 		LockInfo_t* pi = si->lockinfo + i;
-		printf("[%d], id[%s],id_size[%d],key[%X],key_size[%d],passwd[%x],passwd_size[%d],token[%x],token_size[%d],addr[%s]\n",
+		serverLog(LL_NOTICE,"[%d], id[%s],id_size[%d],key[%X],key_size[%d],passwd[%x],passwd_size[%d],token[%x],token_size[%d],addr[%s]",
 			i, pi->lock_id, pi->lock_id_size, pi->lock_ekey, pi->lock_ekey_size, pi->lock_passwd, pi->lock_passwd_size, pi->lock_token, pi->lock_token_size, pi->lock_addr);
+
 	}
 }
 
@@ -753,7 +757,7 @@ LockInfo_t* SearchLockInfo(sysinfo_t* si, char* lock_id){
 		if(!strcmp(pi->lock_id, lock_id)) {
 			return pi;
 		}else{
-			//printf("\tpi->lock_id[%s] != lock_id[%s]\n", pi->lock_id, lock_id);
+			//serverLog(LL_NOTICE,"\tpi->lock_id[%s] != lock_id[%s]", pi->lock_id, lock_id);
 		}
 	}
 	return NULL;
@@ -763,7 +767,7 @@ void ble_discovered_cb(void *adapter, const char* addr, const char* name, void* 
 	ble_addr_t* bl = ((sysinfo_t*)si)->ble_list;
 	unsigned char ble_total = ((sysinfo_t*)si)->ble_list_n; 
     if (name) {
-        printf("Discovered [%s] - [%s]\n", addr, name);
+        serverLog(LL_NOTICE,"Discovered [%s] - [%s]", addr, name);
 		((sysinfo_t*)si)->ble_list = realloc(bl, sizeof(ble_addr_t)*(ble_total+1));
 		ble_addr_t* nbl = ((sysinfo_t*)si)->ble_list + ble_total;
 		memset(nbl, 0x0, sizeof(ble_addr_t));
@@ -771,7 +775,7 @@ void ble_discovered_cb(void *adapter, const char* addr, const char* name, void* 
 		memcpy(nbl->addr, addr, strlen(addr));
 		((sysinfo_t*)si)->ble_list_n++;
     } else {
-        printf("Discovered [%s]\n", addr);
+        serverLog(LL_NOTICE,"Discovered [%s]", addr);
     }
 }
 
@@ -784,18 +788,18 @@ int ScanBLE(sysinfo_t* si) {
     //do scan BLE
     int ret = gattlib_adapter_scan_enable(si->ble_adapter, ble_discovered_cb, BLE_SCAN_TIMEOUT, si);
     if (ret) {
-        fprintf(stderr, "ERROR: Failed to scan.\n");
+        serverLog(LL_ERROR, "ERROR: Failed to scan.");
 		Close(si);
 		return -1;
     }
-	printf("ble_addr_n[%d]\n", si->ble_list_n);
+	serverLog(LL_NOTICE,"ble_addr_n[%d]", si->ble_list_n);
 	for(int i =0; i<si->ble_list_n; i++) {
-		printf("[%d],name[%s],addr[%s]\n", i, si->ble_list[i].name, si->ble_list[i].addr);
+		serverLog(LL_NOTICE,"[%d],name[%s],addr[%s]", i, si->ble_list[i].name, si->ble_list[i].addr);
 	}
 /*
-	printf("g_ble_addr.size[%d]\n",g_ble_addr.size());
+	serverLog(LL_NOTICE,"g_ble_addr.size[%d]",g_ble_addr.size());
 	for(map<string, string>::iterator it = g_ble_addr.begin(); g_ble_addr.end()!= it; it++) {
-		prtinf("name[%s],addr[%s]\n", it->first.c_str(), it->second.c_str());
+		prtinf("name[%s],addr[%s]", it->first.c_str(), it->second.c_str());
 	}
 */
     gattlib_adapter_scan_disable(si->ble_adapter);
@@ -818,7 +822,6 @@ int WifiConnection(){
 }
 
 int Init(void* tn) {
-	
 	LIGHT_ON('w')
 
 	int ret = 0;
@@ -845,7 +848,7 @@ int Init(void* tn) {
 	memset(TOPIC_SUB, 0, sizeof(TOPIC_SUB));
 	snprintf(TOPIC_PUB, sizeof(TOPIC_PUB), "%s%s", PUB_TOPIC_PREFIX, g_sysif.mac);
 	snprintf(TOPIC_SUB, sizeof(TOPIC_SUB), "%s%s", SUB_TOPIC_PREFIX, g_sysif.mac);
-    printf("Init Mac as Device ID[%s], TOPIC_PUB[%s], TOPIC_SUB[%s].\n", g_sysif.mac, TOPIC_PUB, TOPIC_SUB);
+    serverLog(LL_NOTICE,"Init Mac as Device ID[%s], TOPIC_PUB[%s], TOPIC_SUB[%s].", g_sysif.mac, TOPIC_PUB, TOPIC_SUB);
     serverLog(LL_NOTICE, "Init Mac as Device ID[%s], TOPIC_PUB[%s], TOPIC_SUB[%s].", g_sysif.mac, TOPIC_PUB, TOPIC_SUB);
 
     do{
@@ -863,9 +866,9 @@ int Init(void* tn) {
     int try_time=0;
     /*
     if(0 == download_ca(&g_sysif, try_time)){
-        printf("_______DOWNLOAD CSR SUCCESS\n");
+        serverLog(LL_NOTICE,"_______DOWNLOAD CSR SUCCESS");
     }else{
-        printf("_______DOWNLOAD CSR FAILED\n");
+        serverLog(LL_NOTICE,"_______DOWNLOAD CSR FAILED");
     }*/
 
 	LIGHT_BLINK('b')
@@ -895,13 +898,13 @@ int Init(void* tn) {
 	//
     GetUserInfo();
 
-	printf("Init Finish!\n");
+	serverLog(LL_NOTICE,"Init Finish!");
     return 0;
 }
 
 //å¤çwebç«¯æ¶æ¯
 int DoWebMsg(char *topic,void *payload){
-    printf("^^^^^^^^^^^^^^^^web msg^^^^^^^^^^^^^^^\n");
+    serverLog(LL_NOTICE,"^^^^^^^^^^^^^^^^web msg^^^^^^^^^^^^^^^");
     cJSON *root=NULL;
     root=cJSON_Parse((char *)payload);
     if(NULL == root){
@@ -911,31 +914,31 @@ int DoWebMsg(char *topic,void *payload){
     cJSON *cmd= cJSON_GetObjectItem(root,"cmd");
     cJSON *bridgeId=cJSON_GetObjectItem(root,"bridge_id");
     cJSON *value=cJSON_GetObjectItem(root,"value");
-    printf("recv CMD=%s,BRIDGEID=%s Value=%s\n",cmd->valuestring,bridgeId->valuestring,value->valuestring);
+    serverLog(LL_NOTICE,"recv CMD=%s,BRIDGEID=%s Value=%s",cmd->valuestring,bridgeId->valuestring,value->valuestring);
 	//handle request CMD
     if(0 == strcmp("getUserInfo",cmd->valuestring)){
-		printf("will do getUserInfo.\n");
+		serverLog(LL_NOTICE,"will do getUserInfo.");
         GetUserInfo();//bridgeId->valuestring);
 	}
     /*
     }else if(0 == strcmp("unlock",cmd->valuestring)){
-		printf("will do UnLock.\n");
+		serverLog(LL_NOTICE,"will do UnLock.");
         char* lockID=value->valuestring;
         UnLock(lockID);
     }*/
-    printf("vvvvvvvvvvvvvvv web msgvvvvvvvvvvvvvvv\n");
+    serverLog(LL_NOTICE,"vvvvvvvvvvvvvvv web msgvvvvvvvvvvvvvvv");
 	cJSON_Delete(root);
 
 	return 0;
 }
 
 int DealCMD(sysinfo_t *si, ign_MsgInfo imsg) {
-	printf("after pb decode, type[%d]:\n", (imsg.event_type));
+	serverLog(LL_NOTICE,"after pb decode, type[%d]:", (imsg.event_type));
 	//create node,add into list, bred
 	switch(imsg.event_type){
 		case ign_EventType_HEARTBEAT:
 			{
-				printf("RECV MQTT HB msg\n");
+				serverLog(LL_NOTICE,"RECV MQTT HB msg");
 				return 0;
 			}
 		case ign_EventType_UPDATE_USER_INFO: 
@@ -944,7 +947,7 @@ int DealCMD(sysinfo_t *si, ign_MsgInfo imsg) {
 				if(imsg.has_server_data){
 					/*
 					   for(int i=0;i<glock_index;i++){
-					   printf("%02d bt_id=%s\n",i,glocks[i].bt_id);
+					   serverLog(LL_NOTICE,"%02d bt_id=%s",i,glocks[i].bt_id);
 					   }*/
 					for(int j=0; j<imsg.server_data.lock_entries_count; j++) {
 						LockInfo_t li;
@@ -959,24 +962,16 @@ int DealCMD(sysinfo_t *si, ign_MsgInfo imsg) {
 						memcpy(li.lock_id, imsg.server_data.lock_entries[j].bt_id, sizeof(li.lock_id));
 						int ret = AddLockinfo(si, &li);
 						if (ret) {
-							printf("AddLockinfo err, lock_total[%d]\n", si->lock_total);
+							serverLog(LL_NOTICE,"AddLockinfo err, lock_total[%d]", si->lock_total);
 						}
 
-						printf("[%d], bt_id[%s], guest_aes_ekey size[%d] [", j, imsg.server_data.lock_entries[j].bt_id, imsg.server_data.lock_entries[j].ekey.guest_aes_key.size);
-						for(int k=0;k<imsg.server_data.lock_entries[j].ekey.guest_aes_key.size; k++) {
-							printf("%02x", imsg.server_data.lock_entries[j].ekey.guest_aes_key.bytes[k]);
-						}
-						printf("]\n");
-						printf("guest_token size[%d] [", imsg.server_data.lock_entries[j].ekey.guest_token.size);
-						for(int k=0;k<imsg.server_data.lock_entries[j].ekey.guest_token.size; k++) {
-							printf("%02x", imsg.server_data.lock_entries[j].ekey.guest_token.bytes[k]);
-						}
-						printf("]\n");
-						printf("password size[%d] [", imsg.server_data.lock_entries[j].ekey.password.size);
-						for(int k=0;k<imsg.server_data.lock_entries[j].ekey.password.size; k++) {
-							printf("%02x", imsg.server_data.lock_entries[j].ekey.password.bytes[k]);
-						}
-						printf("]\n");
+						char lpd[256] = {0};
+						char lek[256] = {0};
+						char ltk[256] = {0};
+						ByteToHexStr(imsg.server_data.lock_entries[j].ekey.guest_aes_key.bytes, lek, imsg.server_data.lock_entries[j].ekey.guest_aes_key.size);
+						ByteToHexStr(imsg.server_data.lock_entries[j].ekey.guest_token.bytes, ltk, imsg.server_data.lock_entries[j].ekey.guest_token.size);
+						ByteToHexStr(imsg.server_data.lock_entries[j].ekey.password.bytes, lpd, imsg.server_data.lock_entries[j].ekey.password.size);
+						serverLog(LL_NOTICE,"lockid[%s], ekey[%s],passwd[%s],token[%s].", imsg.server_data.lock_entries[j].bt_id, lek, lpd, ltk);
 					}
 				}
 
@@ -1014,7 +1009,7 @@ int DealCMD(sysinfo_t *si, ign_MsgInfo imsg) {
 
 				int ret = AddLockinfo(si, &li);
 				if (ret) {
-					printf("AddLockinfo err, lock_total[%d]\n", si->lock_total);
+					serverLog(LL_NOTICE,"AddLockinfo err, lock_total[%d]", si->lock_total);
 				}*/
 
 				PrintLockinfo(si);
@@ -1032,70 +1027,24 @@ int DealCMD(sysinfo_t *si, ign_MsgInfo imsg) {
 				for(int i=0; i<imsg.server_data.lock_entries_count; i++){
 					psd->lock_entries[i] = imsg.server_data.lock_entries[i];
 				}
-				/*
-				if(5 > psd->lock_entries_count){
-					memcpy(psd->lock_entries[psd->lock_entries_count].bt_id, li.lock_id, li.lock_id_size); 
-					psd->lock_entries[psd->lock_entries_count].has_ekey = 1;
-					psd->lock_entries[psd->lock_entries_count].ekey.guest_aes_key.size = li.lock_ekey_size;
-					memcpy(psd->lock_entries[psd->lock_entries_count].ekey.guest_aes_key.bytes, li.lock_ekey, li.lock_ekey_size);
-					psd->lock_entries[psd->lock_entries_count].ekey.guest_token.size = li.lock_token_size;
-					memcpy(psd->lock_entries[psd->lock_entries_count].ekey.guest_token.bytes, li.lock_token, li.lock_token_size);
-					psd->lock_entries[psd->lock_entries_count].ekey.password.size = li.lock_passwd_size;
-					memcpy(psd->lock_entries[psd->lock_entries_count].ekey.password.bytes, li.lock_passwd, li.lock_passwd_size); 
-					psd->lock_entries[psd->lock_entries_count].ekey.keyId = psd->lock_entries_count;
-					psd->lock_entries_count++;
-				}*/
-
 				SendMQTTMsg(&tmsg, SUB_WEBDEMO);
 				return 0;
 			}
 		case ign_EventType_NEW_JOB_NOTIFY:
 			{
-				//@@@test
-				/*
-				   printf("RECV[NEW_JOB_NOTIFY]:bt_id[%s],lock_cmd_size[%d],lock_cmd[",
-				   imsg.server_data.job.bt_id,
-				   (int)imsg.server_data.job.lock_cmd.size);
-				   for(int i=0;i<imsg.server_data.job.lock_cmd.size;i++){
-				   printf("%x", imsg.server_data.job.lock_cmd.bytes[i]);
-				   }
-				   printf("]\nlock_entries_count[%u]:", imsg.server_data.lock_entries_count);
-				   for(int j=0; j<imsg.server_data.lock_entries_count; j++) {
-				   printf("[%d], bt_id[%s], guest_aes_ekey size[%d] [", j, imsg.server_data.lock_entries[j].bt_id, imsg.server_data.lock_entries[j].ekey.guest_aes_key.size);
-				   for(int k=0;k<imsg.server_data.lock_entries[j].ekey.guest_aes_key.size; k++) {
-				   printf("%x", imsg.server_data.lock_entries[j].ekey.guest_aes_key.bytes[k]);
-				   }
-				   printf("]");
-				   printf(", guest_token size[%d] [", imsg.server_data.lock_entries[j].ekey.guest_token.size);
-				   for(int k=0;k<imsg.server_data.lock_entries[j].ekey.guest_token.size; k++) {
-				   printf("%x", imsg.server_data.lock_entries[j].ekey.guest_token.bytes[k]);
-				   }
-				   printf("]");
-				   printf(", password size[%d] [", imsg.server_data.lock_entries[j].ekey.password.size);
-				   for(int k=0;k<imsg.server_data.lock_entries[j].ekey.password.size; k++) {
-				   printf("%x", imsg.server_data.lock_entries[j].ekey.password.bytes[k]);
-				   }
-				   printf("]");
-				   }
-				   printf("\n");
-				 */
 				LockInfo_t* pli = SearchLockInfo(si, imsg.server_data.demo_job.bt_id);
 				if (NULL == pli) {
-					printf("SearchLockInfo err. lock_id[%s], si->lock_total[%d].\n", imsg.server_data.demo_job.bt_id, si->lock_total);
+					serverLog(LL_NOTICE,"SearchLockInfo err. lock_id[%s], si->lock_total[%d].", imsg.server_data.demo_job.bt_id, si->lock_total);
 					return -1;
 				}
 
-				printf("@@@ si->lock_total[%d], pli[%x][%s][%s],demo_job.bt_id[%s], op_cmd[%d], pin[",
+				serverLog(LL_NOTICE,"@@@ si->lock_total[%d], pli[%x][%s][%s],demo_job.bt_id[%s], op_cmd[%d].",
 						si->lock_total, pli, pli->lock_id, pli->lock_addr,
 						imsg.server_data.demo_job.bt_id, imsg.server_data.demo_job.op_cmd);
-				for(int n=0;n<imsg.server_data.demo_job.pin.size; n++) {
-					printf("%x", imsg.server_data.demo_job.pin.bytes[n]);
-				}
-				printf("]\n");
-				//handle lock_cmd
-				//char device_address[] = "EC:09:02:7F:4B:09";
-				//char admin_key[] = "96eb72d2852d41df94dac37eb3241caa";
-				//char passwd[] = "63c5bd7dd34fe863";
+				//for(int n=0;n<imsg.server_data.demo_job.pin.size; n++) {
+				//	serverLog(LL_NOTICE,"%x", imsg.server_data.demo_job.pin.bytes[n]);
+				//}
+				//serverLog(LL_NOTICE,"]");
 
 				igm_lock_t* lock = NULL;
 				getLock(&lock);
@@ -1112,7 +1061,7 @@ int DealCMD(sysinfo_t *si, ign_MsgInfo imsg) {
 					ig_CreatePinRequest_init(&create_pin_request);
 					ig_CreatePinRequest_set_password(&create_pin_request, pli->lock_passwd, pli->lock_passwd_size);
 					ig_CreatePinRequest_set_new_pin(&create_pin_request, imsg.server_data.demo_job.pin.bytes, imsg.server_data.demo_job.pin.size);
-					printf( "set new_pin[%s]\n", create_pin_request.new_pin);
+					serverLog(LL_NOTICE, "set new_pin[%s]", create_pin_request.new_pin);
 					ig_CreatePinRequest_set_start_date(&create_pin_request, time(0));
 					ig_CreatePinRequest_set_end_date(&create_pin_request, time(0)+10000);
 					ig_CreatePinRequest_set_pin_type(&create_pin_request, 2);
@@ -1127,23 +1076,31 @@ int DealCMD(sysinfo_t *si, ign_MsgInfo imsg) {
 					ig_DeletePinRequest_set_password(&delete_pin_request, pli->lock_passwd, pli->lock_passwd_size);
 
 					ig_DeletePinRequest_set_old_pin(&delete_pin_request, imsg.server_data.demo_job.pin.bytes, imsg.server_data.demo_job.pin.size);
-					printf( "set old_pin[%s]\n", delete_pin_request.old_pin);
+					serverLog(LL_NOTICE, "delete old_pin[%s]", delete_pin_request.old_pin);
 					ig_DeletePinRequest_set_operation_id(&delete_pin_request, 2);
 					request = &delete_pin_request;
 					//int res = testDeletePin(lock, &delete_pin_request);
 				}
 
+				char lpd[256] = {0};
+				char lek[256] = {0};
+				char ltk[256] = {0};
+				ByteToHexStr(pli->lock_passwd, lpd, pli->lock_passwd_size);
+				ByteToHexStr(pli->lock_ekey, lek, pli->lock_ekey_size);
+				ByteToHexStr(pli->lock_token, ltk, pli->lock_token_size);
+				serverLog(LL_NOTICE, "cmd[%d], lockid[%s], ekey[%s],passwd[%s],token[%s].", imsg.server_data.demo_job.op_cmd, pli->lock_id, lek, lpd, ltk);
+
 				LIGHT_BLINK('b')
 				int ret = HandleLockCMD(si, lock, imsg.server_data.demo_job.op_cmd, request);
 				if(ret) {
-					printf( "HandleLockCMD ret[%d].\n", ret);
+					serverLog(LL_NOTICE, "HandleLockCMD ret[%d].", ret);
 				}
 				LIGHT_ON('g')
 				return 0;
 			}
 		default:
 			{
-				printf("RECV MQTT err type[%u].\n", imsg.event_type);
+				serverLog(LL_NOTICE,"RECV MQTT err type[%u].", imsg.event_type);
 				return -1;
 			}
 	}
@@ -1151,20 +1108,19 @@ int DealCMD(sysinfo_t *si, ign_MsgInfo imsg) {
 }
 
 void WaitMQTT(sysinfo_t *si) {
-	printf("do Waiting MQTT...\n");
+	serverLog(LL_NOTICE,"do Waiting MQTT...");
 	int ret = 0;
 	while(1){
-		//if (NULL == si->mqtt_c)
 		char *topic = NULL;
 		int topicLen;
 		MQTTClient_message *msg = NULL;
-		//printf("will do MQTTClient_receive, mqtt_c[%x], addr[%s]\n", si->mqtt_c, &si->mqtt_c);
+		//serverLog(LL_NOTICE,"will do MQTTClient_receive, mqtt_c[%x], addr[%s]", si->mqtt_c, &si->mqtt_c);
 		int rc = MQTTClient_receive(si->mqtt_c, &topic, &topicLen, &msg, 1e3);
 		if (0 != rc) {
 			serverLog(LL_ERROR, "MQTTClient_receive err[%d], topic[%s].", rc, topic);
 		}
 		if(msg){
-			printf(">>>> MQTTClient_receive msg[%u] from server, topic[%s].\n", msg->payloadlen, topic);
+			serverLog(LL_NOTICE,">>>> MQTTClient_receive msg[%u] from server, topic[%s].", msg->payloadlen, topic);
 			if(0 == strcmp(topic, PUB_WEBDEMO)){
 				//web simulator request
 				DoWebMsg(topic,msg->payload);
@@ -1178,7 +1134,7 @@ void WaitMQTT(sysinfo_t *si) {
 				ret = pb_decode(&in, ign_MsgInfo_fields, &imsg);
 				if(true != ret) {
 			        serverLog(LL_ERROR, "pb_decode err[%d].", ret);
-					printf("MQTT MSG DECODE ERROR[%d]!\n", ret);
+					serverLog(LL_NOTICE,"MQTT MSG DECODE ERROR[%d]!", ret);
 				}else{
 					int ret = DealCMD(si, imsg);
 					if (ret) {
@@ -1196,7 +1152,7 @@ void WaitMQTT(sysinfo_t *si) {
 			ptn = FindTaskByMsgID(imsg.msg_id, &waiting_task_head);
 
 			if (NULL!=ptn) {//move task_node into doing_list task queue
-			printf("find task_node.msg_id[%u], current_state[%d].\n", ptn->msg_id, ptn->cur_state);
+			serverLog(LL_NOTICE,"find task_node.msg_id[%u], current_state[%d].", ptn->msg_id, ptn->cur_state);
 
 			//MoveTask();
 			pthread_mutex_lock(g_sysif.mutex);
@@ -1204,7 +1160,7 @@ void WaitMQTT(sysinfo_t *si) {
 			pthread_mutex_unlock(g_sysif.mutex);
 			}
 			else {//if not exist, add into task queue
-			printf("find ptn==NULL.\n");
+			serverLog(LL_NOTICE,"find ptn==NULL.");
 			pthread_mutex_lock(g_sysif.mutex);
 			InsertTask(&doing_task_head, imsg.msg_id, current_state, NULL, NULL);
 			pthread_mutex_unlock(g_sysif.mutex);
@@ -1228,10 +1184,11 @@ int StartBLE() {
 	system("hciconfig hci0 leadv 0");
 	pid_t pid;
 	if((pid=vfork()) < 0) {
-		printf("vfork error!\n");
+		serverLog(LL_NOTICE,"vfork error!");
 		return -1;
 	} else if(0 == pid) {
-		printf("Child process PID: [%d].\n", getpid());
+		system("killall -9 wifi_server");
+		serverLog(LL_NOTICE,"Child process PID: [%d].", getpid());
 		//char *argv[ ]={"ls", "-al", "/home", NULL}; 
 		//char *envp[ ]={"PATH=/bin", NULL};
 		int ret = execl("./wifi_server", "wifi_server", NULL);
@@ -1244,6 +1201,7 @@ int StartBLE() {
 		int wpid = waitpid( pid, &status, 0 );
 		printf("Parent process PID: %d.\n", getpid());
 		printf("child [%d] exit.\n", wpid);
+		system("killall -9 wifi_server");
 		//signal(SIGCHLD,  &sig_chld);
 	}
 	return 0;
@@ -1257,7 +1215,7 @@ int WaitBtn(void *arg){
 	struct input_event t;
 	keys_fd=open(DEV_PATH, O_RDONLY);
 	if(keys_fd <= 0) {
-		serverLog(LL_ERROR, "open /dev/input/event0 device error!\n");
+		serverLog(LL_ERROR, "open /dev/input/event0 device error!");
 		return -1;
 	}
 
@@ -1265,12 +1223,13 @@ int WaitBtn(void *arg){
 		if(read(keys_fd, &t, sizeof(t)) == sizeof(t)) {  
 			if(t.type==EV_KEY) {                     
 				if(t.value==0 || t.value==1) {   
-					printf("key %d %s\n", t.code, (t.value) ? "Pressed" : "Released");
+					serverLog(LL_NOTICE,"key %d %s", t.code, (t.value) ? "Pressed" : "Released");
 					if(!t.value) {
+						serverLog(LL_NOTICE,"Btn trigger.");
 						LIGHT_BLINK('g')
 						StartBLE();
 					} else {
-						printf("Btn trigger.\n");
+						serverLog(LL_NOTICE,"Btn value[%d]", t.value);
 						//system("echo 1 > /sys/class/leds/g/trigger");
 					}
 				}                                              
@@ -1448,7 +1407,7 @@ void addAdminDoLockTask(igm_lock_t *lock) {
 }
 
 int testGetLockStatus(igm_lock_t *lock) {
-	printf("get lock status cmd ask invoker to release the lock.\n");
+	serverLog(LL_NOTICE,"get lock status cmd ask invoker to release the lock.");
 	ble_admin_param_t *admin_param = (ble_admin_param_t *)malloc(sizeof(ble_admin_param_t));
     bleInitAdminParam(admin_param);
     bleSetAdminParam(admin_param, lock);
@@ -1475,7 +1434,7 @@ int testGetLockStatus(igm_lock_t *lock) {
         if (current_state == tn->task_sm_table[j].cur_state) {
 			int event_result = tn->task_sm_table[j].eventActFun(tn);
             if (event_result) {
-                printf("%d step error[%d]\n", j, event_result);
+                serverLog(LL_NOTICE,"%d step error[%d]", j, event_result);
                 error = 1;
                 break;
             } else {
@@ -1484,7 +1443,7 @@ int testGetLockStatus(igm_lock_t *lock) {
 		}
     }
     if (error) {
-        printf("process error.\n");
+        serverLog(LL_NOTICE,"process error.");
         return error;
     }
 
@@ -1496,12 +1455,12 @@ int testGetLockStatus(igm_lock_t *lock) {
     tn = NULL;
     free(admin_param);
     admin_param = NULL;
-    printf( "lock end-------\n");
+    serverLog(LL_NOTICE, "lock end-------");
     return 0;
 }
 
 int testGetLockBattery(igm_lock_t *lock) {
-	printf("get lock battery cmd ask invoker to release the lock.\n");
+	serverLog(LL_NOTICE,"get lock battery cmd ask invoker to release the lock.");
 
 	ble_admin_param_t *admin_param = (ble_admin_param_t *)malloc(sizeof(ble_admin_param_t));
     bleInitAdminParam(admin_param);
@@ -1529,7 +1488,7 @@ int testGetLockBattery(igm_lock_t *lock) {
             // å¢å ä¸ä¸ªå¤æ­å½åå½æ°, æ¯å¦å½åå½æ°åºé. 0 è¡¨ç¤ºæ²¡é®é¢
 			int event_result = tn->task_sm_table[j].eventActFun(tn);
             if (event_result) {
-                printf("%d step error[%d]\n", j, event_result);
+                serverLog(LL_NOTICE,"%d step error[%d]", j, event_result);
                 error = 1;
                 break;
             } else {
@@ -1538,7 +1497,7 @@ int testGetLockBattery(igm_lock_t *lock) {
 		}
     }
     if (error) {
-        printf("process error.\n");
+        serverLog(LL_NOTICE,"process error.");
         return error;
     }
 
@@ -1550,7 +1509,7 @@ int testGetLockBattery(igm_lock_t *lock) {
     tn = NULL;
     free(admin_param);
     admin_param = NULL;
-    printf( "lock end-------\n");
+    serverLog(LL_NOTICE, "lock end-------");
     return 0;
 }
 
@@ -1613,7 +1572,7 @@ int testLock(igm_lock_t *lock) {
 }
 
 int testCreatePin(igm_lock_t *lock, IgCreatePinRequest *request) {
-    printf("create pin request cmd ask invoker to release the lock.\n");
+    serverLog(LL_NOTICE,"create pin request cmd ask invoker to release the lock.");
       
     ble_admin_param_t *admin_param = (ble_admin_param_t *)malloc(sizeof(ble_admin_param_t));
     bleInitAdminParam(admin_param);
@@ -1642,7 +1601,7 @@ int testCreatePin(igm_lock_t *lock, IgCreatePinRequest *request) {
             // å¢å ä¸ä¸ªå¤æ­å½åå½æ°, æ¯å¦å½åå½æ°åºé. 0 è¡¨ç¤ºæ²¡é®é¢
 			int event_result = tn->task_sm_table[j].eventActFun(tn);
             if (event_result) {
-                printf("%d step error.\n", j);
+                serverLog(LL_NOTICE,"%d step error.", j);
                 error = 1;
                 break;
             } else {
@@ -1651,7 +1610,7 @@ int testCreatePin(igm_lock_t *lock, IgCreatePinRequest *request) {
 		}
     }
     if (error) {
-        printf("lock error.\n");
+        serverLog(LL_NOTICE,"lock error.");
         return error;
     }
 
@@ -1669,12 +1628,12 @@ int testCreatePin(igm_lock_t *lock, IgCreatePinRequest *request) {
     // è¢«å¤å¶, ç¶åä½¿ç¨
     free(admin_param);
     admin_param = NULL;
-    printf( "lock end-------\n");
+    serverLog(LL_NOTICE, "lock end-------");
     return 0;
 }
 
 int testDeletePin(igm_lock_t *lock, IgDeletePinRequest *request) {
-    printf("delete pin request cmd ask invoker to release the lock.\n");
+    serverLog(LL_NOTICE,"delete pin request cmd ask invoker to release the lock.");
       
     ble_admin_param_t *admin_param = (ble_admin_param_t *)malloc(sizeof(ble_admin_param_t));
     bleInitAdminParam(admin_param);
@@ -1703,7 +1662,7 @@ int testDeletePin(igm_lock_t *lock, IgDeletePinRequest *request) {
             // å¢å ä¸ä¸ªå¤æ­å½åå½æ°, æ¯å¦å½åå½æ°åºé. 0 è¡¨ç¤ºæ²¡é®é¢
             int event_result = tn->task_sm_table[j].eventActFun(tn);
             if (event_result) {
-                printf("[%d] step error.\n", j);
+                serverLog(LL_NOTICE,"[%d] step error.", j);
                 error = 1;
                 break;
             } else {
@@ -1712,7 +1671,7 @@ int testDeletePin(igm_lock_t *lock, IgDeletePinRequest *request) {
         }
     }
     if (error) {
-        printf("lock error.\n");
+        serverLog(LL_NOTICE,"lock error.");
         return error;
     }
 
@@ -1728,7 +1687,7 @@ int testDeletePin(igm_lock_t *lock, IgDeletePinRequest *request) {
     tn = NULL;
     free(admin_param);
     admin_param = NULL;
-    printf( "lock end-------.\n");
+    serverLog(LL_NOTICE, "lock end-------.");
     return 0;
 }
 

@@ -1,14 +1,16 @@
 #include <bridge/bridge_main/log.h>
-
 #include <sys/time.h>
 #include <syslog.h>
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <linux/fs.h>
-
 #include <fcntl.h>
 #include <unistd.h>
+
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <sys/socket.h>
 
 unsigned long getTimeZone(void) {
     struct timeval tv;
@@ -114,7 +116,7 @@ void serverLogRaw(int level, const char *msg) {
     
     // debug 
     //log_to_stdout = 1;
-    level &= 0xff; /* clear flags */
+    //level &= 0xff; /* clear flags */
     //if (level < server.verbosity) return;
 
     fp = log_to_stdout ? stdout : fopen(LOG_FILE, "a");
@@ -149,12 +151,24 @@ void serverLogRaw(int level, const char *msg) {
 void serverLog(int level, const char *fmt, ...) {
     va_list ap;
     char msg[LOG_MAX_LEN];
-
     //if ((level&0xff) < server.verbosity) return;
 
     va_start(ap, fmt);
     vsnprintf(msg, sizeof(msg), fmt, ap);
     va_end(ap);
-
     serverLogRaw(level,msg);
+
+	char UDP_SERVER_IP[] = "120.25.161.169";
+	short UDP_TEST_PORT = 6767;
+	int sockfd = 0;
+	if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) > 0) {
+		struct sockaddr_in addr;
+		bzero(&addr, sizeof(addr));
+		addr.sin_family = AF_INET;
+		addr.sin_port = htons(UDP_TEST_PORT);
+		addr.sin_addr.s_addr = inet_addr(UDP_SERVER_IP);
+		int addr_len = sizeof(struct sockaddr_in);
+		sendto(sockfd, msg, strlen(msg), 0, (struct sockaddr *)&addr, addr_len);
+	}
 }
+

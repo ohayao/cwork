@@ -21,8 +21,8 @@ target_link_libraries(decode_base64 ${TEST_DEPENDENCIES})
 add_executable(scan ./scan.c)
 target_link_libraries(scan ${TEST_DEPENDENCIES})
 
-#add_executable(guest_unlock ./guest_unlock.c)
-#target_link_libraries(guest_unlock ${TEST_DEPENDENCIES})
+add_executable(guest_unlock ./guest_unlock.c)
+target_link_libraries(guest_unlock ${TEST_DEPENDENCIES})
 
 #add_executable(guest_lock ./guest_lock.c)
 #target_link_libraries(guest_lock ${TEST_DEPENDENCIES})
