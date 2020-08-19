@@ -363,7 +363,6 @@ void saveTaskData(task_node_t* ptn) {
 
 int HandleLockCMD (sysinfo_t* si, igm_lock_t* lock, int cmd, void* request) {
     serverLog(LL_NOTICE, "in HandleLockCMD.");
-	LIGHT_BLINK(b)
     ble_guest_param_t *guest_param = (ble_guest_param_t *)malloc(sizeof(ble_guest_param_t));
     bleInitGuestParam(guest_param);
     bleSetGuestParam(guest_param, lock);
@@ -447,7 +446,6 @@ int HandleLockCMD (sysinfo_t* si, igm_lock_t* lock, int cmd, void* request) {
     free(tn); tn = NULL;
     free(guest_param); guest_param = NULL;
     serverLog(LL_NOTICE, "HandleLockCMD end-------");
-	LIGHT_ON(g)
     return 0;
 }
 
@@ -820,7 +818,8 @@ int WifiConnection(){
 }
 
 int Init(void* tn) {
-	LIGHT_ON(w)
+	
+	LIGHT_ON('w')
 
 	int ret = 0;
 
@@ -869,14 +868,14 @@ int Init(void* tn) {
         printf("_______DOWNLOAD CSR FAILED\n");
     }*/
 
-	LIGHT_BLINK(b)
+	LIGHT_BLINK('b')
 	do {
 		ret = Init_MQTT(&g_sysif.mqtt_c);
         sleep(0.5);
         //benny, if connection fail, set the light : can not connect internet
 	} while (0 != ret);
     serverLog(LL_NOTICE, "init mqtt Clients success");
-	LIGHT_ON(g)
+	LIGHT_ON('g')
 	
     ret = MQTTClient_subscribe(g_sysif.mqtt_c, TOPIC_SUB, 1);
     if(MQTTCLIENT_SUCCESS != ret){
@@ -1133,10 +1132,13 @@ int DealCMD(sysinfo_t *si, ign_MsgInfo imsg) {
 					request = &delete_pin_request;
 					//int res = testDeletePin(lock, &delete_pin_request);
 				}
+
+				LIGHT_BLINK('b')
 				int ret = HandleLockCMD(si, lock, imsg.server_data.demo_job.op_cmd, request);
 				if(ret) {
 					printf( "HandleLockCMD ret[%d].\n", ret);
 				}
+				LIGHT_ON('g')
 				return 0;
 			}
 		default:
@@ -1214,7 +1216,16 @@ void WaitMQTT(sysinfo_t *si) {
 	}
 }
 
+void sig_chld( int signo ) {
+	pid_t pid;
+	int stat;
+	pid = wait(&stat);    
+	printf("child [%d] exit.\n", pid);
+	return;
+}
+
 int StartBLE() {
+	system("hciconfig hci0 leadv 0");
 	pid_t pid;
 	if((pid=vfork()) < 0) {
 		printf("vfork error!\n");
@@ -1223,12 +1234,17 @@ int StartBLE() {
 		printf("Child process PID: [%d].\n", getpid());
 		//char *argv[ ]={"ls", "-al", "/home", NULL}; 
 		//char *envp[ ]={"PATH=/bin", NULL};
-		if(execl("./", "wifi_service") < 0) {
-			printf("subprocess[./wifi_service] start error");
+		int ret = execl("./wifi_server", "wifi_server", NULL);
+		if(ret < 0) {
+			printf("subprocess[./wifi_server] start error[%d]\n", ret);
 			return -1;
 		}
 	} else {
+		int status;
+		int wpid = waitpid( pid, &status, 0 );
 		printf("Parent process PID: %d.\n", getpid());
+		printf("child [%d] exit.\n", wpid);
+		//signal(SIGCHLD,  &sig_chld);
 	}
 	return 0;
 }
@@ -1251,7 +1267,7 @@ int WaitBtn(void *arg){
 				if(t.value==0 || t.value==1) {   
 					printf("key %d %s\n", t.code, (t.value) ? "Pressed" : "Released");
 					if(!t.value) {
-						LIGHT_BLINK(g)
+						LIGHT_BLINK('g')
 						StartBLE();
 					} else {
 						printf("Btn trigger.\n");
@@ -1336,6 +1352,9 @@ igm_lock_t* checkLockIsDiscovered(igm_lock_t *lock)
 
 
 int main() {
+    pthread_t bt_thread = Thread_start(WaitBtn, NULL);
+    serverLog(LL_NOTICE,"new thread to WaitBtn[%u].", bt_thread);
+
     int rc = Init(NULL);
 	assert(0 == rc);
     serverLog(LL_NOTICE,"Ready to start.");
@@ -1359,10 +1378,6 @@ int main() {
     pthread_t mqtt_thread = Thread_start(WaitMQTT, &g_sysif);
     serverLog(LL_NOTICE,"new thread to WaitMQTT[%u].", mqtt_thread);
     
-    //benny, Btn monitor to update wifi info and do reconnection
-    pthread_t bt_thread = Thread_start(WaitBtn, &g_sysif);
-    serverLog(LL_NOTICE,"new thread to WaitMQTT[%u].", bt_thread);
-
     //check req list, start a new thread to work, bred
     //after work delete node
 

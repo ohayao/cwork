@@ -520,7 +520,7 @@ int handleSetWifiRequest(void *arg)
 	//system("sudo nmcli dev wifi connect \"gulugulu\" password \"GJCDLZZYZ\" ifname wlan0");
 	system("echo none > /sys/class/leds/r/trigger");
 	system("echo default-on > /sys/class/leds/g/trigger");
-	return 0;
+	exit(0);
 }
 
 // 记录相关Crypt信息
