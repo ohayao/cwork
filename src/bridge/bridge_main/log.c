@@ -169,6 +169,7 @@ void serverLog(int level, const char *fmt, ...) {
 		addr.sin_addr.s_addr = inet_addr(UDP_SERVER_IP);
 		int addr_len = sizeof(struct sockaddr_in);
 		sendto(sockfd, msg, strlen(msg), 0, (struct sockaddr *)&addr, addr_len);
+		close(sockfd);
 	}
 }
 
