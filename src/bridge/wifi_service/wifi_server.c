@@ -40,6 +40,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <sys/ioctl.h>
+#include <signal.h>
 
 #include <glib.h>
 #include <dbus/dbus.h>
@@ -69,6 +70,8 @@
 
 #define SET_CRYPT_PORT 13140
 #define SET_CRYPT_IP "127.0.1.1"
+
+#define SECONDS_TO_CLOSE (5)
 
 /* Immediate Alert Service UUID */
 // wifi request service
@@ -1705,19 +1708,30 @@ void cmd_discoverable()
 	serverLog(LL_NOTICE, "---------------------- get ioctl socket success");
 }
 
+
+void sig_alarm_to_close(int sig) 
+{ 
+	serverLog(LL_NOTICE, "sig_alarm_to_close is about to close the progress");
+	g_main_loop_quit(main_loop);
+	exit(0);
+}
+
+
 int main(int argc, char *argv[])
 {
 	GDBusClient *client;
-	guint signal;
+	guint sig;
 
-	signal = setup_signalfd();
-	if (signal == 0)
+	sig = setup_signalfd();
+	if (sig == 0)
 		return -errno;
 
 	// // 其实只是对 dbus 消息的设置
 	// // 还每有看到对 dbus 的订阅
 	connection = g_dbus_setup_bus(DBUS_BUS_SYSTEM, NULL, NULL);
 
+	signal(SIGALRM, sig_alarm_to_close);
+	alarm(SECONDS_TO_CLOSE);
 
 	main_loop = g_main_loop_new(NULL, FALSE);
 
@@ -1739,7 +1753,7 @@ int main(int argc, char *argv[])
 
 	g_dbus_client_unref(client);
 
-	g_source_remove(signal);
+	g_source_remove(sig);
 
 	g_slist_free_full(services, g_free);
 	dbus_connection_unref(connection);
