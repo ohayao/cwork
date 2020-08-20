@@ -115,11 +115,11 @@ void serverLogRaw(int level, const char *msg) {
     int log_to_stdout = LOG_FILE =='\0';
     
     // debug 
-    //log_to_stdout = 1;
+    log_to_stdout = 1;
     //level &= 0xff; /* clear flags */
     //if (level < server.verbosity) return;
 
-    fp = log_to_stdout ? stdout : fopen(LOG_FILE, "a");
+    fp = log_to_stdout ? stdout : fopen(LOG_FILE, "w");
     if (!fp) return;
 
     if (rawmode) {

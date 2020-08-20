@@ -443,20 +443,19 @@ int handleSetWifiRequest(void *arg)
 	system("echo none > /sys/class/leds/b/trigger");
 	system("echo timer > /sys/class/leds/g/trigger");
 	SetWIFIInfoRequest request;
-	int decode_res = decodeWifiInfoRequest(
-		decrypted_data, decrypted_bytes_written, &request, 0);
-	if (decode_res)
-	{
+	int decode_res = decodeWifiInfoRequest(decrypted_data, decrypted_bytes_written, &request, 0);
+	if (decode_res) {
 		serverLog(LL_ERROR, "decodeWifiInfoRequest error");
 		return 1;
 	}
-	serverLog(LL_NOTICE, "decodeWifiInfoRequest success");
+	serverLog(LL_NOTICE, "decodeWifiInfoRequest success, ssid[%s]_l[%d], passwd[%s]_l[%d],token_len[%d][%s].",
+			request.ssid,request.ssid_len, request.password,request.password_len, request.token_len, request.token);
 
 	char ssid[256] = {0};
 	char passwd[256] = {0};
 	if (request.has_ssid) {
-		snprintf(ssid, request.ssid_len, "%s", request.ssid);
-		printf("request ssid:[%s].\n", ssid);
+		snprintf(ssid, request.ssid_len+1, "%s", request.ssid);
+		serverLog(LL_NOTICE, "request ssid:[%s].\n", ssid);
 		/*
 		for (int i = 0; i < request.ssid_len; ++i) {
 			printf("%c", request.ssid[i]);
@@ -466,8 +465,8 @@ int handleSetWifiRequest(void *arg)
 	}
 
 	if (request.has_password) {
-		snprintf(passwd, request.password_len, "%s", request.password);
-		printf("request password:[%s].\n", passwd);
+		snprintf(passwd, request.password_len+1, "%s", request.password);
+		serverLog(LL_NOTICE, "request password:[%s].\n", passwd);
 		/*
 		for (int i = 0; i < request.password_len; ++i) {
 			printf("%c", request.password[i]);
@@ -486,14 +485,8 @@ int handleSetWifiRequest(void *arg)
 	// 	printf("\n");
 	// }
 
-	if (request.has_token)
-	{
-		serverLog(LL_NOTICE, "request token:");
-		for (int i = 0; i < request.token_len; ++i)
-		{
-			printf("%c", request.token[i]);
-		}
-		printf("\n");
+	if (request.has_token) {
+		//serverLog(LL_NOTICE, "request token[%s]", request.token);
 	}
 	
 	// if (request.has_mqtt_jwt_token)
@@ -514,7 +507,7 @@ int handleSetWifiRequest(void *arg)
 	// }
 	
 	char nm_str[1024] = {0};
-	snprintf(nm_str, 1024, "sudo nmcli dev wifi connect \"%s\" password \"%s\" ifname wlan0", ssid, passwd);
+	snprintf(nm_str, 1024, "nmcli dev wifi connect \"%s\" password \"%s\" ifname wlan0", ssid, passwd);
 	printf("will do[%s].\n", nm_str);
 	system(nm_str);
 	//system("sudo nmcli dev wifi connect \"gulugulu\" password \"GJCDLZZYZ\" ifname wlan0");

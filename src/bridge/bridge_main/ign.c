@@ -182,6 +182,7 @@ int SendMQTTMsg(ign_MsgInfo* msg, char* topic) {
             serverLog(LL_ERROR, "MQTT_sendMessage err[%d], do reconnection.", ret);
             do {
                 ret = Init_MQTT(&g_sysif.mqtt_c);
+				sleep(1);
             } while (NULL == g_sysif.mqtt_c); //0 != ret);
 
 			ret = MQTTClient_subscribe(g_sysif.mqtt_c, TOPIC_SUB, 1);
@@ -853,7 +854,7 @@ int Init(void* tn) {
 
     do{
         ret = WifiConnection();
-        sleep(0.5);
+        sleep(1);
         //benny, if connection fail, set the light : can not connect wifi
     } while(0 != ret);
     serverLog(LL_NOTICE, "init Wifi connection success");
@@ -874,8 +875,7 @@ int Init(void* tn) {
 	LIGHT_BLINK('b')
 	do {
 		ret = Init_MQTT(&g_sysif.mqtt_c);
-        sleep(0.5);
-        //benny, if connection fail, set the light : can not connect internet
+        sleep(1);
 	} while (0 != ret);
     serverLog(LL_NOTICE, "init mqtt Clients success");
 	LIGHT_ON('g')

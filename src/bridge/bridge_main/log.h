@@ -5,7 +5,7 @@
 #include <stdarg.h>
 #include <string.h>
 
-#define LOG_MAX_LEN    1024 /* Default maximum length of syslog messages.*/
+#define LOG_MAX_LEN    2048 /* Default maximum length of syslog messages.*/
 #define LL_DEBUG 0
 #define LL_VERBOSE 1
 #define LL_NOTICE 2
