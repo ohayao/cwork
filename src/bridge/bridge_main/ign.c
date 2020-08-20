@@ -180,10 +180,12 @@ int SendMQTTMsg(ign_MsgInfo* msg, char* topic) {
         size_t len=out.bytes_written;
         if(MQTTCLIENT_SUCCESS != (ret = MQTT_sendMessage(g_sysif.mqtt_c, topic, 1, buf, (int)len))){
             serverLog(LL_ERROR, "MQTT_sendMessage err[%d], do reconnection.", ret);
+			LIGHT_BLINK('r')
             do {
                 ret = Init_MQTT(&g_sysif.mqtt_c);
 				sleep(1);
             } while (NULL == g_sysif.mqtt_c); //0 != ret);
+			LIGHT_ON('g')
 
 			ret = MQTTClient_subscribe(g_sysif.mqtt_c, TOPIC_SUB, 1);
 			if(MQTTCLIENT_SUCCESS != ret){
