@@ -71,7 +71,7 @@
 #define SET_CRYPT_PORT 13140
 #define SET_CRYPT_IP "127.0.1.1"
 
-#define SECONDS_TO_CLOSE (5)
+#define SECONDS_TO_CLOSE (60)
 
 /* Immediate Alert Service UUID */
 // wifi request service
@@ -515,6 +515,8 @@ int handleSetWifiRequest(void *arg)
 	system(nm_str);
 	//system("sudo nmcli dev wifi connect \"gulugulu\" password \"GJCDLZZYZ\" ifname wlan0");
 	system("echo none > /sys/class/leds/r/trigger");
+	system("echo none > /sys/class/leds/g/trigger");
+	system("echo none > /sys/class/leds/b/trigger");
 	system("echo default-on > /sys/class/leds/g/trigger");
 	exit(0);
 }
@@ -1709,8 +1711,11 @@ void cmd_discoverable()
 }
 
 
-void sig_alarm_to_close(int sig) 
-{ 
+void sig_alarm_to_close(int sig) { 
+	system("echo none > /sys/class/leds/r/trigger");
+	system("echo none > /sys/class/leds/b/trigger");
+	system("echo none > /sys/class/leds/g/trigger");
+	system("echo default-on > /sys/class/leds/g/trigger");
 	serverLog(LL_NOTICE, "sig_alarm_to_close is about to close the progress");
 	g_main_loop_quit(main_loop);
 	exit(0);
